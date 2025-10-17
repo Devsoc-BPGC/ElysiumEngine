@@ -1,10 +1,10 @@
 #include "physics/Force.hpp"
 
-// Constructor implementation
+// Constructor
 Force::Force(double x, double y) : x(x), y(y) {
 }
 
-// Getter implementations
+// Getters
 double Force::getX() const {
     return x;
 }

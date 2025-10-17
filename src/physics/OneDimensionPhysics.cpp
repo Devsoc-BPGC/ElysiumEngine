@@ -4,13 +4,13 @@
 // Define the constant
 const double DELTA_T = 0.01;
 
-// Constructor implementation
+// Constructor
 OneDimensionalParticle::OneDimensionalParticle(double pos, double mass) 
     : pos(pos), prevPos(pos), mass(mass) {
     assert(mass != 0);
 }
 
-// Getter implementations
+// Getters
 double OneDimensionalParticle::getPosition() const {
     return pos;
 }
@@ -19,7 +19,7 @@ double OneDimensionalParticle::getMass() const {
     return mass;
 }
 
-// Setter implementation
+// Setters
 void OneDimensionalParticle::setPosition(double p) {
     pos = p;
     prevPos = p;

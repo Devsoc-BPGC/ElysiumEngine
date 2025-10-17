@@ -14,7 +14,7 @@ public:
     // Constructor
     TwoDimensionalParticle(double x_pos, double y_pos, double mass);
     
-    // Destructor (default is fine with stack allocation)
+    // Destructor
     ~TwoDimensionalParticle() = default;
 
     // Update with force
