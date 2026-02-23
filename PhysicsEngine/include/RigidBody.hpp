@@ -1,43 +1,51 @@
+#ifndef RIGIDBODY_HPP
+#define RIGIDBODY_HPP
 
+#include <vector>
+#include "CoreMath.hpp"
+#include "Collider.hpp"
+
+typedef std::vector<Collider> ColliderList;
 
 struct RigidBody {
-  float mass;
-  float inverseMass;
-  Mat3 localInverseInertiaTensor;
-  Mat3 globalInverseInertiaTensor;
-
-  Vec3 globalCentroid;
-  Vec3 localCentroid;
+    float mass;
+    float inverseMass;
 
 
-  Vec3 position;
-  Vec3 orientation;
-  Vec3 linearVelocity;
-  Vec3 angularVelocity;
+    Mat3 orientation;
+    Mat3 inverseOrientation;
 
-  Vec3 forceAccumulator;
-  Vec3 torqueAccumulator;
+    Mat3 localInverseInertiaTensor;
+    Mat3 inverseInertiaTensorWorld;
 
-  ColliderList colliders;
+    Vec3 globalCentroid;
+    Vec3 localCentroid;
 
-  void UpdateGlobalCentroidFromPosition(void);
-  void UpdatePositionFromGlobalCentroid(void);
+    Vec3 position;
+    Vec3 linearVelocity;
+    Vec3 angularVelocity;
 
-  void UpdateOrientation(void);
-  
-  void AddCollider(Collider &collider);
+    Vec3 forceAccumulator;
+    Vec3 torqueAccumulator;
 
-  const Vec3 LocalToGlobal(const Vec3 &p) const;
-  const Vec3 GlobalToLocal(const Vec3 &p) const;
-  const Vec3 LocalToGlobalVec(const Vec3 &v) const;
-  const Vec3 GlobalToLocalVec(const Vec3 &v) const;
+    ColliderList colliders;
 
-  void ApplyForce(const Vec3 &f, const Vec3 &at);
-}
+    // Helpers to keep position and centroid in sync
+    void UpdateGlobalCentroidFromPosition(void);
+    void UpdatePositionFromGlobalCentroid(void);
+    void UpdateOrientation(void);
 
-struct Collider
-{
-  float m_mass;
-  Mat3 m_localInertiaTensor;
-  Vec3 m_localCentroid;
+    // Matches your RigidBody.cpp implementation
+    void AddColliders(Collider &collider);
+    void Integrate(float dt);
+
+    // Coordinate Transformations
+    const Vec3 LocalToGlobal(const Vec3 &p) const;
+    const Vec3 GlobalToLocal(const Vec3 &p) const;
+    const Vec3 LocalToGlobalVec(const Vec3 &v) const;
+    const Vec3 GlobalToLocalVec(const Vec3 &v) const;
+
+    void ApplyForce(const Vec3 &f, const Vec3 &at);
 };
+
+#endif

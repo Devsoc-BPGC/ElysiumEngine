@@ -10,7 +10,7 @@ void RigidBody::UpdatePositionFromGlobalCentroid(void) {
 }
 
 void RigidBody::AddColliders(Collider &collider) {
-  colliders.Add(collider);
+  colliders.push_back(collider);
 
   localCentroid.Zero();
   mass = 0.0f;
@@ -20,8 +20,8 @@ void RigidBody::AddColliders(Collider &collider) {
     localCentroid += collider.mass * collider.localCentroid;
   }
 
-  massData.inverseMass = 1.0f / mass;
-  localCentroid *= massData.inverseMass;
+  inverseMass = 1.0f / mass;
+  localCentroid *= inverseMass;
 
   Mat3 localInertiaTensor;
   localInertiaTensor.Zero();
@@ -31,7 +31,7 @@ void RigidBody::AddColliders(Collider &collider) {
     const float rDotR = r.Dot(r);
     const Mat3 rOutR = r.outerProduct(r);
 
-    local InertiaTensor += collider.localInertiaTensor + collider.mass * (rDotR * Mat3::Identity() - rOutR);
+    localInertiaTensor += collider.localInertiaTensor + collider.mass * (rDotR * Mat3::Identity() - rOutR);
   }
 
   localInverseInertiaTensor = localInertiaTensor.Inverted();
@@ -41,30 +41,30 @@ const Vec3 RigidBody::LocalToGlobal(const Vec3 &p) const
 {
   return orientation * p + position;
 }
- 
+
 const Vec3 RigidBody::GlobalToLocal(const Vec3 &p) const
 {
   return inverseOrientation * (p - position);
 }
- 
+
 const Vec3 RigidBody::LocalToGlobalVec(const Vec3 &v) const
 {
   return orientation * v;
 }
- 
+
 const Vec3 RigidBody::GlobalToLocalVec(const Vec3 &v) const
 {
   return inverseOrientation * v;
 }
 
-void RigidBody3D::ApplyForce(const Vec3 &f, const Vec3 &at) {
+void RigidBody::ApplyForce(const Vec3 &f, const Vec3 &at) {
   forceAccumulator += f;
   torqueAccumulator += (at - globalCentroid).Cross(f);
 }
 
-void RigidBody3D::UpdateOrientation(void) {
+void RigidBody::UpdateOrientation(void) {
   Quat q = orientation.ToQuat();
-  q.normalize();
+  q.Normalize();
   orientation = q.ToMatrix();
 
   inverseOrientation = orientation.Transposed();
@@ -83,13 +83,13 @@ void RigidBody::Integrate(float dt) {
 
     globalCentroid += linearVelocity * dt;
 
-    
+
     if (angularVelocity.MagnitudeSquared() > EPSILON) {
         Vec3 axis = angularVelocity.Normalized();
         float angle = angularVelocity.Magnitude() * dt;
         orientation = Mat3::RotationMatrix(axis, angle) * orientation;
     }
-  
+
     UpdateOrientation();
     UpdatePositionFromGlobalCentroid();
 }
