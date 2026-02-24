@@ -1,5 +1,5 @@
-#include "../include/RigidBody.hpp"
-#include "../include/CoreMath.hpp"
+#include "RigidBody.hpp"
+#include "CoreMath.hpp"
 
 void RigidBody::UpdateGlobalCentroidFromPosition(void) {
   globalCentroid = orientation * localCentroid + position;
@@ -9,7 +9,7 @@ void RigidBody::UpdatePositionFromGlobalCentroid(void) {
   position = orientation * (-localCentroid) + globalCentroid;
 }
 
-void RigidBody::AddColliders(Collider &collider) {
+void RigidBody::AddColliders(const Collider &collider) {
   colliders.push_back(collider);
 
   localCentroid.Zero();

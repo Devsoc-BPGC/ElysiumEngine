@@ -1,28 +1,39 @@
-#include "../include/PhysicsWorld.hpp"
+#include "PhysicsWorld.hpp"
+#include "BroadPhase.hpp"
+#include "NarrowPhase.hpp"
+// #include <iostream>
 
 void PhysicsWorld::Step(float dt) {
-    // 1. Apply Global Forces
+    // 1. Apply Gravity
     for (auto* body : rigidBodies) {
         if (body->inverseMass > 0.0f) {
             float mass = 1.0f / body->inverseMass;
-
-            // Force = mass * acceleration
-            Vec3 gravityForce = gravity * mass;
-
-            // Apply gravity at the center of mass (globalCentroid)
-            // to avoid inducing rotation from gravity itself.
-            body->ApplyForce(gravityForce, body->globalCentroid);
+            body->ApplyForce(gravity * mass, body->globalCentroid);
         }
     }
 
-    // 2. INTEGRATION PHASE
-    // This moves the bodies based on the forces applied above
+    // 2. Integration
     for (auto* body : rigidBodies) {
         body->Integrate(dt);
     }
 
-    // 3. TODO: Collision Detection (Narrow phase / Broad phase)
-    // 4. TODO: Constraint Solver (Impulse resolution)
+    // This finds potential collisions between balls
+    std::vector<CollisionPair> candidates = BroadPhase::GeneratePairs(rigidBodies);
+
+    // Phase 4: Narrow Phase (Body vs Body)
+    for (auto& pair : candidates) {
+        NarrowPhase::ResolveCircleCollision(pair.A, pair.B);
+    }
+
+    // It ensures balls stay in the box after hitting each other.
+    ResolveBoundaries();
+
+    std::vector<CollisionPair> pairs = BroadPhase::GeneratePairs(rigidBodies);
+
+    // Temporary Debug
+    if (!pairs.empty()) {
+        // std::cout << "Broad Phase found " << pairs.size() << " potential collisions!" << std::endl;
+    }
 }
 
 void PhysicsWorld::ClearForces() {
