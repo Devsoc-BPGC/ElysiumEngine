@@ -1,5 +1,8 @@
 #include "../include/AABB.hpp"
 
+/**
+ * Tests for overlap between two AABBs.
+ */
 bool TestAABBOverlap(AABB* a, AABB* b)
 {
     float d1x = b->min.x - a->max.x;

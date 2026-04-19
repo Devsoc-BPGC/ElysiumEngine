@@ -30,7 +30,7 @@ public:
         // Sphere Mass: (4/3) * PI * r^3 * density
         // Since you're doing 2D rendering, you might prefer Area-based mass:
         // PI * r^2 * density
-        c.mass = 3.14159f * (r * r) * density;
+        c.mass = PI * (r * r) * density;
 
         // Inertia Tensor for a sphere: (2/5) * m * r^2
         float i = (2.0f / 5.0f) * c.mass * (r * r);
