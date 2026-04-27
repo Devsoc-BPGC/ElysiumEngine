@@ -57,6 +57,9 @@ void RigidBody::AddColliders(const Collider &collider) {
     }
 
     localInverseInertiaTensor = localInertiaTensor.Inverted();
+    
+    // Initialize world-space inertia tensor
+    inverseInertiaTensorWorld = orientation * localInverseInertiaTensor * inverseOrientation;
 }
 
 /**
@@ -109,7 +112,7 @@ void RigidBody::ApplyForce(const Vec3 &f, const Vec3 &at) {
 /**
  * @brief Normalizes the orientation matrix to prevent floating-point drift.
  * * Converts the matrix to a Quaternion, normalizes it, and converts back to a Matrix.
- * Also updates the inverse (transposed) orientation.
+ * Also updates the inverse (transposed) orientation and world inertia tensor.
  */
 void RigidBody::UpdateOrientation(void) {
     Quat q = orientation.ToQuat();
@@ -117,6 +120,9 @@ void RigidBody::UpdateOrientation(void) {
     orientation = q.ToMatrix();
 
     inverseOrientation = orientation.Transposed();
+    
+    // Update the world-space inverse inertia tensor: I_inv_world = R * I_inv_local * R^T
+    inverseInertiaTensorWorld = orientation * localInverseInertiaTensor * inverseOrientation;
 }
 
 /**

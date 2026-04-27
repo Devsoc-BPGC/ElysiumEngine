@@ -9,19 +9,11 @@
 #include <vector>
 #include "CoreMath.hpp"
 #include "Collider.hpp"
+#include "AABB.hpp"
 
 /** * @brief A collection of colliders attached to a single rigid body.
  */
 typedef std::vector<Collider> ColliderList;
-
-/**
- * @struct AABB
- * @brief Simple Axis-Aligned Bounding Box used for broad-phase collision detection.
- */
-struct AABB {
-    Vec3 min; /**< The minimum point of the box (bottom-left-back). */
-    Vec3 max; /**< The maximum point of the box (top-right-front). */
-};
 
 /**
  * @struct RigidBody
@@ -102,8 +94,9 @@ struct RigidBody {
 
         // Initialize with the first collider
         Vec3 firstPos = LocalToGlobal(colliders[0].localCentroid);
-        box.min = firstPos - Vec3(colliders[0].radius, colliders[0].radius, 0);
-        box.max = firstPos + Vec3(colliders[0].radius, colliders[0].radius, 0);
+        float r0 = colliders[0].radius;
+        box.min = firstPos - Vec3(r0, r0, r0);
+        box.max = firstPos + Vec3(r0, r0, r0);
 
         for (size_t i = 1; i < colliders.size(); ++i) {
             Vec3 worldPos = LocalToGlobal(colliders[i].localCentroid);
@@ -111,8 +104,10 @@ struct RigidBody {
 
             if (worldPos.x - r < box.min.x) box.min.x = worldPos.x - r;
             if (worldPos.y - r < box.min.y) box.min.y = worldPos.y - r;
+            if (worldPos.z - r < box.min.z) box.min.z = worldPos.z - r;
             if (worldPos.x + r > box.max.x) box.max.x = worldPos.x + r;
             if (worldPos.y + r > box.max.y) box.max.y = worldPos.y + r;
+            if (worldPos.z + r > box.max.z) box.max.z = worldPos.z + r;
         }
         return box;
     }

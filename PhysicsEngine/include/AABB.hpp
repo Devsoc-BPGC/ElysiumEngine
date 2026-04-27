@@ -1,26 +1,15 @@
-#include <stdbool.h>
+#ifndef AABB_HPP
+#define AABB_HPP
+
+#include "CoreMath.hpp"
 
 /**
- * @brief Represents a 2D vector.
+ * @struct AABB
+ * @brief Simple Axis-Aligned Bounding Box used for broad-phase collision detection.
  */
-typedef struct {
-    float x;
-    float y;
-} Vector2;
+struct AABB {
+    Vec3 min; /**< The minimum point of the box. */
+    Vec3 max; /**< The maximum point of the box. */
+};
 
-/**
- * @brief Represents an axis-aligned bounding box.
- */
-typedef struct {
-    Vector2 min;
-    Vector2 max;
-} AABB;
-
-/**
- * @brief Represents a circle.
- */
-typedef struct {
-    float centerX;
-    float centerY;
-    float radius;
-} Circle;
+#endif

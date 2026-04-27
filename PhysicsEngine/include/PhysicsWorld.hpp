@@ -51,11 +51,6 @@ public:
 
     /**
      * @brief Performs simple static boundary collision and response.
-     * * This function checks every collider against a hard-coded bounding box.
-     * If a collider penetrates a boundary, it performs two actions:
-     * 1. **Position Correction**: Instantly moves the body back within bounds to prevent sinking.
-     * 2. **Velocity Reflection**: Flips the velocity component and applies a coefficient of restitution.
-     * * @note This uses a simple "AABB vs Point-Radius" logic for the screen/world edges.
      */
     void ResolveBoundaries() {
         float minX = 1.0f, maxX = 15.0f;
@@ -63,6 +58,7 @@ public:
         float restitution = 0.8f;
 
         for (auto* body : rigidBodies) {
+            bool collided = false;
             for (auto& col : body->colliders) {
                 // Convert collider center to world coordinates
                 Vec3 pos = body->LocalToGlobal(col.localCentroid);
@@ -71,21 +67,28 @@ public:
                 if (pos.y + col.radius > maxY) { // Ceiling hit
                     body->position.y -= (pos.y + col.radius) - maxY;
                     if (body->linearVelocity.y > 0) body->linearVelocity.y *= -restitution;
+                    collided = true;
                 }
                 else if (pos.y - col.radius < minY) { // Floor hit
                     body->position.y += minY - (pos.y - col.radius);
                     if (body->linearVelocity.y < 0) body->linearVelocity.y *= -restitution;
+                    collided = true;
                 }
 
                 // --- Walls (X-axis) ---
                 if (pos.x + col.radius > maxX) { // Right Wall hit
                     body->position.x -= (pos.x + col.radius) - maxX;
                     if (body->linearVelocity.x > 0) body->linearVelocity.x *= -restitution;
+                    collided = true;
                 }
                 else if (pos.x - col.radius < minX) { // Left Wall hit
                     body->position.x += minX - (pos.x - col.radius);
                     if (body->linearVelocity.x < 0) body->linearVelocity.x *= -restitution;
+                    collided = true;
                 }
+            }
+            if (collided) {
+                body->UpdateGlobalCentroidFromPosition();
             }
         }
     }
