@@ -7,8 +7,8 @@
 #include <typeindex>
 #include <unordered_map>
 #include "Component.hpp"
-#include "../../PhysicsEngine/include/RigidBody.hpp"
-#include "../../PhysicsEngine/include/CoreMath.hpp"
+#include "RigidBody.hpp"
+#include "CoreMath.hpp"
 
 class GameObject {
 public:

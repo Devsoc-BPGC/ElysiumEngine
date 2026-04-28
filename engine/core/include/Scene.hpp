@@ -4,7 +4,7 @@
 #include <vector>
 #include <memory>
 #include "GameObject.hpp"
-#include "../../PhysicsEngine/include/PhysicsWorld.hpp"
+#include "PhysicsWorld.hpp"
 
 class Scene {
 public:

@@ -1,10 +1,10 @@
 #include <SFML/Graphics.hpp>
 #include <memory>
 #include <cstdlib>
-#include "../../ElysiumCore/include/Scene.hpp"
-#include "../../ElysiumCore/include/GameObject.hpp"
-#include "../../ElysiumCore/include/SimpleRenderer.hpp"
-#include "../../ElysiumCore/include/Component.hpp"
+#include "Scene.hpp"
+#include "GameObject.hpp"
+#include "SimpleRenderer.hpp"
+#include "Component.hpp"
 
 class LifeSpan : public Component {
 public:
