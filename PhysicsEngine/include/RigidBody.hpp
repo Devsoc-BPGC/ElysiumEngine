@@ -41,6 +41,17 @@ struct RigidBody {
 
     ColliderList colliders;  /**< List of collision geometries attached to this body. */
 
+    /**
+     * @brief Constructs a new RigidBody with default values.
+     */
+    RigidBody()
+        : mass(0.0f), inverseMass(0.0f),
+          orientation(Mat3::Identity()), inverseOrientation(Mat3::Identity()),
+          localInverseInertiaTensor(Mat3::Identity()), inverseInertiaTensorWorld(Mat3::Identity()),
+          globalCentroid(0, 0, 0), localCentroid(0, 0, 0),
+          position(0, 0, 0), linearVelocity(0, 0, 0), angularVelocity(0, 0, 0),
+          forceAccumulator(0, 0, 0), torqueAccumulator(0, 0, 0) {}
+
     /** @name Transformation Synchronizers */
     ///@{
     /** @brief Updates the global centroid based on current position and orientation. */

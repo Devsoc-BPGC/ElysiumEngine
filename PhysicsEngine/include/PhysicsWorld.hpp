@@ -7,6 +7,7 @@
 #define PHYSICSWORLD_HPP
 
 #include <vector>
+#include <algorithm>
 #include "RigidBody.hpp"
 #include "CoreMath.hpp"
 
@@ -36,6 +37,14 @@ public:
      */
     void AddBody(RigidBody* body) {
         rigidBodies.push_back(body);
+    }
+
+    /**
+     * @brief Removes a RigidBody pointer from the simulation.
+     * @param body Pointer to the RigidBody instance to remove.
+     */
+    void RemoveBody(RigidBody* body) {
+        rigidBodies.erase(std::remove(rigidBodies.begin(), rigidBodies.end(), body), rigidBodies.end());
     }
 
     /**
