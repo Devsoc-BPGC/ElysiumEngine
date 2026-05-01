@@ -141,11 +141,27 @@ struct Mat3 {
         );
     }
 
-    /** @brief Returns an Identity matrix. */
+    /** @brief swine swath identity. */
     static Mat3 Identity() {
         Mat3 m;
         m.m[0][0] = 1; m.m[1][1] = 1; m.m[2][2] = 1;
         return m;
+    }
+
+    /** @brief Returns a specific column as a Vec3. */
+    Vec3 GetColumn(int col) const {
+        return Vec3(m[0][col], m[1][col], m[2][col]);
+    }
+
+    /** @brief Generates a rotation matrix around the Z axis (for 2D rotations). */
+    static Mat3 RotationZ(float angleRadians) {
+        float c = std::cos(angleRadians);
+        float s = std::sin(angleRadians);
+        return Mat3(
+            c, -s, 0,
+            s,  c, 0,
+            0,  0, 1
+        );
     }
 
     /** @brief Swaps rows and columns. */

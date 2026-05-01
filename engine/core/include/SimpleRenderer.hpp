@@ -3,11 +3,13 @@
 
 #include <SFML/Graphics.hpp>
 #include "Scene.hpp"
+#include "BroadPhase.hpp"
 
 class SimpleRenderer {
 public:
     sf::RenderWindow& window;
     float pixelsPerMeter;
+    bool drawDebugGrid = false;
 
     SimpleRenderer(sf::RenderWindow& window, float ppm = 50.0f) 
         : window(window), pixelsPerMeter(ppm) {}
@@ -16,6 +18,27 @@ public:
         window.clear(sf::Color(30, 30, 30));
 
         float ptm = pixelsPerMeter;
+
+        // Draw Debug Grid
+        if (drawDebugGrid) {
+            float cellSize = BroadPhase::CELL_SIZE * ptm;
+            sf::Vector2u windowSize = window.getSize();
+            
+            sf::VertexArray lines(sf::PrimitiveType::Lines);
+            sf::Color gridColor(60, 60, 60, 150);
+
+            // Vertical lines
+            for (float x = 0; x <= windowSize.x; x += cellSize) {
+                lines.append(sf::Vertex({x, 0}, gridColor));
+                lines.append(sf::Vertex({x, (float)windowSize.y}, gridColor));
+            }
+            // Horizontal lines
+            for (float y = 0; y <= windowSize.y; y += cellSize) {
+                lines.append(sf::Vertex({0, y}, gridColor));
+                lines.append(sf::Vertex({(float)windowSize.x, y}, gridColor));
+            }
+            window.draw(lines);
+        }
 
         // Draw the hardcoded Boundary Box (1m to 15m X, 1m to 11m Y)
         sf::RectangleShape boundaryVisual;
@@ -60,23 +83,25 @@ public:
                     window.draw(shape);
                 }
 
-                // Draw Centroid
-                sf::CircleShape centroidDot(2.0f);
-                centroidDot.setFillColor(sf::Color::Red);
-                centroidDot.setOrigin({2.0f, 2.0f});
-                centroidDot.setPosition({body->globalCentroid.x * ptm, body->globalCentroid.y * ptm});
-                window.draw(centroidDot);
-            }
+                if (drawDebugGrid) {
+                    // Draw Centroid
+                    sf::CircleShape centroidDot(2.0f);
+                    centroidDot.setFillColor(sf::Color::Red);
+                    centroidDot.setOrigin({2.0f, 2.0f});
+                    centroidDot.setPosition({body->globalCentroid.x * ptm, body->globalCentroid.y * ptm});
+                    window.draw(centroidDot);
 
-            // Draw AABB (Optional/Debug)
-            AABB bounds = body->GetAABB();
-            sf::RectangleShape aabbVisual;
-            aabbVisual.setPosition({bounds.min.x * ptm, bounds.min.y * ptm});
-            aabbVisual.setSize({(bounds.max.x - bounds.min.x) * ptm, (bounds.max.y - bounds.min.y) * ptm});
-            aabbVisual.setFillColor(sf::Color::Transparent);
-            aabbVisual.setOutlineColor(sf::Color(0, 255, 0, 100));
-            aabbVisual.setOutlineThickness(1.0f);
-            window.draw(aabbVisual);
+                    // Draw AABB (Optional/Debug)
+                    AABB bounds = body->GetAABB();
+                    sf::RectangleShape aabbVisual;
+                    aabbVisual.setPosition({bounds.min.x * ptm, bounds.min.y * ptm});
+                    aabbVisual.setSize({(bounds.max.x - bounds.min.x) * ptm, (bounds.max.y - bounds.min.y) * ptm});
+                    aabbVisual.setFillColor(sf::Color::Transparent);
+                    aabbVisual.setOutlineColor(sf::Color(0, 255, 0, 100));
+                    aabbVisual.setOutlineThickness(1.0f);
+                    window.draw(aabbVisual);
+                }
+            }
         }
 
         window.display();

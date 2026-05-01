@@ -86,6 +86,12 @@ int main() {
 
             if (event->is<sf::Event::Closed>()) window.close();
             
+            if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()) {
+                if (keyPressed->code == sf::Keyboard::Key::G) {
+                    renderer.drawDebugGrid = !renderer.drawDebugGrid;
+                }
+            }
+
             // Spawn in the middle (8m, 6m) on Mouse Click
             if (Input::IsMouseButtonPressed(sf::Mouse::Button::Left)) {
                 auto ball = std::make_shared<GameObject>("New Ball");

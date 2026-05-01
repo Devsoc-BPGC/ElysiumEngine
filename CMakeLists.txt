@@ -28,6 +28,21 @@ target_include_directories(ElysiumApp PRIVATE
     engine/physics/include
 )
 
+# Add Performance Tests
+add_executable(PhysicsPerformanceTest test/PhysicsPerformanceTest.cpp)
+target_link_libraries(PhysicsPerformanceTest PRIVATE ElysiumEngine SFML::System)
+target_include_directories(PhysicsPerformanceTest PRIVATE 
+    engine/core/include
+    engine/physics/include
+)
+
+add_executable(BroadPhasePerformanceTest test/BroadPhasePerformanceTest.cpp)
+target_link_libraries(BroadPhasePerformanceTest PRIVATE ElysiumEngine SFML::System)
+target_include_directories(BroadPhasePerformanceTest PRIVATE 
+    engine/core/include
+    engine/physics/include
+)
+
 if(WIN32)
     add_custom_command(TARGET ElysiumApp POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
