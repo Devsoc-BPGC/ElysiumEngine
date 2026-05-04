@@ -97,8 +97,9 @@ int main() {
             // Handle Mouse Wheel for Boundary Rotation
             float wheelDelta = Input::GetMouseWheelDelta();
             if (std::abs(wheelDelta) > 0.01f) {
-                scene.physicsWorld.boundaryRotation += wheelDelta * 0.05f;
+                // scene.physicsWorld.boundaryRotation += wheelDelta * 0.05f;
             }
+            scene.physicsWorld.boundaryRotation += 0.01f;
 
             // Spawn in the middle (8m, 6m) on Mouse Click
             if (Input::IsMouseButtonPressed(sf::Mouse::Button::Left)) {

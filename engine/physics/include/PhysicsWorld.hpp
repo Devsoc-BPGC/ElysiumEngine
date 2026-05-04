@@ -31,6 +31,18 @@ public:
     float boundaryRotation = 0.0f;
 
     /**
+     * @brief Configures the world boundaries.
+     * @param center The center position of the boundary box.
+     * @param halfExtents The half-extents (size/2) of the boundary box.
+     * @param rotation The rotation of the boundary box in radians (default is 0.0f).
+     */
+    void SetBoundaries(const Vec3& center, const Vec3& halfExtents, float rotation = 0.0f) {
+        boundaryCenter = center;
+        boundaryHalfExtents = halfExtents;
+        boundaryRotation = rotation;
+    }
+
+    /**
      * @brief Constructs a new Physics World.
      * @param gravityVector The initial global gravity force. Defaults to Earth-like gravity.
      */

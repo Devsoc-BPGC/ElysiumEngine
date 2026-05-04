@@ -43,6 +43,13 @@ target_include_directories(BroadPhasePerformanceTest PRIVATE
     engine/physics/include
 )
 
+add_executable(BoundaryTest test/BoundaryTest.cpp)
+target_link_libraries(BoundaryTest PRIVATE ElysiumEngine SFML::System)
+target_include_directories(BoundaryTest PRIVATE 
+    engine/core/include
+    engine/physics/include
+)
+
 if(WIN32)
     add_custom_command(TARGET ElysiumApp POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
