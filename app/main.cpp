@@ -12,7 +12,7 @@ class LifeSpan : public Component {
 public:
     float remaining;
     LifeSpan(float duration) : remaining(duration) {}
-    
+
     void Update(float dt) override {
         remaining -= dt;
         if (remaining <= 0) {
@@ -56,12 +56,14 @@ int main() {
     scene.physicsWorld.gravity = Vec3(0.0f, 9.81f, 0.0f);
 
     // 2. Create Player
+    /*
     auto player = std::make_shared<GameObject>("Player");
     player->position = Vec3(4.0f, 4.0f, 0.0f);
     auto& playerRB = player->CreateRigidBody();
     playerRB.AddColliders(Collider::CreateBox(Vec3(0.5f, 0.5f, 0.5f), 1.0f));
     player->AddComponent<PlayerController>();
     scene.AddGameObject(player);
+    */
 
     // 3. Create Initial Dynamic Balls
     for (int i = 0; i < 3; ++i) {
@@ -85,11 +87,17 @@ int main() {
             Input::HandleEvent(*event);
 
             if (event->is<sf::Event::Closed>()) window.close();
-            
+
             if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()) {
                 if (keyPressed->code == sf::Keyboard::Key::G) {
                     renderer.drawDebugGrid = !renderer.drawDebugGrid;
                 }
+            }
+
+            // Handle Mouse Wheel for Boundary Rotation
+            float wheelDelta = Input::GetMouseWheelDelta();
+            if (std::abs(wheelDelta) > 0.01f) {
+                scene.physicsWorld.boundaryRotation += wheelDelta * 0.05f;
             }
 
             // Spawn in the middle (8m, 6m) on Mouse Click
@@ -97,11 +105,11 @@ int main() {
                 auto ball = std::make_shared<GameObject>("New Ball");
                 sf::Vector2f mousePos = Input::GetMousePosition();
                 ball->position = Vec3(mousePos.x / 50.0f, mousePos.y / 50.0f, 0.0f);
-                
+
                 auto& rb = ball->CreateRigidBody();
                 rb.linearVelocity = Vec3((rand() % 10 - 5), (rand() % 10 - 5), 0);
                 rb.AddColliders(Collider::CreateSphere(0.4f, 1.0f));
-                
+
                 ball->AddComponent<LifeSpan>(5.0f);
                 scene.AddGameObject(ball);
             }

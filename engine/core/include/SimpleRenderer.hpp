@@ -11,11 +11,11 @@ public:
     float pixelsPerMeter;
     bool drawDebugGrid = false;
 
-    SimpleRenderer(sf::RenderWindow& window, float ppm = 50.0f) 
+    SimpleRenderer(sf::RenderWindow& window, float ppm = 50.0f)
         : window(window), pixelsPerMeter(ppm) {}
 
     void Render(Scene& scene) {
-        window.clear(sf::Color(30, 30, 30));
+        window.clear(sf::Color(119, 221, 119));
 
         float ptm = pixelsPerMeter;
 
@@ -23,7 +23,7 @@ public:
         if (drawDebugGrid) {
             float cellSize = BroadPhase::CELL_SIZE * ptm;
             sf::Vector2u windowSize = window.getSize();
-            
+
             sf::VertexArray lines(sf::PrimitiveType::Lines);
             sf::Color gridColor(60, 60, 60, 150);
 
@@ -40,13 +40,15 @@ public:
             window.draw(lines);
         }
 
-        // Draw the hardcoded Boundary Box (1m to 15m X, 1m to 11m Y)
+        // Draw the Boundary Box
         sf::RectangleShape boundaryVisual;
-        boundaryVisual.setSize({(15.0f - 1.0f) * ptm, (11.0f - 1.0f) * ptm});
-        boundaryVisual.setPosition({1.0f * ptm, 1.0f * ptm});
+        boundaryVisual.setSize({scene.physicsWorld.boundaryHalfExtents.x * 2.0f * ptm, scene.physicsWorld.boundaryHalfExtents.y * 2.0f * ptm});
+        boundaryVisual.setOrigin({scene.physicsWorld.boundaryHalfExtents.x * ptm, scene.physicsWorld.boundaryHalfExtents.y * ptm});
+        boundaryVisual.setPosition({scene.physicsWorld.boundaryCenter.x * ptm, scene.physicsWorld.boundaryCenter.y * ptm});
         boundaryVisual.setFillColor(sf::Color::Transparent);
-        boundaryVisual.setOutlineThickness(2.0f);
+        boundaryVisual.setOutlineThickness(5.0f);
         boundaryVisual.setOutlineColor(sf::Color::White);
+        boundaryVisual.setRotation(sf::radians(scene.physicsWorld.boundaryRotation));
         window.draw(boundaryVisual);
 
         for (auto& obj : scene.objects) {
@@ -62,7 +64,7 @@ public:
                 if (col.type == ColliderType::Sphere) {
                     float screenRadius = col.radius * ptm;
                     sf::CircleShape shape(screenRadius);
-                    shape.setFillColor(sf::Color::Cyan);
+                    shape.setFillColor(sf::Color::White);
                     shape.setOrigin({screenRadius, screenRadius});
                     shape.setPosition({globalPos.x * ptm, globalPos.y * ptm});
                     window.draw(shape);
@@ -73,7 +75,7 @@ public:
                     shape.setOrigin({col.halfExtents.x * ptm, col.halfExtents.y * ptm});
                     shape.setPosition({globalPos.x * ptm, globalPos.y * ptm});
                     shape.setFillColor(sf::Color(100, 100, 100)); // Grey for boxes
-                    
+
                     // Simple rotation for the box
                     Quat q = body->orientation.ToQuat();
                     // We only care about Z rotation for 2D SFML

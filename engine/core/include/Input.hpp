@@ -16,6 +16,7 @@ public:
     };
 
     static void Update() {
+        m_mouseWheelDelta = 0.0f;
         // Transition Pressed to Held, and Released to None
         for (auto& [key, state] : m_keyStates) {
             if (state == ButtonState::Pressed) state = ButtonState::Held;
@@ -46,6 +47,11 @@ public:
         }
         else if (const auto* mouseMoved = event.getIf<sf::Event::MouseMoved>()) {
             m_mousePosition = { (float)mouseMoved->position.x, (float)mouseMoved->position.y };
+        }
+        else if (const auto* mouseWheel = event.getIf<sf::Event::MouseWheelScrolled>()) {
+            if (mouseWheel->wheel == sf::Mouse::Wheel::Vertical) {
+                m_mouseWheelDelta = mouseWheel->delta;
+            }
         }
     }
 
@@ -80,11 +86,13 @@ public:
     }
 
     static sf::Vector2f GetMousePosition() { return m_mousePosition; }
+    static float GetMouseWheelDelta() { return m_mouseWheelDelta; }
 
 private:
     static inline std::unordered_map<sf::Keyboard::Key, ButtonState> m_keyStates;
     static inline std::unordered_map<sf::Mouse::Button, ButtonState> m_mouseButtonStates;
     static inline sf::Vector2f m_mousePosition;
+    static inline float m_mouseWheelDelta = 0.0f;
 };
 
 #endif
