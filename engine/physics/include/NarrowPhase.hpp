@@ -164,6 +164,28 @@ private:
         Vec3 impulse = normalFromAtoB * j;
         a->linearVelocity -= impulse * a->inverseMass;
         b->linearVelocity += impulse * b->inverseMass;
+
+        // 3. Friction Resolution (Tangent Impulse)
+        Vec3 tangentVel = relativeVel - (normalFromAtoB * velAlongNormal);
+        float tangentSpeed = tangentVel.Magnitude();
+
+        if (tangentSpeed > EPSILON) {
+            Vec3 tangent = tangentVel / tangentSpeed;
+            float jt = -relativeVel.Dot(tangent);
+            jt /= totalInvMass;
+
+            // Coulomb's law: friction force <= friction_coeff * normal force
+            // In impulse form: tangent_impulse <= friction_coeff * normal_impulse
+            float combinedFriction = std::sqrt(a->friction * b->friction);
+            float maxJt = combinedFriction * j;
+
+            if (jt > maxJt) jt = maxJt;
+            if (jt < -maxJt) jt = -maxJt;
+
+            Vec3 frictionImpulse = tangent * jt;
+            a->linearVelocity -= frictionImpulse * a->inverseMass;
+            b->linearVelocity += frictionImpulse * b->inverseMass;
+        }
     }
 };
 

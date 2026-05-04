@@ -50,6 +50,13 @@ target_include_directories(BoundaryTest PRIVATE
     engine/physics/include
 )
 
+add_executable(FrictionTest test/FrictionTest.cpp)
+target_link_libraries(FrictionTest PRIVATE ElysiumEngine SFML::System)
+target_include_directories(FrictionTest PRIVATE 
+    engine/core/include
+    engine/physics/include
+)
+
 if(WIN32)
     add_custom_command(TARGET ElysiumApp POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
