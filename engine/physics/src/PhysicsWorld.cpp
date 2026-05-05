@@ -40,7 +40,7 @@ void PhysicsWorld::Step(float dt) {
     // 4. Narrow Phase (Body vs Body)
     // Detailed geometric intersection tests and impulse resolution.
     for (auto& pair : candidates) {
-        NarrowPhase::ResolveCircleCollision(pair.A, pair.B);
+        NarrowPhase::ResolveCollision(pair.A, pair.B);
     }
 
     // 5. Boundary Resolution

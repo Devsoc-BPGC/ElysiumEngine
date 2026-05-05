@@ -22,6 +22,7 @@ typedef std::vector<Collider> ColliderList;
 struct RigidBody {
     float mass;              /**< Total mass of the body. */
     float inverseMass;       /**< Precomputed 1/mass (0 for static objects). */
+    float friction;          /**< Friction coefficient (Coulomb friction). */
 
     Mat3 orientation;        /**< Current rotation matrix in world space. */
     Mat3 inverseOrientation; /**< Cached transpose/inverse of the orientation matrix. */
@@ -40,6 +41,17 @@ struct RigidBody {
     Vec3 torqueAccumulator;  /**< Sum of all torques to be applied in the next step. */
 
     ColliderList colliders;  /**< List of collision geometries attached to this body. */
+
+    /**
+     * @brief Constructs a new RigidBody with default values.
+     */
+    RigidBody()
+        : mass(0.0f), inverseMass(0.0f), friction(0.3f),
+          orientation(Mat3::Identity()), inverseOrientation(Mat3::Identity()),
+          localInverseInertiaTensor(Mat3::Identity()), inverseInertiaTensorWorld(Mat3::Identity()),
+          globalCentroid(0, 0, 0), localCentroid(0, 0, 0),
+          position(0, 0, 0), linearVelocity(0, 0, 0), angularVelocity(0, 0, 0),
+          forceAccumulator(0, 0, 0), torqueAccumulator(0, 0, 0) {}
 
     /** @name Transformation Synchronizers */
     ///@{

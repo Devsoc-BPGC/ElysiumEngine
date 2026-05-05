@@ -1,4 +1,4 @@
-#include "../include/AABB.hpp"
+#include "AABB.hpp"
 
 /**
  * Tests for overlap between two AABBs.
