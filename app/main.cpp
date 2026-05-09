@@ -1,3 +1,4 @@
+#include <Elysium.hpp>
 #include <SFML/Graphics.hpp>
 #include <memory>
 #include <cstdlib>
@@ -50,78 +51,74 @@ public:
     }
 };
 
-int main() {
-    // 1. Setup Scene
-    Scene scene;
-    scene.physicsWorld.gravity = Vec3(0.0f, 9.81f, 0.0f);
-
-    // 2. Create Player
-    /*
-    auto player = std::make_shared<GameObject>("Player");
-    player->position = Vec3(4.0f, 4.0f, 0.0f);
-    auto& playerRB = player->CreateRigidBody();
-    playerRB.AddColliders(Collider::CreateBox(Vec3(0.5f, 0.5f, 0.5f), 1.0f));
-    player->AddComponent<PlayerController>();
-    scene.AddGameObject(player);
-    */
-
-    // 3. Create Initial Dynamic Balls
-    for (int i = 0; i < 3; ++i) {
-        auto ball = std::make_shared<GameObject>("Ball " + std::to_string(i));
-        ball->position = Vec3(3.0f + i * 2.0f, 2.0f, 0.0f);
-        auto& rb = ball->CreateRigidBody();
-        rb.linearVelocity = Vec3(0.5f * i, 2.0f, 0.0f);
-        rb.AddColliders(Collider::CreateSphere(0.5f, 1.0f));
-        scene.AddGameObject(ball);
+class Sandbox : public Elysium::Application {
+public:
+    Sandbox() {
     }
 
-    // 4. Setup Window and Renderer
-    sf::RenderWindow window(sf::VideoMode({800, 600}), "Elysium Engine - Input System");
-    SimpleRenderer renderer(window, 50.0f);
-    sf::Clock clock;
+    ~Sandbox() {
+    }
 
-    while (window.isOpen()) {
-        Input::Update();
+    void Run() {
+        // 1. Setup Scene
+        Scene scene;
+        scene.physicsWorld.gravity = Vec3(0.0f, 9.81f, 0.0f);
 
-        while (const std::optional event = window.pollEvent()) {
-            Input::HandleEvent(*event);
+        // 3. Create Initial Dynamic Balls
+        for (int i = 0; i < 3; ++i) {
+            auto ball = std::make_shared<GameObject>("Ball " + std::to_string(i));
+            ball->position = Vec3(3.0f + i * 2.0f, 2.0f, 0.0f);
+            auto& rb = ball->CreateRigidBody();
+            rb.linearVelocity = Vec3(0.5f * i, 2.0f, 0.0f);
+            rb.AddColliders(Collider::CreateSphere(0.5f, 1.0f));
+            scene.AddGameObject(ball);
+        }
 
-            if (event->is<sf::Event::Closed>()) window.close();
+        // 4. Setup Window and Renderer
+        sf::RenderWindow window(sf::VideoMode({800, 600}), "Elysium Engine - Entry Point Abstraction");
+        SimpleRenderer renderer(window, 50.0f);
+        sf::Clock clock;
 
-            if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()) {
-                if (keyPressed->code == sf::Keyboard::Key::G) {
-                    renderer.drawDebugGrid = !renderer.drawDebugGrid;
+        while (window.isOpen()) {
+            Input::Update();
+
+            while (const std::optional event = window.pollEvent()) {
+                Input::HandleEvent(*event);
+
+                if (event->is<sf::Event::Closed>()) window.close();
+
+                if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()) {
+                    if (keyPressed->code == sf::Keyboard::Key::G) {
+                        renderer.drawDebugGrid = !renderer.drawDebugGrid;
+                    }
+                }
+
+                // Spawn in the middle (8m, 6m) on Mouse Click
+                if (Input::IsMouseButtonPressed(sf::Mouse::Button::Left)) {
+                    auto ball = std::make_shared<GameObject>("New Ball");
+                    sf::Vector2f mousePos = Input::GetMousePosition();
+                    ball->position = Vec3(mousePos.x / 50.0f, mousePos.y / 50.0f, 0.0f);
+
+                    auto& rb = ball->CreateRigidBody();
+                    rb.linearVelocity = Vec3((rand() % 10 - 5), (rand() % 10 - 5), 0);
+                    rb.AddColliders(Collider::CreateSphere(0.4f, 1.0f));
+
+                    ball->AddComponent<LifeSpan>(5.0f);
+                    scene.AddGameObject(ball);
                 }
             }
 
-            // Handle Mouse Wheel for Boundary Rotation
-            float wheelDelta = Input::GetMouseWheelDelta();
-            if (std::abs(wheelDelta) > 0.01f) {
-                // scene.physicsWorld.boundaryRotation += wheelDelta * 0.05f;
-            }
-            scene.physicsWorld.boundaryRotation += 0.01f;
+            float dt = clock.restart().asSeconds();
+            if (dt > 0.1f) dt = 0.1f;
 
-            // Spawn in the middle (8m, 6m) on Mouse Click
-            if (Input::IsMouseButtonPressed(sf::Mouse::Button::Left)) {
-                auto ball = std::make_shared<GameObject>("New Ball");
-                sf::Vector2f mousePos = Input::GetMousePosition();
-                ball->position = Vec3(mousePos.x / 50.0f, mousePos.y / 50.0f, 0.0f);
+            scene.physicsWorld.boundaryRotation += 0.001f;
 
-                auto& rb = ball->CreateRigidBody();
-                rb.linearVelocity = Vec3((rand() % 10 - 5), (rand() % 10 - 5), 0);
-                rb.AddColliders(Collider::CreateSphere(0.4f, 1.0f));
-
-                ball->AddComponent<LifeSpan>(5.0f);
-                scene.AddGameObject(ball);
-            }
+            scene.Update(dt);
+            renderer.Render(scene);
         }
-
-        float dt = clock.restart().asSeconds();
-        if (dt > 0.1f) dt = 0.1f;
-
-        scene.Update(dt);
-        renderer.Render(scene);
     }
+};
 
-    return 0;
+Elysium::Application* Elysium::CreateApplication() {
+    return new Sandbox();
 }

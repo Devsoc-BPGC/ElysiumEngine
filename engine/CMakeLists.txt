@@ -9,11 +9,14 @@ set(ENGINE_SOURCES
 file(GLOB_RECURSE CORE_SOURCES core/src/*.cpp)
 list(APPEND ENGINE_SOURCES ${CORE_SOURCES})
 
-add_library(ElysiumEngine STATIC ${ENGINE_SOURCES})
+add_library(ElysiumEngine SHARED ${ENGINE_SOURCES})
 
 target_include_directories(ElysiumEngine PUBLIC 
     core/include
     physics/include
 )
+
+target_compile_definitions(ElysiumEngine PRIVATE ELYSIUM_BUILD_DLL)
+target_compile_definitions(ElysiumEngine PUBLIC ELYSIUM_PLATFORM_LINUX)
 
 target_link_libraries(ElysiumEngine PUBLIC SFML::Graphics SFML::Window SFML::System)
