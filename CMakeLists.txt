@@ -75,3 +75,9 @@ if(WIN32)
         $<TARGET_FILE_DIR:ElysiumApp>
     )
 endif()
+
+enable_testing()
+add_test(NAME PhysicsPerformanceTest COMMAND PhysicsPerformanceTest)
+add_test(NAME BroadPhasePerformanceTest COMMAND BroadPhasePerformanceTest)
+add_test(NAME BoundaryTest COMMAND BoundaryTest)
+add_test(NAME FrictionTest COMMAND FrictionTest)
