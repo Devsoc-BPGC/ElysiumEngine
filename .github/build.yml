@@ -3,114 +3,48 @@ name: Build and Test
 on:
   push:
     branches: [main, master, develop]
-    paths-ignore:
-      - "**.md"
-      - "docs/**"
   pull_request:
     branches: [main, master, develop]
-    paths-ignore:
-      - "**.md"
-      - "docs/**"
-  workflow_dispatch: # Allows manual triggering
+  workflow_dispatch:
 
 env:
-  # Customize the CMake build type here
   BUILD_TYPE: Release
-  # Set the path to your external dependencies
-  EXTERNAL_DIR: external
 
 jobs:
   build:
-    strategy:
-      fail-fast: false # Continue other jobs even if one fails
-      matrix:
-        include:
-          # Linux (Ubuntu)
-          - os: ubuntu-latest
-            name: Linux
-            generator: "Unix Makefiles"
-            cxx: g++
-            cxx_standard: 20
-            install_deps: |
-              sudo apt-get update
-              sudo apt-get install -y \
-                libxrandr-dev \
-                libxcursor-dev \
-                libxi-dev \
-                libxinerama-dev \
-                libudev-dev \
-                libgl1-mesa-dev \
-                libglu1-mesa-dev \
-                mesa-common-dev \
-                libopenal-dev \
-                libvorbis-dev \
-                libflac-dev \
-                libx11-dev \
-                libxext-dev \
-                xorg-dev
-
-          # macOS
-          - os: macos-latest
-            name: macOS
-            generator: "Unix Makefiles"
-            cxx: clang++
-            cxx_standard: 20
-            install_deps: |
-              brew install \
-                sfml \
-                glfw \
-                glm \
-                openal-soft \
-                libvorbis \
-                libflac
-
-          # Windows (MSVC)
-          - os: windows-latest
-            name: Windows
-            generator: "Visual Studio 17 2022"
-            cxx: cl
-            cxx_standard: 20
-            install_deps: |
-              echo "Using vcpkg for dependencies"
-            vcpkg_install: |
-              vcpkg install sfml:x64-windows glfw3:x64-windows
-
+    # ✅ The runs-on MUST use matrix.os
     runs-on: ${{ matrix.os }}
+
+    # ✅ Strategy goes INSIDE the job
+    strategy:
+      fail-fast: false # Don't cancel other builds if one fails
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: recursive # If you have git submodules for SFML/GLFW
+          submodules: recursive # Very important if SFML/GLFW are submodules!
 
-      # Setup for Windows vcpkg
-      - name: Setup vcpkg (Windows only)
-        if: runner.os == 'Windows'
-        uses: johnwason/vcpkg-action@v6
-        with:
-          pkgs: sfml glfw3
-          triplet: x64-windows
-          token: ${{ github.token }}
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libxrandr-dev libxcursor-dev libxi-dev libxinerama-dev \
+            libudev-dev libgl1-mesa-dev libglu1-mesa-dev libopenal-dev \
+            libvorbis-dev libflac-dev xorg-dev
 
-      # Install dependencies
-      - name: Install dependencies
-        if: runner.os != 'Windows'
-        run: ${{ matrix.install_deps }}
+      - name: Install macOS dependencies
+        if: runner.os == 'macOS'
+        run: |
+          brew install sfml glfw
 
-      # Setup Visual Studio environment (Windows)
-      - name: Setup Visual Studio environment
-        if: runner.os == 'Windows'
-        uses: ilammy/msvc-dev-cmd@v1
-
-      # Configure CMake
       - name: Configure CMake
         run: |
           cmake -B build \
-            -G "${{ matrix.generator }}" \
             -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
-            -DCMAKE_CXX_STANDARD=${{ matrix.cxx_standard }} \
-            -DCMAKE_CXX_FLAGS="${{ matrix.cxx_flags }}" \
-            -DCMAKE_PREFIX_PATH="${{ env.cmake_prefix_path }}" \
             -DSFML_BUILD_EXAMPLES=OFF \
             -DSFML_BUILD_TEST_PROGRAMS=OFF \
             -DSFML_BUILD_DOC=OFF \
@@ -118,111 +52,25 @@ jobs:
             -DGLFW_BUILD_DOCS=OFF \
             -DGLFW_BUILD_TESTS=OFF \
             -DGLFW_BUILD_EXAMPLES=OFF
-          if [[ "${{ runner.os }}" == "Windows" ]]; then
-            cmake -B build -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake"
-          fi
-        shell: bash
 
-      # Build the engine and applications
       - name: Build
         working-directory: build
         run: cmake --build . --config ${{ env.BUILD_TYPE }} --parallel 2
 
-      # Run performance tests
-      - name: Run Physics Performance Test
+      - name: Run tests (Linux/macOS)
+        if: runner.os != 'Windows'
         working-directory: build
         run: |
-          if [[ "${{ runner.os }}" == "Windows" ]]; then
-            ./${{ env.BUILD_TYPE }}/PhysicsPerformanceTest.exe
-          else
-            ./PhysicsPerformanceTest
-          fi
-        continue-on-error: false
-        shell: bash
+          ./PhysicsPerformanceTest
+          ./BroadPhasePerformanceTest
+          ./BoundaryTest
+          ./FrictionTest
 
-      - name: Run Broad Phase Performance Test
-        working-directory: build
-        run: |
-          if [[ "${{ runner.os }}" == "Windows" ]]; then
-            ./${{ env.BUILD_TYPE }}/BroadPhasePerformanceTest.exe
-          else
-            ./BroadPhasePerformanceTest
-          fi
-        continue-on-error: false
-        shell: bash
-
-      - name: Run Boundary Test
-        working-directory: build
-        run: |
-          if [[ "${{ runner.os }}" == "Windows" ]]; then
-            ./${{ env.BUILD_TYPE }}/BoundaryTest.exe
-          else
-            ./BoundaryTest
-          fi
-        continue-on-error: false
-        shell: bash
-
-      - name: Run Friction Test
-        working-directory: build
-        run: |
-          if [[ "${{ runner.os }}" == "Windows" ]]; then
-            ./${{ env.BUILD_TYPE }}/FrictionTest.exe
-          else
-            ./FrictionTest
-          fi
-        continue-on-error: false
-        shell: bash
-
-      # Upload build artifacts (optional)
-      - name: Upload Linux artifacts
-        if: runner.os == 'Linux'
-        uses: actions/upload-artifact@v4
-        with:
-          name: ElysiumEngine-Linux
-          path: |
-            build/ElysiumApp
-            build/PhysicsPerformanceTest
-            build/BroadPhasePerformanceTest
-            build/BoundaryTest
-            build/FrictionTest
-
-      - name: Upload macOS artifacts
-        if: runner.os == 'macOS'
-        uses: actions/upload-artifact@v4
-        with:
-          name: ElysiumEngine-macOS
-          path: |
-            build/ElysiumApp
-            build/PhysicsPerformanceTest
-            build/BroadPhasePerformanceTest
-            build/BoundaryTest
-            build/FrictionTest
-
-      - name: Upload Windows artifacts
+      - name: Run tests (Windows)
         if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v4
-        with:
-          name: ElysiumEngine-Windows
-          path: |
-            build/${{ env.BUILD_TYPE }}/ElysiumApp.exe
-            build/${{ env.BUILD_TYPE }}/PhysicsPerformanceTest.exe
-            build/${{ env.BUILD_TYPE }}/BroadPhasePerformanceTest.exe
-            build/${{ env.BUILD_TYPE }}/BoundaryTest.exe
-            build/${{ env.BUILD_TYPE }}/FrictionTest.exe
-            build/${{ env.BUILD_TYPE }}/sfml-graphics-*.dll
-            build/${{ env.BUILD_TYPE }}/sfml-window-*.dll
-            build/${{ env.BUILD_TYPE }}/sfml-system-*.dll
-            build/${{ env.BUILD_TYPE }}/glfw3.dll
-
-  # Optional: Create a combined status check
-  build-status:
-    needs: build
-    runs-on: ubuntu-latest
-    if: always()
-    steps:
-      - name: Check build status
+        working-directory: build
         run: |
-          echo "Build matrix completed with status: ${{ needs.build.result }}"
-          if [ "${{ needs.build.result }}" != "success" ]; then
-            exit 1
-          fi
+          ./${{ env.BUILD_TYPE }}/PhysicsPerformanceTest.exe
+          ./${{ env.BUILD_TYPE }}/BroadPhasePerformanceTest.exe
+          ./${{ env.BUILD_TYPE }}/BoundaryTest.exe
+          ./${{ env.BUILD_TYPE }}/FrictionTest.exe
