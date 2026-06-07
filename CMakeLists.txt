@@ -21,9 +21,13 @@ set(SFML_INSTALL OFF CACHE BOOL "" FORCE)
 set(SFML_BUILD_NETWORK OFF CACHE BOOL "" FORCE)  # Disable network to avoid deps
 set(SFML_BUILD_AUDIO OFF CACHE BOOL "" FORCE)    # Disable audio to avoid deps
 
-set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
-set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+# Disable Wayland for GLFW
+set(GLFW_BUILD_WAYLAND OFF CACHE BOOL "Build GLFW with Wayland support" FORCE)
+set(GLFW_BUILD_X11 ON CACHE BOOL "Build GLFW with X11 support" FORCE)
+set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "Build GLFW examples" FORCE)
+set(GLFW_BUILD_TESTS OFF CACHE BOOL "Build GLFW tests" FORCE)
+set(GLFW_BUILD_DOCS OFF CACHE BOOL "Build GLFW documentation" FORCE)
+
 
 # Add SFML from external directory
 add_subdirectory(external/SFML)
