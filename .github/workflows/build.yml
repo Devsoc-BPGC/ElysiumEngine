@@ -12,12 +12,10 @@ env:
 
 jobs:
   build:
-    # ✅ The runs-on MUST use matrix.os
     runs-on: ${{ matrix.os }}
 
-    # ✅ Strategy goes INSIDE the job
     strategy:
-      fail-fast: false # Don't cancel other builds if one fails
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
 
@@ -25,7 +23,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: recursive # Very important if SFML/GLFW are submodules!
+          submodules: recursive
 
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
@@ -42,9 +40,12 @@ jobs:
           brew install sfml glfw
 
       - name: Configure CMake
+        shell: bash
         run: |
           cmake -B build \
             -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+            -DSFML_BUILD_NETWORK=OFF \
+            -DSFML_BUILD_AUDIO=OFF \
             -DSFML_BUILD_EXAMPLES=OFF \
             -DSFML_BUILD_TEST_PROGRAMS=OFF \
             -DSFML_BUILD_DOC=OFF \
@@ -54,6 +55,7 @@ jobs:
             -DGLFW_BUILD_EXAMPLES=OFF
 
       - name: Build
+        shell: bash
         working-directory: build
         run: cmake --build . --config ${{ env.BUILD_TYPE }} --parallel 2
 
@@ -61,6 +63,7 @@ jobs:
         if: runner.os != 'Windows'
         working-directory: build
         run: |
+          chmod +x PhysicsPerformanceTest BroadPhasePerformanceTest BoundaryTest FrictionTest
           ./PhysicsPerformanceTest
           ./BroadPhasePerformanceTest
           ./BoundaryTest
@@ -70,7 +73,7 @@ jobs:
         if: runner.os == 'Windows'
         working-directory: build
         run: |
-          ./${{ env.BUILD_TYPE }}/PhysicsPerformanceTest.exe
-          ./${{ env.BUILD_TYPE }}/BroadPhasePerformanceTest.exe
-          ./${{ env.BUILD_TYPE }}/BoundaryTest.exe
-          ./${{ env.BUILD_TYPE }}/FrictionTest.exe
+          ./Release/PhysicsPerformanceTest.exe
+          ./Release/BroadPhasePerformanceTest.exe
+          ./Release/BoundaryTest.exe
+          ./Release/FrictionTest.exe
