@@ -4,11 +4,22 @@ project(ElysiumEngineProject VERSION 1.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Platform detection for compiler definitions
+if(WIN32)
+  add_compile_definitions(ELYSIUM_PLATFORM_WINDOWS)
+elseif(APPLE)
+  add_compile_definitions(ELYSIUM_PLATFORM_MAC)
+elseif(UNIX)
+  add_compile_definitions(ELYSIUM_PLATFORM_LINUX)
+endif()
+
 # SFML Configuration
 set(SFML_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(SFML_BUILD_TEST_PROGRAMS OFF CACHE BOOL "" FORCE)
 set(SFML_BUILD_DOC OFF CACHE BOOL "" FORCE)
 set(SFML_INSTALL OFF CACHE BOOL "" FORCE)
+set(SFML_BUILD_NETWORK OFF CACHE BOOL "" FORCE)  # Disable network to avoid deps
+set(SFML_BUILD_AUDIO OFF CACHE BOOL "" FORCE)    # Disable audio to avoid deps
 
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -19,15 +30,14 @@ add_subdirectory(external/SFML)
 
 add_subdirectory(external/glfw)
 
-
 # Add engine subdirectory
 add_subdirectory(engine)
 
 # Add application
 add_executable(ElysiumApp app/main.cpp)
 
-
 # Link application with engine and SFML
+# Remove STATIC keyword - it doesn't belong here
 target_link_libraries(ElysiumApp PRIVATE ElysiumEngine SFML::Graphics SFML::Window SFML::System glfw)
 
 # Set include directories for the app to find engine headers

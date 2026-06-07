@@ -17,7 +17,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            name: Linux
+            preset: linux
+          - os: macos-latest
+            name: macOS
+            preset: macos
+          - os: windows-latest
+            name: Windows
+            preset: windows
 
     steps:
       - name: Checkout repository
@@ -30,26 +39,40 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            libxrandr-dev libxcursor-dev libxi-dev libxinerama-dev \
-            libudev-dev libgl1-mesa-dev libglu1-mesa-dev libopenal-dev \
-            libvorbis-dev libflac-dev xorg-dev
+            libxrandr-dev \
+            libxcursor-dev \
+            libxi-dev \
+            libxinerama-dev \
+            libudev-dev \
+            libgl1-mesa-dev \
+            libglu1-mesa-dev \
+            libopenal-dev \
+            libvorbis-dev \
+            libflac-dev \
+            xorg-dev \
+            libfreetype-dev \
+            libharfbuzz-dev
 
       - name: Install macOS dependencies
         if: runner.os == 'macOS'
         run: |
-          brew install sfml glfw
+          brew install \
+            sfml \
+            glfw \
+            freetype \
+            harfbuzz
 
       - name: Configure CMake
         shell: bash
         run: |
           cmake -B build \
             -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
-            -DSFML_BUILD_NETWORK=OFF \
-            -DSFML_BUILD_AUDIO=OFF \
             -DSFML_BUILD_EXAMPLES=OFF \
             -DSFML_BUILD_TEST_PROGRAMS=OFF \
             -DSFML_BUILD_DOC=OFF \
             -DSFML_INSTALL=OFF \
+            -DSFML_BUILD_NETWORK=OFF \
+            -DSFML_BUILD_AUDIO=OFF \
             -DGLFW_BUILD_DOCS=OFF \
             -DGLFW_BUILD_TESTS=OFF \
             -DGLFW_BUILD_EXAMPLES=OFF
@@ -63,7 +86,9 @@ jobs:
         if: runner.os != 'Windows'
         working-directory: build
         run: |
-          chmod +x PhysicsPerformanceTest BroadPhasePerformanceTest BoundaryTest FrictionTest
+          # Make executables executable
+          chmod +x PhysicsPerformanceTest BroadPhasePerformanceTest BoundaryTest FrictionTest 2>/dev/null || true
+          # Run tests
           ./PhysicsPerformanceTest
           ./BroadPhasePerformanceTest
           ./BoundaryTest
@@ -77,3 +102,43 @@ jobs:
           ./Release/BroadPhasePerformanceTest.exe
           ./Release/BoundaryTest.exe
           ./Release/FrictionTest.exe
+
+      - name: Upload Linux artifacts
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ElysiumEngine-Linux
+          path: |
+            build/ElysiumApp
+            build/PhysicsPerformanceTest
+            build/BroadPhasePerformanceTest
+            build/BoundaryTest
+            build/FrictionTest
+          retention-days: 7
+
+      - name: Upload macOS artifacts
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ElysiumEngine-macOS
+          path: |
+            build/ElysiumApp
+            build/PhysicsPerformanceTest
+            build/BroadPhasePerformanceTest
+            build/BoundaryTest
+            build/FrictionTest
+          retention-days: 7
+
+      - name: Upload Windows artifacts
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ElysiumEngine-Windows
+          path: |
+            build/Release/ElysiumApp.exe
+            build/Release/PhysicsPerformanceTest.exe
+            build/Release/BroadPhasePerformanceTest.exe
+            build/Release/BoundaryTest.exe
+            build/Release/FrictionTest.exe
+            build/Release/*.dll
+          retention-days: 7
