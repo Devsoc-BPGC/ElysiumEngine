@@ -12,7 +12,7 @@
 /**
  * @brief External declaration of the client factory function.
  */
-extern Elysium::Application* Elysium::CreateApplication();
+extern Elysium::Application *Elysium::CreateApplication();
 
 /**
  * @brief The main function that bootstraps the engine and client application.
@@ -20,11 +20,11 @@ extern Elysium::Application* Elysium::CreateApplication();
  * @param argv Array of command line argument strings.
  * @return Exit status code.
  */
-int main(int argc, char** argv) {
-    auto app = Elysium::CreateApplication();
-    app->Run();
-    delete app;
-    return 0;
+int main(int argc, char **argv) {
+  auto app = Elysium::CreateApplication();
+  app->Run();
+  delete app;
+  return 0;
 }
 
 #endif
