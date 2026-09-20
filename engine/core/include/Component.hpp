@@ -7,11 +7,11 @@ class GameObject;
 
 class Component {
 public:
-    GameObject* gameObject;
-    
-    virtual ~Component() = default;
-    virtual void Start() {}
-    virtual void Update(float dt) {}
+  GameObject *gameObject;
+
+  virtual ~Component() = default;
+  virtual void Start() {}
+  virtual void Update(float dt) {}
 };
 
 #endif
