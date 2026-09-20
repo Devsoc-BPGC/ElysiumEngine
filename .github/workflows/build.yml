@@ -12,6 +12,7 @@ env:
 
 jobs:
   build:
+    name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -20,25 +21,38 @@ jobs:
         include:
           - os: ubuntu-latest
             name: Linux
-            preset: linux
+            cc: gcc
+            cxx: g++
           - os: macos-latest
             name: macOS
-            preset: macos
+            cc: clang
+            cxx: clang++
           - os: windows-latest
             name: Windows
-            preset: windows
+            cc: cl
+            cxx: cl
 
     steps:
-      - name: Checkout repository
+      - name: Checkout (with submodules)
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
+      # ---------------- MSVC environment (Windows) ----------------
+      - name: Setup MSVC
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      # ---------------- Linux dependencies ----------------
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
+            ninja-build \
+            libx11-dev \
             libxrandr-dev \
             libxcursor-dev \
             libxi-dev \
@@ -53,92 +67,51 @@ jobs:
             libfreetype-dev \
             libharfbuzz-dev
 
+      # ---------------- macOS dependencies ----------------
+      # Only install Ninja. SFML and its deps are built from the submodule,
+      # NOT from Homebrew (mixing Homebrew SFML with your submodule causes
+      # ABI/version mismatches).
       - name: Install macOS dependencies
         if: runner.os == 'macOS'
-        run: |
-          brew install \
-            sfml \
-            glfw \
-            freetype \
-            harfbuzz
+        run: brew install ninja
 
-      - name: Configure CMake
-        shell: bash
-        run: |
-          cmake -B build \
-            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
-            -DSFML_BUILD_EXAMPLES=OFF \
-            -DSFML_BUILD_TEST_PROGRAMS=OFF \
-            -DSFML_BUILD_DOC=OFF \
-            -DSFML_INSTALL=OFF \
-            -DSFML_BUILD_NETWORK=OFF \
-            -DSFML_BUILD_AUDIO=OFF \
-            -DGLFW_BUILD_DOCS=OFF \
-            -DGLFW_BUILD_TESTS=OFF \
-            -DGLFW_BUILD_EXAMPLES=OFF
+      # ---------------- ccache for faster rebuilds ----------------
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ matrix.os }}-${{ matrix.cc }}
 
+      # ---------------- Configure ----------------
+      - name: Configure
+        run: >
+          cmake -S . -B build
+          -G Ninja
+          -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
+          -DBUILD_TESTING=ON
+          -DCMAKE_C_COMPILER=${{ matrix.cc }}
+          -DCMAKE_CXX_COMPILER=${{ matrix.cxx }}
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache
+          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          -DSFML_BUILD_EXAMPLES=OFF
+          -DSFML_BUILD_TEST_PROGRAMS=OFF
+          -DSFML_BUILD_DOC=OFF
+          -DSFML_INSTALL=OFF
+          -DSFML_BUILD_NETWORK=OFF
+          -DSFML_BUILD_AUDIO=OFF
+
+      # ---------------- Build ----------------
       - name: Build
-        shell: bash
-        working-directory: build
-        run: cmake --build . --config ${{ env.BUILD_TYPE }} --parallel 2
+        run: cmake --build build --parallel
 
-      - name: Run tests (Linux/macOS)
-        if: runner.os != 'Windows'
-        working-directory: build
-        run: |
-          # Make executables executable
-          chmod +x PhysicsPerformanceTest BroadPhasePerformanceTest BoundaryTest FrictionTest 2>/dev/null || true
-          # Run tests
-          ./PhysicsPerformanceTest
-          ./BroadPhasePerformanceTest
-          ./BoundaryTest
-          ./FrictionTest
+      # ---------------- Tests ----------------
+      - name: Test
+        run: ctest --test-dir build --output-on-failure -C ${{ env.BUILD_TYPE }}
 
-      - name: Run tests (Windows)
-        if: runner.os == 'Windows'
-        working-directory: build
-        run: |
-          ./Release/PhysicsPerformanceTest.exe
-          ./Release/BroadPhasePerformanceTest.exe
-          ./Release/BoundaryTest.exe
-          ./Release/FrictionTest.exe
-
-      - name: Upload Linux artifacts
-        if: runner.os == 'Linux'
+      # ---------------- Artifacts ----------------
+      - name: Upload ${{ matrix.name }} artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ElysiumEngine-Linux
-          path: |
-            build/ElysiumApp
-            build/PhysicsPerformanceTest
-            build/BroadPhasePerformanceTest
-            build/BoundaryTest
-            build/FrictionTest
+          name: ElysiumEngine-${{ matrix.name }}
+          path: build/bin/
           retention-days: 7
-
-      - name: Upload macOS artifacts
-        if: runner.os == 'macOS'
-        uses: actions/upload-artifact@v4
-        with:
-          name: ElysiumEngine-macOS
-          path: |
-            build/ElysiumApp
-            build/PhysicsPerformanceTest
-            build/BroadPhasePerformanceTest
-            build/BoundaryTest
-            build/FrictionTest
-          retention-days: 7
-
-      - name: Upload Windows artifacts
-        if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v4
-        with:
-          name: ElysiumEngine-Windows
-          path: |
-            build/Release/ElysiumApp.exe
-            build/Release/PhysicsPerformanceTest.exe
-            build/Release/BroadPhasePerformanceTest.exe
-            build/Release/BoundaryTest.exe
-            build/Release/FrictionTest.exe
-            build/Release/*.dll
-          retention-days: 7
+          if-no-files-found: warn
