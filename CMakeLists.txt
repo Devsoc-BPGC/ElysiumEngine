@@ -120,7 +120,7 @@ target_link_libraries(ElysiumApp PUBLIC
     SFML::Graphics
     SFML::Window
     SFML::System
-    spdlog::spdlog
+    spdlog::spdlog_header_only
 )
 configure_elysium_target(ElysiumApp)
 
