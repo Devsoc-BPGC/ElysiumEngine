@@ -8,6 +8,7 @@
 // For use by Elysium applications
 
 #include "Application.hpp"
+#include "EditorLayer.hpp"
 
 // --- Entry Point -----------------
 #include "EntryPoint.hpp"

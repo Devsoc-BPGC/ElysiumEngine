@@ -4,6 +4,7 @@
 #include "Component.hpp"
 #include "CoreMath.hpp"
 #include "RigidBody.hpp"
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <typeindex>
@@ -12,6 +13,8 @@
 
 class GameObject {
 public:
+  inline static uint32_t s_NextID = 1;
+  uint32_t id = s_NextID++;
   std::string name;
   bool active = true;
 
@@ -26,8 +29,8 @@ public:
   // Generic components
   std::vector<std::unique_ptr<Component>> components;
 
-  GameObject(const std::string &name = "New GameObject")
-      : name(name), position(0, 0, 0), rotation(Quat()), scale(1, 1, 1) {}
+  GameObject(const std::string &initialName = "New GameObject")
+      : name(initialName), position(0, 0, 0), rotation(Quat()), scale(1, 1, 1) {}
 
   template <typename T, typename... Args> T &AddComponent(Args &&...args) {
     auto comp = std::make_unique<T>(std::forward<Args>(args)...);
@@ -35,6 +38,22 @@ public:
     T &ref = *comp;
     components.push_back(std::move(comp));
     return ref;
+  }
+
+  template <typename T> T *GetComponent() {
+    for (auto &comp : components) {
+      if (auto casted = dynamic_cast<T *>(comp.get()))
+        return casted;
+    }
+    return nullptr;
+  }
+
+  template <typename T> bool HasComponent() const {
+    for (const auto &comp : components) {
+      if (dynamic_cast<const T *>(comp.get()))
+        return true;
+    }
+    return false;
   }
 
   /**

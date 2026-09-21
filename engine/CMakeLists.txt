@@ -9,12 +9,17 @@ set(ENGINE_SOURCES
 file(GLOB_RECURSE CORE_SOURCES core/src/*.cpp)
 list(APPEND ENGINE_SOURCES ${CORE_SOURCES})
 
+# Editor sources
+file(GLOB_RECURSE EDITOR_SOURCES editor/src/*.cpp)
+list(APPEND ENGINE_SOURCES ${EDITOR_SOURCES})
+
 # Changed from SHARED to STATIC to avoid DLL export issues on Windows
 add_library(ElysiumEngine STATIC ${ENGINE_SOURCES})
 
 target_include_directories(ElysiumEngine PUBLIC
     core/include
     physics/include
+    editor/include
 )
 
 # Remove ELYSIUM_BUILD_DLL since we're building static
@@ -26,7 +31,9 @@ target_compile_definitions(ElysiumEngine PUBLIC
 )
 
 target_link_libraries(ElysiumEngine PUBLIC
- SFML::Graphics 
-SFML::Window 
-SFML::System 
-spdlog::spdlog_header_only)
+    SFML::Graphics 
+    SFML::Window 
+    SFML::System 
+    spdlog::spdlog_header_only
+    ImGui-SFML::ImGui-SFML
+)
