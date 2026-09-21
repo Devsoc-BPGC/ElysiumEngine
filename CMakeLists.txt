@@ -25,11 +25,13 @@ endif()
 # --- Test toggle (must be declared before enable_testing / add_test) ---
 option(BUILD_TESTING "Build tests" OFF)
 
+# --- Distribution build toggle (strips all logging) ---
+option(ELYSIUM_DIST "Build in distribution mode (no logging)" OFF)
+
 # ============================================================
 #  Helper: configure a target with platform-specific settings
 # ============================================================
 function(configure_elysium_target target_name)
-    # --- Warnings ---
     if(MSVC)
         target_compile_options(${target_name} PRIVATE /W4 /permissive-)
     elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
@@ -48,7 +50,6 @@ function(configure_elysium_target target_name)
         endif()
     endif()
 
-    # --- Output directories ---
     set_target_properties(${target_name} PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
         ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
@@ -76,7 +77,20 @@ if(NOT MSVC)
 endif()
 
 # ============================================================
-#  SFML configuration (before add_subdirectory)
+#  spdlog configuration
+# ============================================================
+# Header-only mode is the ONLY reliable way to use spdlog here.
+# It avoids every ABI/symbol-mismatch issue with the compiled lib.
+set(SPDLOG_FMT_EXTERNAL     OFF CACHE BOOL "" FORCE)
+set(SPDLOG_BUILD_EXAMPLE    OFF CACHE BOOL "" FORCE)
+set(SPDLOG_BUILD_TESTS      OFF CACHE BOOL "" FORCE)
+set(SPDLOG_INSTALL          OFF CACHE BOOL "" FORCE)
+set(SPDLOG_BUILD_SHARED     OFF CACHE BOOL "" FORCE)
+
+add_subdirectory(external/spdlog)
+
+# ============================================================
+#  SFML configuration
 # ============================================================
 set(SFML_BUILD_EXAMPLES      OFF CACHE BOOL "" FORCE)
 set(SFML_BUILD_TEST_PROGRAMS OFF CACHE BOOL "" FORCE)
@@ -85,31 +99,32 @@ set(SFML_INSTALL             OFF CACHE BOOL "" FORCE)
 set(SFML_BUILD_NETWORK       OFF CACHE BOOL "" FORCE)
 set(SFML_BUILD_AUDIO         OFF CACHE BOOL "" FORCE)
 
-# ============================================================
-#  External dependencies (submodules)
-# ============================================================
 add_subdirectory(external/SFML)
 
 # ============================================================
 #  Engine library
 # ============================================================
 add_subdirectory(engine)
-# ^ engine/CMakeLists.txt is expected to define the ElysiumEngine target
-#   and export include directories via target_include_directories(... PUBLIC ...)
+
+if(ELYSIUM_DIST)
+    target_compile_definitions(ElysiumEngine PUBLIC ELYSIUM_DIST)
+    message(STATUS "ELYSIUM_DIST is ON — all logging will be compiled out")
+endif()
 
 # ============================================================
 #  Application
 # ============================================================
 add_executable(ElysiumApp app/main.cpp)
-target_link_libraries(ElysiumApp PRIVATE
+target_link_libraries(ElysiumApp PUBLIC
     ElysiumEngine
     SFML::Graphics
     SFML::Window
     SFML::System
+    spdlog::spdlog_header_only
 )
 configure_elysium_target(ElysiumApp)
 
-# Windows: copy runtime DLLs next to the app
+# Windows: copy runtime DLLs next to the app (spdlog removed — header-only)
 if(WIN32)
     add_custom_command(TARGET ElysiumApp POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -128,10 +143,13 @@ endif()
 if(BUILD_TESTING)
     enable_testing()
 
-    # Helper: register a test executable that links the engine
     function(elysium_add_test test_name source_file)
         add_executable(${test_name} ${source_file})
-        target_link_libraries(${test_name} PRIVATE ElysiumEngine SFML::System)
+        target_link_libraries(${test_name} PRIVATE
+            ElysiumEngine
+            SFML::System
+            spdlog::spdlog_header_only
+        )
         configure_elysium_target(${test_name})
         add_test(NAME ${test_name} COMMAND ${test_name})
     endfunction()
@@ -143,17 +161,20 @@ if(BUILD_TESTING)
 endif()
 
 # ============================================================
-#  Custom targets (usable via `cmake --build ... --target X`)
+#  Custom targets
 # ============================================================
 find_program(CLANG_FORMAT_EXE clang-format)
 
 if(CLANG_FORMAT_EXE)
+    file(GLOB_RECURSE ELYSIUM_SOURCES
+        ${CMAKE_CURRENT_SOURCE_DIR}/engine/*.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/engine/*.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/app/*.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/app/*.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/*.cpp
+    )
     add_custom_target(format
-        COMMAND ${CLANG_FORMAT_EXE} -i
-            ${CMAKE_CURRENT_SOURCE_DIR}/app/*.cpp
-            ${CMAKE_CURRENT_SOURCE_DIR}/test/*.cpp
-        COMMAND ${CMAKE_COMMAND} -E echo
-            "Note: format engine/ sources separately or add them to this list"
+        COMMAND ${CLANG_FORMAT_EXE} -i ${ELYSIUM_SOURCES}
         COMMENT "Formatting C++ sources with clang-format"
         VERBATIM
     )
@@ -183,6 +204,7 @@ message(STATUS "Source dir     : ${CMAKE_CURRENT_SOURCE_DIR}")
 message(STATUS "Binary dir     : ${CMAKE_BINARY_DIR}")
 message(STATUS "Output bin dir : ${CMAKE_BINARY_DIR}/bin")
 message(STATUS "Tests enabled  : ${BUILD_TESTING}")
+message(STATUS "Dist build     : ${ELYSIUM_DIST}")
 if(WIN32)
     message(STATUS "Platform defs  : ELYSIUM_PLATFORM_WINDOWS")
 elseif(APPLE)

@@ -6,6 +6,7 @@
 #pragma once
 
 #include "Application.hpp"
+#include "Log.h"
 
 #ifdef ELYSIUM_PLATFORM_LINUX
 
@@ -21,6 +22,7 @@ extern Elysium::Application *Elysium::CreateApplication();
  * @return Exit status code.
  */
 int main(int argc, char **argv) {
+  Elysium::Log::Init();
   auto app = Elysium::CreateApplication();
   app->Run();
   delete app;

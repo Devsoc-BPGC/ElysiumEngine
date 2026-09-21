@@ -58,7 +58,7 @@ public:
 
 class Sandbox : public Elysium::Application {
 public:
-  Sandbox() {}
+  Sandbox() { ELYSIUM_INFO("Sandbox initialized"); }
 
   ~Sandbox() {}
 

@@ -25,4 +25,8 @@ target_compile_definitions(ElysiumEngine PUBLIC
     $<$<BOOL:${UNIX} AND NOT ${APPLE}>:ELYSIUM_PLATFORM_LINUX>
 )
 
-target_link_libraries(ElysiumEngine PUBLIC SFML::Graphics SFML::Window SFML::System)
+target_link_libraries(ElysiumEngine PUBLIC
+ SFML::Graphics 
+SFML::Window 
+SFML::System 
+spdlog::spdlog_header_only)
