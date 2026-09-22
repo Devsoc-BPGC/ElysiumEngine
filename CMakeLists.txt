@@ -102,6 +102,31 @@ set(SFML_BUILD_AUDIO         OFF CACHE BOOL "" FORCE)
 add_subdirectory(external/SFML)
 
 # ============================================================
+#  Dear ImGui & ImGui-SFML (Docking Branch + SFML 3)
+# ============================================================
+include(FetchContent)
+
+# 1. Fetch Dear ImGui (Docking branch)
+FetchContent_Declare(
+    imgui
+    GIT_REPOSITORY https://github.com/ocornut/imgui.git
+    GIT_TAG        v1.91.5-docking
+)
+FetchContent_MakeAvailable(imgui)
+
+# 2. ImGui-SFML configuration
+set(IMGUI_DIR ${imgui_SOURCE_DIR} CACHE PATH "Path to Dear ImGui" FORCE)
+set(IMGUI_SFML_FIND_SFML OFF CACHE BOOL "" FORCE)
+
+# 3. Fetch ImGui-SFML
+FetchContent_Declare(
+    imgui-sfml
+    GIT_REPOSITORY https://github.com/SFML/imgui-sfml.git
+    GIT_TAG        v3.0
+)
+FetchContent_MakeAvailable(imgui-sfml)
+
+# ============================================================
 #  Engine library
 # ============================================================
 add_subdirectory(engine)
@@ -121,6 +146,7 @@ target_link_libraries(ElysiumApp PUBLIC
     SFML::Window
     SFML::System
     spdlog::spdlog_header_only
+    ImGui-SFML::ImGui-SFML
 )
 configure_elysium_target(ElysiumApp)
 

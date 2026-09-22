@@ -22,8 +22,10 @@ typedef std::vector<Collider> ColliderList;
  * properties.
  */
 struct RigidBody {
+  bool isStatic = false;
   float mass;        /**< Total mass of the body. */
   float inverseMass; /**< Precomputed 1/mass (0 for static objects). */
+  float restitution = 0.75f;
   float friction;    /**< Friction coefficient (Coulomb friction). */
 
   Mat3 orientation;        /**< Current rotation matrix in world space. */
@@ -54,7 +56,7 @@ struct RigidBody {
    * @brief Constructs a new RigidBody with default values.
    */
   RigidBody()
-      : mass(0.0f), inverseMass(0.0f), friction(0.3f),
+      : isStatic(false), mass(0.0f), inverseMass(0.0f), restitution(0.75f), friction(0.3f),
         orientation(Mat3::Identity()), inverseOrientation(Mat3::Identity()),
         localInverseInertiaTensor(Mat3::Identity()),
         inverseInertiaTensorWorld(Mat3::Identity()), globalCentroid(0, 0, 0),
