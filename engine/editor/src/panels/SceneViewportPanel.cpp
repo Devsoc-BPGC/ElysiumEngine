@@ -8,7 +8,7 @@ namespace Elysium {
 SceneViewportPanel::SceneViewportPanel() : EditorPanel("Viewport") {}
 
 void SceneViewportPanel::OnImGuiRender(EditorContext &context, Scene &scene,
-                                      SimpleRenderer &renderer) {
+                                       SimpleRenderer &renderer) {
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
   if (ImGui::Begin("Viewport", &isOpen,
                    ImGuiWindowFlags_NoScrollbar |
@@ -21,8 +21,10 @@ void SceneViewportPanel::OnImGuiRender(EditorContext &context, Scene &scene,
     context.isViewportFocused = ImGui::IsWindowFocused();
 
     // Ensure valid minimum dimensions
-    unsigned int width = static_cast<unsigned int>(std::max(1.0f, viewportAvail.x));
-    unsigned int height = static_cast<unsigned int>(std::max(1.0f, viewportAvail.y));
+    unsigned int width =
+        static_cast<unsigned int>(std::max(1.0f, viewportAvail.x));
+    unsigned int height =
+        static_cast<unsigned int>(std::max(1.0f, viewportAvail.y));
 
     // Dynamic resize of the off-screen RenderTexture
     if (m_currentTextureSize.x != width || m_currentTextureSize.y != height) {
@@ -36,7 +38,8 @@ void SceneViewportPanel::OnImGuiRender(EditorContext &context, Scene &scene,
     float zoom = context.camera.zoom;
     sf::View view;
     view.setSize({static_cast<float>(width), static_cast<float>(height)});
-    view.setCenter({context.camera.center.x * ptm, context.camera.center.y * ptm});
+    view.setCenter(
+        {context.camera.center.x * ptm, context.camera.center.y * ptm});
     view.zoom(1.0f / zoom);
 
     // Render active scene to off-screen RenderTexture
@@ -74,8 +77,8 @@ void SceneViewportPanel::OnImGuiRender(EditorContext &context, Scene &scene,
     }
 
     // Viewport HUD Overlay (Camera info & quick controls)
-    ImVec2 overlayPos = ImVec2(context.viewportPos.x + 10.0f,
-                               context.viewportPos.y + 10.0f);
+    ImVec2 overlayPos =
+        ImVec2(context.viewportPos.x + 10.0f, context.viewportPos.y + 10.0f);
     ImGui::SetNextWindowPos(overlayPos);
     ImGui::SetNextWindowBgAlpha(0.6f);
     if (ImGui::BeginChild("ViewportHUD", ImVec2(240.0f, 65.0f), true,

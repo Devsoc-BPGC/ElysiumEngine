@@ -56,12 +56,14 @@ public:
       // Vertical lines
       for (float x = 0; x <= static_cast<float>(targetSize.x); x += cellSize) {
         lines.append(sf::Vertex({x, 0}, gridColor));
-        lines.append(sf::Vertex({x, static_cast<float>(targetSize.y)}, gridColor));
+        lines.append(
+            sf::Vertex({x, static_cast<float>(targetSize.y)}, gridColor));
       }
       // Horizontal lines
       for (float y = 0; y <= static_cast<float>(targetSize.y); y += cellSize) {
         lines.append(sf::Vertex({0, y}, gridColor));
-        lines.append(sf::Vertex({static_cast<float>(targetSize.x), y}, gridColor));
+        lines.append(
+            sf::Vertex({static_cast<float>(targetSize.x), y}, gridColor));
       }
       target.draw(lines);
       drawCalls++;
@@ -104,7 +106,8 @@ public:
         } else {
           sf::RectangleShape shape;
           shape.setSize({sprite->size.x * ptm, sprite->size.y * ptm});
-          shape.setOrigin({sprite->size.x * 0.5f * ptm, sprite->size.y * 0.5f * ptm});
+          shape.setOrigin(
+              {sprite->size.x * 0.5f * ptm, sprite->size.y * 0.5f * ptm});
           shape.setPosition({obj->position.x * ptm, obj->position.y * ptm});
           shape.setFillColor(sprite->color);
           Quat q = obj->rotation;

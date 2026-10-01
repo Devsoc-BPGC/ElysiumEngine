@@ -30,7 +30,8 @@ public:
   std::vector<std::unique_ptr<Component>> components;
 
   GameObject(const std::string &initialName = "New GameObject")
-      : name(initialName), position(0, 0, 0), rotation(Quat()), scale(1, 1, 1) {}
+      : name(initialName), position(0, 0, 0), rotation(Quat()), scale(1, 1, 1) {
+  }
 
   template <typename T, typename... Args> T &AddComponent(Args &&...args) {
     auto comp = std::make_unique<T>(std::forward<Args>(args)...);

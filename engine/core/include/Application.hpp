@@ -1,49 +1,52 @@
-/**
- * @file Application.hpp
- * @brief Base application class and client factory function definition.
- */
+#ifndef APPLICATION_HPP
+#define APPLICATION_HPP
 
-#pragma once
-
+#include "ApplicationEvent.hpp"
 #include "Core.hpp"
+#include "Event.hpp"
+#include "LayerStack.hpp"
+#include "Timestep.hpp"
+#include "Window.hpp"
+#include <SFML/System/Clock.hpp>
+#include <memory>
+#include <string>
 
 namespace Elysium {
 
-/**
- * @class Application
- * @brief The core application class that manages the main loop and engine
- * subsystems.
- *
- * Client applications should inherit from this class and implement the
- * CreateApplication() factory function.
- */
 class ELYSIUM_API Application {
 public:
-  /**
-   * @brief Constructs the Application object.
-   */
-  Application();
-
-  /**
-   * @brief Virtual destructor for proper cleanup of derived classes.
-   */
+  Application(const std::string &name = "Elysium Application");
   virtual ~Application();
 
-  /**
-   * @brief The main execution loop of the application.
-   *
-   * This method is called by the entry point and runs until the application is
-   * closed.
-   */
-  virtual void Run();
+  void Run();
+  void OnEvent(Event &e);
+
+  void PushLayer(Layer *layer);
+  void PushOverlay(Layer *overlay);
+
+  Window &GetWindow() { return *m_Window; }
+  const Window &GetWindow() const { return *m_Window; }
+
+  void Close() { m_Running = false; }
+
+  static Application &Get() { return *s_Instance; }
+
+private:
+  bool OnWindowClose(WindowCloseEvent &e);
+  bool OnWindowResize(WindowResizeEvent &e);
+
+  std::unique_ptr<Window> m_Window;
+  LayerStack m_LayerStack;
+  bool m_Running = true;
+  bool m_Minimized = false;
+  sf::Clock m_Clock;
+
+  static Application *s_Instance;
 };
 
-/**
- * @brief Factory function to be implemented by the client application.
- * @return A pointer to a new instance of a class derived from Application.
- *
- * The engine's entry point calls this function to bootstrap the application.
- */
+// Client factory function
 Application *CreateApplication();
 
 } // namespace Elysium
+
+#endif // APPLICATION_HPP

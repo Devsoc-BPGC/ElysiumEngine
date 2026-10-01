@@ -10,17 +10,19 @@ namespace Elysium {
 
 static constexpr float PI_VAL = 3.14159265358979323846f;
 
-EntityInspectorPanel::EntityInspectorPanel() : EditorPanel("Entity Inspector") {}
+EntityInspectorPanel::EntityInspectorPanel()
+    : EditorPanel("Entity Inspector") {}
 
 void EntityInspectorPanel::OnImGuiRender(EditorContext &context, Scene &scene,
-                                        SimpleRenderer &renderer) {
+                                         SimpleRenderer &renderer) {
   (void)renderer;
 
   if (ImGui::Begin("Entity Inspector", &isOpen)) {
     if (!context.selectedEntity) {
       ImGui::Spacing();
       ImGui::TextDisabled("No Entity Selected.");
-      ImGui::TextWrapped("Select an entity from the Scene Hierarchy to view and edit its components.");
+      ImGui::TextWrapped("Select an entity from the Scene Hierarchy to view "
+                         "and edit its components.");
       ImGui::End();
       return;
     }
@@ -78,12 +80,15 @@ void EntityInspectorPanel::OnImGuiRender(EditorContext &context, Scene &scene,
       }
 
       if (entity.rigidBody && ImGui::MenuItem("Box Collider")) {
-        entity.rigidBody->AddColliders(Collider::CreateBox(Vec3(0.5f, 0.5f, 0.0f), 1.0f));
+        entity.rigidBody->AddColliders(
+            Collider::CreateBox(Vec3(0.5f, 0.5f, 0.0f), 1.0f));
         ELYSIUM_INFO("Added Box Collider to entity: {}", entity.name);
       }
 
-      if (!entity.GetComponent<SpriteRenderer>() && ImGui::MenuItem("Sprite Renderer")) {
-        entity.AddComponent<SpriteRenderer>(sf::Color(255, 100, 100), sf::Vector2f(1.0f, 1.0f));
+      if (!entity.GetComponent<SpriteRenderer>() &&
+          ImGui::MenuItem("Sprite Renderer")) {
+        entity.AddComponent<SpriteRenderer>(sf::Color(255, 100, 100),
+                                            sf::Vector2f(1.0f, 1.0f));
         ELYSIUM_INFO("Added SpriteRenderer to entity: {}", entity.name);
       }
 
@@ -94,7 +99,7 @@ void EntityInspectorPanel::OnImGuiRender(EditorContext &context, Scene &scene,
 }
 
 void EntityInspectorPanel::DrawTransformComponent(EditorContext &context,
-                                                 GameObject &entity) {
+                                                  GameObject &entity) {
   (void)context;
   if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
     bool changed = false;
@@ -130,8 +135,8 @@ void EntityInspectorPanel::DrawTransformComponent(EditorContext &context,
 }
 
 void EntityInspectorPanel::DrawRigidBodyComponent(EditorContext &context,
-                                                 Scene &scene,
-                                                 GameObject &entity) {
+                                                  Scene &scene,
+                                                  GameObject &entity) {
   (void)context;
   if (!entity.rigidBody)
     return;
@@ -190,7 +195,7 @@ void EntityInspectorPanel::DrawRigidBodyComponent(EditorContext &context,
 }
 
 void EntityInspectorPanel::DrawCollidersComponent(EditorContext &context,
-                                                 GameObject &entity) {
+                                                  GameObject &entity) {
   (void)context;
   if (!entity.rigidBody || entity.rigidBody->colliders.empty())
     return;
@@ -220,13 +225,14 @@ void EntityInspectorPanel::DrawCollidersComponent(EditorContext &context,
 }
 
 void EntityInspectorPanel::DrawSpriteRendererComponent(EditorContext &context,
-                                                      GameObject &entity) {
+                                                       GameObject &entity) {
   (void)context;
   auto *sprite = entity.GetComponent<SpriteRenderer>();
   if (!sprite)
     return;
 
-  if (ImGui::CollapsingHeader("Sprite Renderer", ImGuiTreeNodeFlags_DefaultOpen)) {
+  if (ImGui::CollapsingHeader("Sprite Renderer",
+                              ImGuiTreeNodeFlags_DefaultOpen)) {
     // Shape toggle
     const char *shapes[] = {"Box / Rectangle", "Circle / Sphere"};
     int currentShape = sprite->isCircle ? 1 : 0;
@@ -252,22 +258,22 @@ void EntityInspectorPanel::DrawSpriteRendererComponent(EditorContext &context,
         sprite->color.a / 255.0f,
     };
     if (ImGui::ColorEdit4("Tint Color", color)) {
-      sprite->color = sf::Color(
-          static_cast<uint8_t>(color[0] * 255.0f),
-          static_cast<uint8_t>(color[1] * 255.0f),
-          static_cast<uint8_t>(color[2] * 255.0f),
-          static_cast<uint8_t>(color[3] * 255.0f));
+      sprite->color = sf::Color(static_cast<uint8_t>(color[0] * 255.0f),
+                                static_cast<uint8_t>(color[1] * 255.0f),
+                                static_cast<uint8_t>(color[2] * 255.0f),
+                                static_cast<uint8_t>(color[3] * 255.0f));
     }
   }
 }
 
 void EntityInspectorPanel::DrawCustomComponents(EditorContext &context,
-                                               GameObject &entity) {
+                                                GameObject &entity) {
   (void)context;
   if (entity.components.empty())
     return;
 
-  if (ImGui::CollapsingHeader("Attached Components", ImGuiTreeNodeFlags_DefaultOpen)) {
+  if (ImGui::CollapsingHeader("Attached Components",
+                              ImGuiTreeNodeFlags_DefaultOpen)) {
     for (size_t i = 0; i < entity.components.size(); ++i) {
       ImGui::PushID(static_cast<int>(i));
       ImGui::BulletText("Custom Component #%zu", i + 1);

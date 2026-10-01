@@ -7,7 +7,7 @@ namespace Elysium {
 ToolbarPanel::ToolbarPanel() : EditorPanel("Toolbar") {}
 
 void ToolbarPanel::OnImGuiRender(EditorContext &context, Scene &scene,
-                                SimpleRenderer &renderer) {
+                                 SimpleRenderer &renderer) {
   (void)scene;
   (void)renderer;
 
@@ -37,13 +37,15 @@ void ToolbarPanel::OnImGuiRender(EditorContext &context, Scene &scene,
     float totalControlsWidth = buttonWidth * 3.0f + 30.0f;
     float availWidth = ImGui::GetContentRegionAvail().x;
     if (availWidth > totalControlsWidth) {
-      ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (availWidth - totalControlsWidth) * 0.5f);
+      ImGui::SetCursorPosX(ImGui::GetCursorPosX() +
+                           (availWidth - totalControlsWidth) * 0.5f);
     }
 
     // Play / Stop button
     if (context.playState == ScenePlayState::Edit) {
       ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.15f, 0.6f, 0.25f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.2f, 0.75f, 0.35f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                            ImVec4(0.2f, 0.75f, 0.35f, 1.0f));
       if (ImGui::Button(" Play ", ImVec2(buttonWidth, 0))) {
         context.playState = ScenePlayState::Play;
         ELYSIUM_INFO("Editor: Switched to PLAY mode");
@@ -51,7 +53,8 @@ void ToolbarPanel::OnImGuiRender(EditorContext &context, Scene &scene,
       ImGui::PopStyleColor(2);
     } else {
       ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.7f, 0.2f, 0.2f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.85f, 0.25f, 0.25f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                            ImVec4(0.85f, 0.25f, 0.25f, 1.0f));
       if (ImGui::Button(" Stop ", ImVec2(buttonWidth, 0))) {
         context.playState = ScenePlayState::Edit;
         ELYSIUM_INFO("Editor: Switched to EDIT mode");

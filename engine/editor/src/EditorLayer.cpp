@@ -1,4 +1,5 @@
 #include "EditorLayer.hpp"
+#include "Application.hpp"
 #include "Collider.hpp"
 #include "EditorLogSink.hpp"
 #include "Log.h"
@@ -14,13 +15,25 @@
 
 namespace Elysium {
 
-EditorLayer::EditorLayer() = default;
+EditorLayer::EditorLayer() : Layer("EditorLayer") {
+  // Configure default scene
+  m_scene.physicsWorld.gravity = Vec3(0.0f, 9.81f, 0.0f);
+}
 
 EditorLayer::~EditorLayer() {
   if (m_isInitialized) {
     Shutdown();
   }
 }
+
+void EditorLayer::OnAttach() {
+  if (!m_isInitialized) {
+    m_window = &Application::Get().GetWindow().GetNativeWindow();
+    Init(*m_window);
+  }
+}
+
+void EditorLayer::OnDetach() { Shutdown(); }
 
 void EditorLayer::Init(sf::RenderWindow &window) {
   if (m_isInitialized)
@@ -59,48 +72,104 @@ void EditorLayer::Init(sf::RenderWindow &window) {
   AddPanel<StatsPanel>();
 
   m_isInitialized = true;
-  ELYSIUM_CORE_INFO("Elysium EditorLayer initialized with Dear ImGui Docking");
+  ELYSIUM_CORE_INFO("Elysium EditorLayer attached with Dear ImGui Docking");
 }
 
-void EditorLayer::ProcessEvent(const sf::Event &event) {
-  if (!m_isInitialized || !m_window)
-    return;
+void EditorLayer::OnUpdate(Timestep ts) {
+  m_lastDt = ts.GetSeconds();
 
-  ImGui::SFML::ProcessEvent(*m_window, event);
-
-  // Global Editor Keyboard Shortcuts
-  if (const auto *keyPressed = event.getIf<sf::Event::KeyPressed>()) {
-    ImGuiIO &io = ImGui::GetIO();
-
-    if (!io.WantTextInput) {
-      // Space: Toggle Play / Pause
-      if (keyPressed->code == sf::Keyboard::Key::Space) {
-        if (m_context.playState == ScenePlayState::Play) {
-          m_context.playState = ScenePlayState::Pause;
-          ELYSIUM_INFO("Editor: Paused");
-        } else {
-          m_context.playState = ScenePlayState::Play;
-          ELYSIUM_INFO("Editor: Playing");
-        }
-      }
-
-      // 'F': Focus camera on selected entity
-      if (keyPressed->code == sf::Keyboard::Key::F && m_context.selectedEntity) {
-        m_context.camera.center.x = m_context.selectedEntity->position.x;
-        m_context.camera.center.y = m_context.selectedEntity->position.y;
-        ELYSIUM_INFO("Editor Camera focused on: {}", m_context.selectedEntity->name);
-      }
-    }
+  sf::Clock updateTimer;
+  if (m_context.playState == ScenePlayState::Play) {
+    m_scene.physicsWorld.boundaryRotation += 0.0005f;
+    m_scene.Update(ts.GetSeconds());
+  } else if (m_context.playState == ScenePlayState::Step) {
+    m_scene.Update(1.0f / 60.0f);
+    m_context.playState = ScenePlayState::Pause;
   }
+
+  float updateMs = updateTimer.getElapsedTime().asSeconds() * 1000.0f;
+  m_context.stats.updateTimeMs = updateMs;
+  m_context.stats.physicsTimeMs = updateMs * 0.75f;
+
+  m_context.stats.entityCount = static_cast<uint32_t>(m_scene.objects.size());
+  m_context.stats.frameTimeMs = ts.GetMilliseconds();
+  m_context.stats.fps =
+      (ts.GetSeconds() > 0.0001f) ? (1.0f / ts.GetSeconds()) : 60.0f;
+  m_context.stats.drawCalls = m_renderer.drawCalls;
 }
 
-void EditorLayer::BeginFrame(float dt) {
+void EditorLayer::OnImGuiRender() {
   if (!m_isInitialized || !m_window)
     return;
 
-  ImGui::SFML::Update(*m_window, sf::seconds(dt));
+  sf::Clock renderTimer;
+
+  ImGui::SFML::Update(*m_window, sf::seconds(m_lastDt));
 
   SetupDockSpace();
+  RenderMenuBar(m_scene);
+  ImGui::End();
+
+  for (auto &panel : m_panels) {
+    if (panel->isOpen) {
+      panel->OnImGuiRender(m_context, m_scene, m_renderer);
+    }
+  }
+
+  ImGui::SFML::Render(*m_window);
+
+  m_context.stats.renderTimeMs =
+      renderTimer.getElapsedTime().asSeconds() * 1000.0f;
+}
+
+void EditorLayer::OnEvent(Event &event) {
+  EventDispatcher dispatcher(event);
+  dispatcher.Dispatch<KeyPressedEvent>(
+      [this](KeyPressedEvent &e) { return OnKeyPressed(e); });
+}
+
+bool EditorLayer::OnKeyPressed(KeyPressedEvent &e) {
+  ImGuiIO &io = ImGui::GetIO();
+  if (io.WantTextInput)
+    return false;
+
+  // Space: Toggle Play / Pause
+  if (e.GetKeyCode() == sf::Keyboard::Key::Space) {
+    if (m_context.playState == ScenePlayState::Play) {
+      m_context.playState = ScenePlayState::Pause;
+      ELYSIUM_INFO("Editor: Paused");
+    } else {
+      m_context.playState = ScenePlayState::Play;
+      ELYSIUM_INFO("Editor: Playing");
+    }
+    return true;
+  }
+
+  // 'F': Focus camera on selected entity
+  if (e.GetKeyCode() == sf::Keyboard::Key::F && m_context.selectedEntity) {
+    m_context.camera.center.x = m_context.selectedEntity->position.x;
+    m_context.camera.center.y = m_context.selectedEntity->position.y;
+    ELYSIUM_INFO("Editor Camera focused on: {}",
+                 m_context.selectedEntity->name);
+    return true;
+  }
+
+  // Delete: Delete selected entity
+  if (e.GetKeyCode() == sf::Keyboard::Key::Delete && m_context.selectedEntity) {
+    if (m_context.selectedEntity->rigidBody) {
+      m_scene.physicsWorld.RemoveBody(
+          m_context.selectedEntity->rigidBody.get());
+    }
+    auto it = std::find(m_scene.objects.begin(), m_scene.objects.end(),
+                        m_context.selectedEntity);
+    if (it != m_scene.objects.end()) {
+      m_scene.objects.erase(it);
+    }
+    m_context.selectedEntity = nullptr;
+    return true;
+  }
+
+  return false;
 }
 
 void EditorLayer::SetupDockSpace() {
@@ -109,14 +178,11 @@ void EditorLayer::SetupDockSpace() {
   ImGui::SetNextWindowSize(viewport->WorkSize);
   ImGui::SetNextWindowViewport(viewport->ID);
 
-  ImGuiWindowFlags windowFlags = ImGuiWindowFlags_MenuBar |
-                                ImGuiWindowFlags_NoDocking |
-                                ImGuiWindowFlags_NoTitleBar |
-                                ImGuiWindowFlags_NoCollapse |
-                                ImGuiWindowFlags_NoResize |
-                                ImGuiWindowFlags_NoMove |
-                                ImGuiWindowFlags_NoBringToFrontOnFocus |
-                                ImGuiWindowFlags_NoNavFocus;
+  ImGuiWindowFlags windowFlags =
+      ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking |
+      ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse |
+      ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+      ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
 
   ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
   ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
@@ -149,23 +215,25 @@ void EditorLayer::RenderMenuBar(Scene &scene) {
       }
       ImGui::Separator();
       if (ImGui::MenuItem("Exit", "Alt+F4")) {
-        if (m_window) {
-          m_window->close();
-        }
+        Application::Get().Close();
       }
       ImGui::EndMenu();
     }
 
     // 2. Edit Menu
     if (ImGui::BeginMenu("Edit")) {
-      if (ImGui::MenuItem("Undo", "Ctrl+Z", false, false)) {}
-      if (ImGui::MenuItem("Redo", "Ctrl+Y", false, false)) {}
+      if (ImGui::MenuItem("Undo", "Ctrl+Z", false, false)) {
+      }
+      if (ImGui::MenuItem("Redo", "Ctrl+Y", false, false)) {
+      }
       ImGui::Separator();
       bool hasSelection = (m_context.selectedEntity != nullptr);
-      if (ImGui::MenuItem("Delete Selected Entity", "Del", false, hasSelection)) {
+      if (ImGui::MenuItem("Delete Selected Entity", "Del", false,
+                          hasSelection)) {
         if (m_context.selectedEntity) {
           if (m_context.selectedEntity->rigidBody) {
-            scene.physicsWorld.RemoveBody(m_context.selectedEntity->rigidBody.get());
+            scene.physicsWorld.RemoveBody(
+                m_context.selectedEntity->rigidBody.get());
           }
           auto it = std::find(scene.objects.begin(), scene.objects.end(),
                               m_context.selectedEntity);
@@ -209,13 +277,15 @@ void EditorLayer::RenderMenuBar(Scene &scene) {
     if (ImGui::BeginMenu("Entities")) {
       if (ImGui::MenuItem("Create Empty Entity")) {
         auto entity = std::make_shared<GameObject>("Empty Entity");
-        entity->position = Vec3(m_context.camera.center.x, m_context.camera.center.y, 0.0f);
+        entity->position =
+            Vec3(m_context.camera.center.x, m_context.camera.center.y, 0.0f);
         scene.AddGameObject(entity);
         m_context.selectedEntity = entity;
       }
       if (ImGui::MenuItem("Create Dynamic Ball")) {
         auto entity = std::make_shared<GameObject>("Dynamic Ball");
-        entity->position = Vec3(m_context.camera.center.x, m_context.camera.center.y, 0.0f);
+        entity->position =
+            Vec3(m_context.camera.center.x, m_context.camera.center.y, 0.0f);
         auto &rb = entity->CreateRigidBody();
         rb.AddColliders(Collider::CreateSphere(0.5f, 1.0f));
         scene.AddGameObject(entity);
@@ -223,7 +293,8 @@ void EditorLayer::RenderMenuBar(Scene &scene) {
       }
       if (ImGui::MenuItem("Create Dynamic Box")) {
         auto entity = std::make_shared<GameObject>("Dynamic Box");
-        entity->position = Vec3(m_context.camera.center.x, m_context.camera.center.y, 0.0f);
+        entity->position =
+            Vec3(m_context.camera.center.x, m_context.camera.center.y, 0.0f);
         auto &rb = entity->CreateRigidBody();
         rb.AddColliders(Collider::CreateBox(Vec3(0.5f, 0.5f, 0.0f), 1.0f));
         scene.AddGameObject(entity);
@@ -231,7 +302,8 @@ void EditorLayer::RenderMenuBar(Scene &scene) {
       }
       if (ImGui::MenuItem("Create Static Platform")) {
         auto entity = std::make_shared<GameObject>("Static Platform");
-        entity->position = Vec3(m_context.camera.center.x, m_context.camera.center.y, 0.0f);
+        entity->position =
+            Vec3(m_context.camera.center.x, m_context.camera.center.y, 0.0f);
         auto &rb = entity->CreateRigidBody();
         rb.isStatic = true;
         rb.mass = 0.0f;
@@ -267,42 +339,14 @@ void EditorLayer::RenderMenuBar(Scene &scene) {
       }
       ImGui::Separator();
       ImGui::MenuItem("Show Debug Grid", nullptr, &m_context.drawDebugGrid);
-      ImGui::MenuItem("Show Colliders", nullptr, &m_context.drawPhysicsColliders);
+      ImGui::MenuItem("Show Colliders", nullptr,
+                      &m_context.drawPhysicsColliders);
       ImGui::MenuItem("Show AABBs", nullptr, &m_context.drawAABBs);
       ImGui::EndMenu();
     }
 
     ImGui::EndMenuBar();
   }
-}
-
-void EditorLayer::RenderPanels(Scene &scene, SimpleRenderer &renderer) {
-  if (!m_isInitialized)
-    return;
-
-  // Render main top-level menu bar inside dockspace host window
-  RenderMenuBar(scene);
-
-  // Close the DockSpace host window so docking nodes and child windows render
-  ImGui::End();
-
-  // Update entity count
-  m_context.stats.entityCount = static_cast<uint32_t>(scene.objects.size());
-
-  // Render each registered panel
-  for (auto &panel : m_panels) {
-    if (panel->isOpen) {
-      panel->OnImGuiRender(m_context, scene, renderer);
-    }
-  }
-}
-
-void EditorLayer::EndFrame() {
-  if (!m_isInitialized || !m_window)
-    return;
-
-  // Render ImGui draw lists to the SFML render window
-  ImGui::SFML::Render(*m_window);
 }
 
 void EditorLayer::Shutdown() {
@@ -313,7 +357,7 @@ void EditorLayer::Shutdown() {
   ImGui::SFML::Shutdown();
   m_isInitialized = false;
   m_window = nullptr;
-  ELYSIUM_CORE_INFO("Elysium EditorLayer shutdown complete");
+  ELYSIUM_CORE_INFO("Elysium EditorLayer detached");
 }
 
 void EditorLayer::ApplyModernDarkTheme() {

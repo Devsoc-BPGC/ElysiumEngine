@@ -20,6 +20,7 @@ target_include_directories(ElysiumEngine PUBLIC
     core/include
     physics/include
     editor/include
+    events
 )
 
 # Remove ELYSIUM_BUILD_DLL since we're building static

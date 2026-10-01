@@ -9,12 +9,7 @@
 
 namespace Elysium {
 
-enum class ScenePlayState {
-  Edit,
-  Play,
-  Pause,
-  Step
-};
+enum class ScenePlayState { Edit, Play, Pause, Step };
 
 struct EditorCamera {
   sf::Vector2f center = {8.0f, 6.0f}; // Default center in meters

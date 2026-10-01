@@ -6,7 +6,7 @@ namespace Elysium {
 ConsolePanel::ConsolePanel() : EditorPanel("Console") {}
 
 void ConsolePanel::OnImGuiRender(EditorContext &context, Scene &scene,
-                                SimpleRenderer &renderer) {
+                                 SimpleRenderer &renderer) {
   (void)context;
   (void)scene;
   (void)renderer;
@@ -41,7 +41,8 @@ void ConsolePanel::OnImGuiRender(EditorContext &context, Scene &scene,
     auto messages = GetEditorLogSink()->GetMessages();
     for (const auto &msg : messages) {
       // Filter by level
-      if (msg.level == spdlog::level::trace || msg.level == spdlog::level::debug) {
+      if (msg.level == spdlog::level::trace ||
+          msg.level == spdlog::level::debug) {
         if (!m_showTrace)
           continue;
       } else if (msg.level == spdlog::level::info) {
