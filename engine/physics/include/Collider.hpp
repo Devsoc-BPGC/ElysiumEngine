@@ -3,7 +3,7 @@
 
 #include "CoreMath.hpp"
 
-enum class ColliderType { Sphere, Box };
+enum class ColliderType { Sphere, Box, Polygon };
 
 class Collider {
 public:
@@ -19,7 +19,7 @@ public:
   // Shape-specific data
   float radius;     // For Sphere/Circle
   Vec3 halfExtents; // For Box
-
+  std::vector<Vec3> localVertices;  // For Polygon (Local coordinates)
   /**
    * @brief Constructor for a Circle (Sphere in 3D math terms).
    * @param r Radius of the circle.
@@ -72,6 +72,15 @@ public:
 
     return c;
   }
+
+static Collider CreatePolygon(const std::vector<Vec3>& verts, float density = 1.0f, Vec3 offset = Vec3(0, 0, 0)) {
+  Collider c;
+  c.type = ColliderType::Polygon;
+  c.localVertices = verts;
+  c.localCentroid = offset;
+  c.RecalculateProperties(density);
+  return c;
+}
 
   /**
    * @brief Recalculates mass and local inertia tensor based on shape and
