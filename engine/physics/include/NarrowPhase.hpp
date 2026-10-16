@@ -2,6 +2,7 @@
 #define NARROW_PHASE_HPP
 
 #include "RigidBody.hpp"
+#include "SAT.hpp"
 #include <cmath>
 
 /**
