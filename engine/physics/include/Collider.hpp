@@ -73,14 +73,14 @@ public:
     return c;
   }
 
-static Collider CreatePolygon(const std::vector<Vec3>& verts, float density = 1.0f, Vec3 offset = Vec3(0, 0, 0)) {
-  Collider c;
-  c.type = ColliderType::Polygon;
-  c.localVertices = verts;
-  c.localCentroid = offset;
-  c.RecalculateProperties(density);
-  return c;
-}
+  static Collider CreatePolygon(const std::vector<Vec3>& verts, float density = 1.0f, Vec3 offset = Vec3(0, 0, 0)) {
+    Collider c;
+    c.type = ColliderType::Polygon;
+    c.localVertices = verts;
+    c.localCentroid = offset;
+    c.RecalculateProperties(density);
+    return c;
+  }
 
   /**
    * @brief Recalculates mass and local inertia tensor based on shape and
@@ -100,6 +100,28 @@ static Collider CreatePolygon(const std::vector<Vec3>& verts, float density = 1.
       localInertiaTensor = Mat3::Diagonal(i, i, i);
       radius = halfExtents.Magnitude();
     }
+  }
+
+  std::vector<Vec3> GetWorldVertices(const RigidBody& body) const {
+    std::vector<Vec3> worldVerts;
+      if (type == ColliderType::Box) {
+        float hx = halfExtents.x;
+        float hy = halfExtents.y;
+        Vec3 corners[4] = {
+          localCentroid + Vec3(-hx, -hy, 0.0f),
+          localCentroid + Vec3( hx, -hy, 0.0f),
+          localCentroid + Vec3( hx,  hy, 0.0f),
+          localCentroid + Vec3(-hx,  hy, 0.0f)
+        };
+        for (int i = 0; i < 4; ++i) {
+          worldVerts.push_back(body.LocalToGlobal(corners[i]));
+        }
+      } else if (type == ColliderType::Polygon) {
+        for (const auto& v : localVertices) {
+          worldVerts.push_back(body.LocalToGlobal(localCentroid + v));
+        }
+      }
+    return worldVerts;
   }
 };
 
