@@ -46,7 +46,7 @@ The editor shows the scene through two independent views. Both can be open at on
 | Framing | Fills the panel; a bigger panel shows more of the world | Fixed world height (`viewHeight`) at a fixed aspect ratio, letterboxed; a bigger panel scales the picture |
 | Editor visuals | Debug grid, colliders and AABBs per the **Options** menu / Stats toggles | Hidden unless **Show Debug Visuals** is enabled in the right-click menu |
 
-Each view owns its own `sf::RenderTexture`, sized to its own panel. They share one `SimpleRenderer`; the Game Preview restores the renderer's flags and counters after drawing, so the Stats panel keeps reporting the scene viewport's numbers.
+Each view owns its own `sf::RenderTexture`, sized to its own panel; if the panel has no area or a resize fails, that view skips the frame and retries rather than drawing into a target of the wrong size. They share one `SimpleRenderer`; the Game Preview restores the renderer's flags and counters after drawing, so the Stats panel keeps reporting the scene viewport's numbers.
 
 **Play Mode behaviour.** The Game Preview always renders the live scene through the game camera. In Play mode it shows only game output; in Edit mode it is labelled *NOT PLAYING*, and while paused or stepping it is labelled *PAUSED*. Stopping does not restore the scene to its pre-Play state (the engine has no scene snapshot yet), so the preview shows wherever the simulation left the objects.
 
