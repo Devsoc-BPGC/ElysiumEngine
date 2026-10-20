@@ -84,6 +84,23 @@ struct RigidBody {
   void AddColliders(const Collider &collider);
 
   /**
+   * @brief Removes a collider by index from the rigid body.
+   * @param index The zero-based index of the collider to remove.
+   */
+  void RemoveCollider(size_t index);
+
+  /**
+   * @brief Removes all colliders from the rigid body.
+   */
+  void ClearColliders();
+
+  /**
+   * @brief Recalculates total mass, centroid, and parallel-axis inertia
+   * tensors.
+   */
+  void RecalculateMassProperties();
+
+  /**
    * @brief Performs numerical integration to update velocity and position.
    * @param dt The time step in seconds.
    */

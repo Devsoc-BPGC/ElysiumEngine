@@ -28,38 +28,84 @@ void RigidBody::UpdatePositionFromGlobalCentroid(void) {
 
 /**
  * @brief Adds a collider to the body and recalculates mass properties.
- * * This method updates the total mass, the local center of mass (centroid),
- * and uses the **Parallel Axis Theorem** to compute the new local inertia
- * tensor.
- * * @param collider The collider to be added to the rigid body.
+ * @param collider The collider to be added to the rigid body.
  */
 void RigidBody::AddColliders(const Collider &collider) {
   colliders.push_back(collider);
+  RecalculateMassProperties();
+}
 
+/**
+ * @brief Removes a collider by index and recalculates mass properties.
+ * @param index The zero-based index of the collider to remove.
+ */
+void RigidBody::RemoveCollider(size_t index) {
+  if (index < colliders.size()) {
+    colliders.erase(colliders.begin() + static_cast<std::ptrdiff_t>(index));
+    RecalculateMassProperties();
+  }
+}
+
+/**
+ * @brief Clears all colliders from the body and recalculates mass properties.
+ */
+void RigidBody::ClearColliders() {
+  colliders.clear();
+  RecalculateMassProperties();
+}
+
+/**
+ * @brief Recalculates the total mass, local center of mass (centroid),
+ * and uses the **Parallel Axis Theorem** to compute the new local inertia
+ * tensor.
+ */
+void RigidBody::RecalculateMassProperties() {
   localCentroid.Zero();
-  mass = 0.0f;
 
-  // Calculate total mass and weighted centroid
-  for (Collider &collider : colliders) {
-    mass += collider.mass;
-    localCentroid += collider.mass * collider.localCentroid;
+  if (colliders.empty()) {
+    if (!isStatic) {
+      mass = 0.0f;
+      inverseMass = 0.0f;
+    }
+    localInverseInertiaTensor = Mat3::Identity();
+    inverseInertiaTensorWorld =
+        orientation * localInverseInertiaTensor * inverseOrientation;
+    return;
   }
 
-  inverseMass = (mass > 0.0f) ? 1.0f / mass : 0.0f;
-  localCentroid *= inverseMass;
+  float calculatedMass = 0.0f;
+  // Calculate total mass and weighted centroid
+  for (const Collider &col : colliders) {
+    calculatedMass += col.mass;
+    localCentroid += col.mass * col.localCentroid;
+  }
+
+  if (isStatic) {
+    mass = 0.0f;
+    inverseMass = 0.0f;
+  } else {
+    mass = calculatedMass;
+    inverseMass = (mass > 0.0f) ? 1.0f / mass : 0.0f;
+  }
+
+  if (calculatedMass > 0.0f) {
+    localCentroid *= (1.0f / calculatedMass);
+  } else {
+    localCentroid.Zero();
+  }
 
   Mat3 localInertiaTensor;
   localInertiaTensor.Zero();
 
   // Sum inertia tensors using the Parallel Axis Theorem
-  for (Collider &collider : colliders) {
-    const Vec3 r = localCentroid - collider.localCentroid;
+  for (const Collider &col : colliders) {
+    const Vec3 r = localCentroid - col.localCentroid;
     const float rDotR = r.Dot(r);
     const Mat3 rOutR = r.outerProduct(r);
 
     // I_total = sum( I_local + mass * ( (r·r)I - r⊗r ) )
-    localInertiaTensor += collider.localInertiaTensor +
-                          collider.mass * (rDotR * Mat3::Identity() - rOutR);
+    localInertiaTensor +=
+        col.localInertiaTensor + col.mass * (rDotR * Mat3::Identity() - rOutR);
   }
 
   localInverseInertiaTensor = localInertiaTensor.Inverted();

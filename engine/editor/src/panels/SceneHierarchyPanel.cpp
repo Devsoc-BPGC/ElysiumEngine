@@ -95,8 +95,8 @@ void SceneHierarchyPanel::OnImGuiRender(EditorContext &context, Scene &scene,
           ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_SpanAvailWidth |
           ImGuiTreeNodeFlags_NoTreePushOnOpen;
 
-      std::string label = obj->name + "##" + std::to_string(obj->id);
-      ImGui::TreeNodeEx((void *)(uintptr_t)obj->id, flags, "%s",
+      std::string label = obj->name + "##" + std::to_string(static_cast<uint64_t>(obj->GetUUID()));
+      ImGui::TreeNodeEx((void *)(uintptr_t)static_cast<uint64_t>(obj->GetUUID()), flags, "%s",
                         obj->name.c_str());
 
       if (ImGui::IsItemClicked()) {
@@ -104,7 +104,7 @@ void SceneHierarchyPanel::OnImGuiRender(EditorContext &context, Scene &scene,
       }
 
       // Context menu for each entity item
-      std::string popupId = "EntityContextMenu##" + std::to_string(obj->id);
+      std::string popupId = "EntityContextMenu##" + std::to_string(static_cast<uint64_t>(obj->GetUUID()));
       if (ImGui::BeginPopupContextItem(popupId.c_str())) {
         if (ImGui::MenuItem("Duplicate Entity")) {
           auto clone = std::make_shared<GameObject>(obj->name + " (Copy)");

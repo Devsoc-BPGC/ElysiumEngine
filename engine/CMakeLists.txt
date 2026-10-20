@@ -33,6 +33,7 @@ target_compile_definitions(ElysiumEngine PUBLIC
 
 target_link_libraries(ElysiumEngine PUBLIC
     SFML::Graphics 
+    SFML::Audio
     SFML::Window 
     SFML::System 
     spdlog::spdlog_header_only

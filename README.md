@@ -18,6 +18,7 @@ Elysium has evolved from a standalone 2D physics engine into a full-featured 2D 
   - [4. Viewport & Rendering Pipeline](#4-viewport--rendering-pipeline)
   - [5. Scene, Entities & Components](#5-scene-entities--components)
   - [6. 2D Physics Simulation](#6-2d-physics-simulation)
+  - [7. Audio Subsystem & Spatial Sound](#7-audio-subsystem--spatial-sound)
 - [Prerequisites & Dependencies](#prerequisites--dependencies)
 - [Building & Running](#building--running)
 - [Developer & Contributor Guide](#developer--contributor-guide)
@@ -96,8 +97,17 @@ Elysium follows a modular, decoupled engine design:
 - **Real-Time Diagnostics**:
   - In-engine **Console Panel** hooked directly into `spdlog` via a custom ring-buffered `EditorLogSink`.
   - **Stats & Profiler Panel** showing real-time FPS graphs, frame timing breakdown (Update, Physics, Render), entity counts, and draw call statistics.
+- **64-Bit UUID & Safe Entity Handles**:
+  - High-performance `UUID` class backed by hardware entropy (`std::random_device`) and standard 64-bit Mersenne Twister (`std::mt19937_64`).
+  - Persistent, unique 64-bit identifiers assigned to all `GameObject`s with full support for explicit IDs during scene deserialization.
+  - O(1) hash map scene lookups and safe deletion (`Scene::GetEntityByUUID`, `Scene::DestroyEntityByUUID`).
+  - Safe, lightweight templated `EntityHandle` reference wrapper preventing dangling pointer crashes.
 - **2D Physics Simulation**:
   - Continuous impulse-based rigid body dynamics, broadphase spatial hash grid, and narrowphase SAT collision response.
+- **Audio Subsystem**:
+  - Decoupled `AudioEngine` singleton/application subsystem managing streamed background music (`sf::Music`) and an asset-cached pool of sound effects (`sf::Sound` / `sf::SoundBuffer`).
+  - `AudioSourceComponent` providing GameObject-attached 3D spatial audio synchronized with entity `Transform`s and SFML 3's `sf::Listener`.
+  - Full editor reflection in the **Entity Inspector** with file path picker, volume/pitch sliders, loop/spatial toggles, and live playback preview controls.
 
 ---
 
@@ -115,29 +125,38 @@ ElysiumEngine/
 │   ├── CMakeLists.txt          # Engine library build target (ElysiumEngine)
 │   ├── core/                   # Application core, windowing, and entity systems
 │   │   ├── include/
-│   │   │   ├── Application.hpp     # Application singleton and master loop
-│   │   │   ├── Window.hpp          # sf::RenderWindow encapsulation and event pump
-│   │   │   ├── Layer.hpp           # Base class for engine layers
-│   │   │   ├── LayerStack.hpp      # Ordered layer and overlay stack
-│   │   │   ├── Timestep.hpp        # Frame delta time wrapper (seconds/ms)
-│   │   │   ├── KeyCodes.hpp        # Platform-independent key codes
-│   │   │   ├── MouseCodes.hpp      # Platform-independent mouse codes
-│   │   │   ├── GameObject.hpp      # Entity definition and component container
-│   │   │   ├── Component.hpp       # Component base interface
-│   │   │   ├── SpriteRenderer.hpp  # Visual shape/sprite renderer component
-│   │   │   ├── Scene.hpp           # Scene container and physics world binding
-│   │   │   ├── SimpleRenderer.hpp  # Off-screen & target-agnostic 2D renderer
-│   │   │   ├── Input.hpp           # Static keyboard and mouse polling
-│   │   │   ├── Log.h               # spdlog logging macros
-│   │   │   ├── Core.hpp            # Platform macros and DLL exports
-│   │   │   ├── EntryPoint.hpp      # Platform main() bootstrap
-│   │   │   └── Elysium.hpp         # Umbrella engine header for client apps
+│   │   │   ├── Application.hpp          # Application singleton and master loop
+│   │   │   ├── AudioEngine.hpp          # High-level Audio Subsystem & sound pool
+│   │   │   ├── AudioSourceComponent.hpp # GameObject spatial audio component
+│   │   │   ├── Window.hpp               # sf::RenderWindow encapsulation and event pump
+│   │   │   ├── Layer.hpp                # Base class for engine layers
+│   │   │   ├── LayerStack.hpp           # Ordered layer and overlay stack
+│   │   │   ├── Timestep.hpp             # Frame delta time wrapper (seconds/ms)
+│   │   │   ├── KeyCodes.hpp             # Platform-independent key codes
+│   │   │   ├── MouseCodes.hpp           # Platform-independent mouse codes
+│   │   │   ├── GameObject.hpp           # Entity definition and component container
+│   │   │   ├── EntityHandle.hpp         # Lightweight templated entity reference handle
+│   │   │   ├── UUID.hpp                 # 64-bit UUID class and std::hash specialization
+│   │   │   ├── Component.hpp            # Component base interface
+│   │   │   ├── SpriteRenderer.hpp       # Visual shape/sprite renderer component
+│   │   │   ├── Scene.hpp                # Scene container and physics world binding
+│   │   │   ├── SimpleRenderer.hpp       # Off-screen & target-agnostic 2D renderer
+│   │   │   ├── Input.hpp                # Static keyboard and mouse polling
+│   │   │   ├── Log.h                    # spdlog logging macros
+│   │   │   ├── Core.hpp                 # Platform macros and DLL exports
+│   │   │   ├── EntryPoint.hpp           # Platform main() bootstrap
+│   │   │   └── Elysium.hpp              # Umbrella engine header for client apps
 │   │   └── src/
-│   │       ├── Application.cpp     # Engine game loop and event distribution
-│   │       ├── Window.cpp          # SFML 3 event pump and translation
-│   │       ├── Layer.cpp           # Layer base implementation
-│   │       ├── LayerStack.cpp      # LayerStack management
-│   │       └── Log.cpp             # spdlog initialization
+│   │       ├── Application.cpp          # Engine game loop and event distribution
+│   │       ├── AudioEngine.cpp          # Audio subsystem, sound pool & buffer cache
+│   │       ├── AudioSourceComponent.cpp # AudioSourceComponent lifecycle & spatialization
+│   │       ├── GameObject.cpp           # GameObject lifecycle & logging
+│   │       ├── Scene.cpp                # Scene entity registry and physics integration
+│   │       ├── UUID.cpp                 # 64-bit Mersenne Twister & entropy generator
+│   │       ├── Window.cpp               # SFML 3 event pump and translation
+│   │       ├── Layer.cpp                # Layer base implementation
+│   │       ├── LayerStack.cpp           # LayerStack management
+│   │       └── Log.cpp                  # spdlog initialization
 │   ├── editor/                 # Dear ImGui Editor UI module
 │   │   ├── include/
 │   │   │   ├── EditorLayer.hpp     # Engine layer driving ImGui lifecycle & docking
@@ -182,7 +201,9 @@ ElysiumEngine/
     ├── BoundaryTest.cpp
     ├── BroadPhasePerformanceTest.cpp
     ├── FrictionTest.cpp
-    └── PhysicsPerformanceTest.cpp
+    ├── PhysicsPerformanceTest.cpp
+    ├── RigidBodyDecouplingTest.cpp
+    └── UUIDEntityTest.cpp
 ```
 
 ---
@@ -283,11 +304,39 @@ The **Scene Viewport Panel** (`SceneViewportPanel`) achieves full decoupling bet
 ### 5. Scene, Entities & Components
 
 Game objects are represented by [`GameObject`](file:///home/mrgreenapple24/projects/ElysiumEngine/engine/core/include/GameObject.hpp):
+- **Identity & UUID**: Every `GameObject` is uniquely identified by a 64-bit [`UUID`](file:///home/mrgreenapple24/projects/ElysiumEngine/engine/core/include/UUID.hpp) (`entity->GetUUID()`). Supports explicit UUIDs upon creation for deserialization.
 - **Transform**: `position` (`Vec3`), `rotation` (`Quat`), `scale` (`Vec3`).
 - **Physics**: Optional attached `std::unique_ptr<RigidBody>`.
 - **Components**: Extensible component array (`std::vector<std::unique_ptr<Component>>`).
 - **Lookup**: Query components via `entity->GetComponent<T>()` or check existence with `entity->HasComponent<T>()`.
 - **Visuals**: Attach [`SpriteRenderer`](file:///home/mrgreenapple24/projects/ElysiumEngine/engine/core/include/SpriteRenderer.hpp) for color, rectangle sizes, or circle shapes.
+
+#### Scene Entity Registry
+[`Scene`](file:///home/mrgreenapple24/projects/ElysiumEngine/engine/core/include/Scene.hpp) maintains an internal `std::unordered_map<UUID, std::shared_ptr<GameObject>>` for fast O(1) entity management:
+```cpp
+// Look up an entity by UUID
+GameObject* entity = scene.GetEntityByUUID(uuid);
+
+// Safely destroy an entity (unregisters physics, map entry, and list)
+bool success = scene.DestroyEntityByUUID(uuid);
+```
+
+#### Safe Entity Handles (`EntityHandle`)
+To prevent dangling pointers across frames when entities are destroyed, components can use the lightweight templated [`EntityHandle<T>`](file:///home/mrgreenapple24/projects/ElysiumEngine/engine/core/include/EntityHandle.hpp):
+```cpp
+// Store handle instead of raw pointer
+Elysium::EntityHandle<GameObject> targetHandle(targetEntity->GetUUID());
+
+// Safely resolve at runtime
+if (GameObject* liveTarget = targetHandle.Resolve(&scene)) {
+    // Entity is alive and safe to access
+}
+
+// Or resolve a specific component type
+if (HealthComponent* health = targetHandle.ResolveComponent<HealthComponent>(&scene)) {
+    health->TakeDamage(10.0f);
+}
+```
 
 In the **Entity Inspector**, modifying any transform parameter automatically invokes `entity->SyncTransform()`, instantly synchronizing the physics body's position, centroid, and orientation.
 
@@ -301,6 +350,34 @@ The physics engine (`engine/physics/`) provides robust 2D dynamics:
 - **BroadPhase**: Uniform spatial grid for rapid collision pair candidate pruning.
 - **NarrowPhase**: Separating Axis Theorem (SAT) for box-box, sphere-sphere, and box-sphere contact manifold generation.
 - **Simulation Control**: Toggle between Edit Mode (physics paused, live manual transform positioning) and Play Mode (active physics stepping).
+
+---
+
+### 7. Audio Subsystem & Spatial Sound
+
+Elysium features a decoupled, high-level audio system built with **SFML 3.2**:
+
+- **AudioEngine Subsystem**:
+  - Accessible via `AudioEngine::Get()` or `Application::Get().GetAudioEngine()`.
+  - Background music streaming via `sf::Music` (`PlayMusic`, `PauseMusic`, `ResumeMusic`, `StopMusic`).
+  - Cached sound buffers (`sf::SoundBuffer`) and dynamic sound pool recycling (`AcquireSound`, `PlaySound`).
+  - Master volume control modulating SFML 3's `sf::Listener::setGlobalVolume`.
+
+- **AudioSourceComponent**:
+  - Attach audio playback directly to entities:
+    ```cpp
+    auto entity = std::make_shared<GameObject>("AudioEmitter");
+    auto& audio = entity->AddComponent<Elysium::AudioSourceComponent>("assets/sounds/ambient.ogg");
+    audio.isSpatial = true;
+    audio.loop = true;
+    audio.playOnAwake = true;
+    audio.minDistance = 2.0f;
+    audio.attenuation = 1.0f;
+    ```
+  - In spatial mode (`isSpatial = true`), the component tracks the entity's 3D transform (`Vec3 position`) and updates `sf::SoundSource::setPosition` in real-time relative to the global listener.
+
+- **Editor Reflection**:
+  - Exposes sound file selection, live play/pause/stop previews, volume/pitch sliders, and spatial attenuation parameters inside the **Entity Inspector**.
 
 ---
 
@@ -447,7 +524,7 @@ Upcoming milestones as detailed in [`PLAN.md`](file:///home/mrgreenapple24/proje
 - [ ] **Renderer2D Batching**: Batched quad and circle drawing pipeline utilizing vertex buffers.
 - [ ] **Entity Component System (ECS)**: Transitioning internal storage to `EnTT`.
 - [ ] **Scripting Engine**: Embedding Lua via `sol2` for dynamic runtime gameplay scripting.
-- [ ] **Audio Subsystem**: Integrating SFML's spatial audio module.
+- [x] **Audio Subsystem**: Integrating SFML 3.2's spatial audio module, buffer caching, and sound pooling.
 
 ---
 

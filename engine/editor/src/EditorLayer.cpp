@@ -319,33 +319,11 @@ void EditorLayer::RenderMenuBar(Scene &scene) {
         scene.AddGameObject(entity);
         m_context.selectedEntity = entity;
       }
-      if (ImGui::MenuItem("Create Dynamic Ball")) {
-        auto entity = std::make_shared<GameObject>("Dynamic Ball");
+      if (ImGui::MenuItem("Create Rigid Body")) {
+        auto entity = std::make_shared<GameObject>("Rigid Body");
         entity->position =
             Vec3(m_context.camera.center.x, m_context.camera.center.y, 0.0f);
         auto &rb = entity->CreateRigidBody();
-        rb.AddColliders(Collider::CreateSphere(0.5f, 1.0f));
-        scene.AddGameObject(entity);
-        m_context.selectedEntity = entity;
-      }
-      if (ImGui::MenuItem("Create Dynamic Box")) {
-        auto entity = std::make_shared<GameObject>("Dynamic Box");
-        entity->position =
-            Vec3(m_context.camera.center.x, m_context.camera.center.y, 0.0f);
-        auto &rb = entity->CreateRigidBody();
-        rb.AddColliders(Collider::CreateBox(Vec3(0.5f, 0.5f, 0.0f), 1.0f));
-        scene.AddGameObject(entity);
-        m_context.selectedEntity = entity;
-      }
-      if (ImGui::MenuItem("Create Static Platform")) {
-        auto entity = std::make_shared<GameObject>("Static Platform");
-        entity->position =
-            Vec3(m_context.camera.center.x, m_context.camera.center.y, 0.0f);
-        auto &rb = entity->CreateRigidBody();
-        rb.isStatic = true;
-        rb.mass = 0.0f;
-        rb.inverseMass = 0.0f;
-        rb.AddColliders(Collider::CreateBox(Vec3(3.0f, 0.3f, 0.0f), 0.0f));
         scene.AddGameObject(entity);
         m_context.selectedEntity = entity;
       }

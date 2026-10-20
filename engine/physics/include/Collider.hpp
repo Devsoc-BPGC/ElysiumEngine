@@ -72,6 +72,26 @@ public:
 
     return c;
   }
+
+  /**
+   * @brief Recalculates mass and local inertia tensor based on shape and
+   * density.
+   * @param density Mass density (default: 1.0f).
+   */
+  void RecalculateProperties(float density = 1.0f) {
+    if (type == ColliderType::Sphere) {
+      mass = PI * (radius * radius) * density;
+      float i = 0.5f * mass * (radius * radius);
+      localInertiaTensor = Mat3::Diagonal(i, i, i);
+    } else if (type == ColliderType::Box) {
+      mass = (2.0f * halfExtents.x) * (2.0f * halfExtents.y) * density;
+      float w = 2.0f * halfExtents.x;
+      float h = 2.0f * halfExtents.y;
+      float i = (1.0f / 12.0f) * mass * (w * w + h * h);
+      localInertiaTensor = Mat3::Diagonal(i, i, i);
+      radius = halfExtents.Magnitude();
+    }
+  }
 };
 
 #endif
