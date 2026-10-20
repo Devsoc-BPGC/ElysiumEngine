@@ -14,6 +14,8 @@
 
 namespace Elysium {
 
+class GamePreviewPanel;
+
 class EditorLayer : public Layer {
 public:
   EditorLayer();
@@ -56,6 +58,8 @@ private:
   bool m_isInitialized = false;
 
   Scene m_scene;
+  std::unique_ptr<Scene> m_runtimeScene; // Simulated copy of m_scene in Play
+  GamePreviewPanel *m_gamePreview = nullptr;
   SimpleRenderer m_renderer{50.0f};
   float m_lastDt = 0.016f;
 };

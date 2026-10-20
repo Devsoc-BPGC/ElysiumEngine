@@ -17,6 +17,10 @@ public:
       : color(col), size(sz), radius(0.5f), isCircle(false) {}
   SpriteRenderer(sf::Color col, float r)
       : color(col), radius(r), isCircle(true) {}
+
+  std::unique_ptr<Component> Clone() const override {
+    return std::make_unique<SpriteRenderer>(*this);
+  }
 };
 
 #endif // SPRITERENDERER_HPP

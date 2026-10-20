@@ -67,7 +67,7 @@ void EditorLayer::Init(sf::RenderWindow &window) {
   // Instantiate standard editor panels
   AddPanel<ToolbarPanel>();
   AddPanel<SceneViewportPanel>();
-  AddPanel<GamePreviewPanel>();
+  m_gamePreview = &AddPanel<GamePreviewPanel>();
   AddPanel<SceneHierarchyPanel>();
   AddPanel<EntityInspectorPanel>();
   AddPanel<ConsolePanel>();
@@ -80,12 +80,26 @@ void EditorLayer::Init(sf::RenderWindow &window) {
 void EditorLayer::OnUpdate(Timestep ts) {
   m_lastDt = ts.GetSeconds();
 
+  // Leaving Edit mode simulates a copy of the scene, so the edit scene (and
+  // the scene viewport showing it) stays unchanged; returning to Edit mode
+  // discards the copy
+  if (m_context.playState != ScenePlayState::Edit && !m_runtimeScene) {
+    m_runtimeScene = m_scene.Clone();
+    if (m_gamePreview) {
+      m_gamePreview->isOpen = true;
+      m_gamePreview->RequestFocus();
+    }
+  } else if (m_context.playState == ScenePlayState::Edit && m_runtimeScene) {
+    m_runtimeScene.reset();
+  }
+  m_context.runtimeScene = m_runtimeScene.get();
+
   sf::Clock updateTimer;
   if (m_context.playState == ScenePlayState::Play) {
-    m_scene.physicsWorld.boundaryRotation += 0.0005f;
-    m_scene.Update(ts.GetSeconds());
+    m_runtimeScene->physicsWorld.boundaryRotation += 0.0005f;
+    m_runtimeScene->Update(ts.GetSeconds());
   } else if (m_context.playState == ScenePlayState::Step) {
-    m_scene.Update(1.0f / 60.0f);
+    m_runtimeScene->Update(1.0f / 60.0f);
     m_context.playState = ScenePlayState::Pause;
   }
 
@@ -93,7 +107,8 @@ void EditorLayer::OnUpdate(Timestep ts) {
   m_context.stats.updateTimeMs = updateMs;
   m_context.stats.physicsTimeMs = updateMs * 0.75f;
 
-  m_context.stats.entityCount = static_cast<uint32_t>(m_scene.objects.size());
+  const Scene &simulated = m_runtimeScene ? *m_runtimeScene : m_scene;
+  m_context.stats.entityCount = static_cast<uint32_t>(simulated.objects.size());
   m_context.stats.frameTimeMs = ts.GetMilliseconds();
   m_context.stats.fps =
       (ts.GetSeconds() > 0.0001f) ? (1.0f / ts.GetSeconds()) : 60.0f;
@@ -334,6 +349,9 @@ void EditorLayer::Shutdown() {
     return;
 
   m_panels.clear();
+  m_gamePreview = nullptr;
+  m_runtimeScene.reset();
+  m_context.runtimeScene = nullptr;
   ImGui::SFML::Shutdown();
   m_isInitialized = false;
   m_window = nullptr;

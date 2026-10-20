@@ -50,6 +50,12 @@ void GamePreviewPanel::OnImGuiRender(EditorContext &context, Scene &scene,
              context.viewportPos.y + 12.0f),
       ImGuiCond_FirstUseEver);
 
+  if (m_focusRequested) {
+    ImGui::SetNextWindowCollapsed(false);
+    ImGui::SetNextWindowFocus();
+    m_focusRequested = false;
+  }
+
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
   if (ImGui::Begin("Game Preview", &isOpen,
                    ImGuiWindowFlags_NoScrollbar |
@@ -87,7 +93,9 @@ void GamePreviewPanel::OnImGuiRender(EditorContext &context, Scene &scene,
       renderer.drawPhysicsColliders = context.gamePreviewDebugVisuals;
       renderer.drawAABBs = context.gamePreviewDebugVisuals;
       renderer.pixelsPerMeter = ptm;
-      renderer.Render(m_previewTexture, scene, view);
+      // While playing, show the simulated copy rather than the edit scene
+      Scene &shown = context.runtimeScene ? *context.runtimeScene : scene;
+      renderer.Render(m_previewTexture, shown, view);
       m_previewTexture.display();
       renderer = savedRenderer;
 

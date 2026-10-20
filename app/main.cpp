@@ -11,6 +11,10 @@ public:
   float remaining;
   LifeSpan(float duration) : remaining(duration) {}
 
+  std::unique_ptr<Component> Clone() const override {
+    return std::make_unique<LifeSpan>(*this);
+  }
+
   void Update(float dt) override {
     remaining -= dt;
     if (remaining <= 0) {
@@ -22,6 +26,10 @@ public:
 class PlayerController : public Component {
 public:
   float speed = 10.0f;
+
+  std::unique_ptr<Component> Clone() const override {
+    return std::make_unique<PlayerController>(*this);
+  }
 
   void Update(float dt) override {
     (void)dt;

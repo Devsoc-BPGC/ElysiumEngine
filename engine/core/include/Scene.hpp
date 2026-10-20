@@ -4,6 +4,7 @@
 #include "GameObject.hpp"
 #include "PhysicsWorld.hpp"
 #include <memory>
+#include <unordered_map>
 #include <vector>
 
 class Scene {
@@ -18,6 +19,33 @@ public:
     if (obj->rigidBody) {
       physicsWorld.AddBody(obj->rigidBody.get());
     }
+  }
+
+  // Deep copy for Play mode: simulating the copy leaves this scene untouched.
+  // Bodies are registered in the same order as here, so the copy simulates
+  // exactly as this scene would.
+  std::unique_ptr<Scene> Clone() const {
+    auto copy = std::make_unique<Scene>();
+    copy->physicsWorld = physicsWorld; // gravity, boundary, etc.
+    copy->physicsWorld.rigidBodies.clear();
+
+    std::unordered_map<const RigidBody *, RigidBody *> bodyCopies;
+    for (const auto &obj : objects) {
+      if (!obj)
+        continue;
+      auto objCopy = obj->Clone();
+      if (obj->rigidBody) {
+        bodyCopies[obj->rigidBody.get()] = objCopy->rigidBody.get();
+      }
+      copy->objects.push_back(std::move(objCopy));
+    }
+    for (const RigidBody *body : physicsWorld.rigidBodies) {
+      auto it = bodyCopies.find(body);
+      if (it != bodyCopies.end()) {
+        copy->physicsWorld.AddBody(it->second);
+      }
+    }
+    return copy;
   }
 
   void Update(float dt) {

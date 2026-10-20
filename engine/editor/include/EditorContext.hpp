@@ -7,6 +7,8 @@
 #include <memory>
 #include <string>
 
+class Scene;
+
 namespace Elysium {
 
 enum class ScenePlayState { Edit, Play, Pause, Step };
@@ -52,6 +54,10 @@ struct EditorContext {
   EditorCamera camera;
   GameCamera gameCamera;
   EditorStats stats;
+
+  // Copy of the scene being simulated while not in Edit mode (null in Edit
+  // mode). Play never touches the edit scene shown in the scene viewport.
+  Scene *runtimeScene = nullptr;
 
   // Visual settings
   bool drawDebugGrid = true;
