@@ -184,6 +184,7 @@ if(BUILD_TESTING)
     elysium_add_test(BroadPhasePerformanceTest test/BroadPhasePerformanceTest.cpp)
     elysium_add_test(BoundaryTest              test/BoundaryTest.cpp)
     elysium_add_test(FrictionTest              test/FrictionTest.cpp)
+    elysium_add_test(GameApiTest                test/GameApiTest.cpp)
 endif()
 
 # ============================================================
