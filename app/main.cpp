@@ -63,21 +63,8 @@ public:
     auto &scene = editorLayer->GetScene();
 
     // Populate Initial Demo Scene Entities
-    // 1. Static Platform
-    {
-      auto ground = std::make_shared<GameObject>("Ground Platform");
-      ground->position = Vec3(8.0f, 10.0f, 0.0f);
-      auto &rb = ground->CreateRigidBody();
-      rb.isStatic = true;
-      rb.mass = 0.0f;
-      rb.inverseMass = 0.0f;
-      rb.AddColliders(Collider::CreateBox(Vec3(6.0f, 0.4f, 0.0f), 0.0f));
-      ground->AddComponent<SpriteRenderer>(sf::Color(80, 140, 90),
-                                           sf::Vector2f(12.0f, 0.8f));
-      scene.AddGameObject(ground);
-    }
 
-    // 2. Dynamic Balls
+    // 1. Dynamic Balls
     for (int i = 0; i < 3; ++i) {
       auto ball =
           std::make_shared<GameObject>("Dynamic Ball " + std::to_string(i));
@@ -95,7 +82,7 @@ public:
       scene.AddGameObject(ball);
     }
 
-    // 3. Dynamic Box with PlayerController
+    // 2. Dynamic Box with PlayerController
     {
       auto playerBox = std::make_shared<GameObject>("Player Box");
       playerBox->position = Vec3(8.0f, 4.0f, 0.0f);

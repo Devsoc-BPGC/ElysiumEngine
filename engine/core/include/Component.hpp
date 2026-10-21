@@ -7,11 +7,15 @@ class GameObject;
 
 class Component {
 public:
-  GameObject *gameObject;
+  GameObject *gameObject = nullptr;
 
   virtual ~Component() = default;
   virtual void Start() {}
-  virtual void Update(float dt) {}
+  virtual void Update(float dt) { (void)dt; }
 };
+
+namespace Elysium {
+using Component = ::Component;
+}
 
 #endif

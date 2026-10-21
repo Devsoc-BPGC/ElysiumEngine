@@ -97,34 +97,23 @@ set(SFML_BUILD_TEST_PROGRAMS OFF CACHE BOOL "" FORCE)
 set(SFML_BUILD_DOC           OFF CACHE BOOL "" FORCE)
 set(SFML_INSTALL             OFF CACHE BOOL "" FORCE)
 set(SFML_BUILD_NETWORK       OFF CACHE BOOL "" FORCE)
-set(SFML_BUILD_AUDIO         OFF CACHE BOOL "" FORCE)
+set(SFML_BUILD_AUDIO         ON  CACHE BOOL "" FORCE)
 
 add_subdirectory(external/SFML)
 
 # ============================================================
-#  Dear ImGui & ImGui-SFML (Docking Branch + SFML 3)
+# Dear ImGui & ImGui-SFML (Docking Branch + SFML 3)
 # ============================================================
-include(FetchContent)
 
-# 1. Fetch Dear ImGui (Docking branch)
-FetchContent_Declare(
-    imgui
-    GIT_REPOSITORY https://github.com/ocornut/imgui.git
-    GIT_TAG        v1.91.5-docking
+# Dear ImGui is source-only; ImGui-SFML integrates its sources.
+set(IMGUI_DIR
+    "${CMAKE_CURRENT_SOURCE_DIR}/external/imgui"
+    CACHE PATH "Path to Dear ImGui" FORCE
 )
-FetchContent_MakeAvailable(imgui)
 
-# 2. ImGui-SFML configuration
-set(IMGUI_DIR ${imgui_SOURCE_DIR} CACHE PATH "Path to Dear ImGui" FORCE)
 set(IMGUI_SFML_FIND_SFML OFF CACHE BOOL "" FORCE)
 
-# 3. Fetch ImGui-SFML
-FetchContent_Declare(
-    imgui-sfml
-    GIT_REPOSITORY https://github.com/SFML/imgui-sfml.git
-    GIT_TAG        v3.0
-)
-FetchContent_MakeAvailable(imgui-sfml)
+add_subdirectory(external/imgui-sfml)
 
 # ============================================================
 #  Engine library
@@ -143,6 +132,7 @@ add_executable(ElysiumApp app/main.cpp)
 target_link_libraries(ElysiumApp PUBLIC
     ElysiumEngine
     SFML::Graphics
+    SFML::Audio
     SFML::Window
     SFML::System
     spdlog::spdlog_header_only
@@ -185,6 +175,8 @@ if(BUILD_TESTING)
     elysium_add_test(BoundaryTest              test/BoundaryTest.cpp)
     elysium_add_test(FrictionTest              test/FrictionTest.cpp)
     elysium_add_test(GameApiTest                test/GameApiTest.cpp)
+    elysium_add_test(RigidBodyDecouplingTest   test/RigidBodyDecouplingTest.cpp)
+    elysium_add_test(UUIDEntityTest            test/UUIDEntityTest.cpp)
 endif()
 
 # ============================================================
