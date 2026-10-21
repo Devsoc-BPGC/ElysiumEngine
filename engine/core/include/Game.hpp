@@ -11,11 +11,22 @@
 #include "Scene.hpp"
 #include "SpriteRenderer.hpp"
 
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <utility>
 
 namespace Elysium::Game {
+
+namespace detail {
+template <typename T> uint64_t GetObjectId(const T &object) noexcept {
+  if constexpr (requires { object.GetUUID(); }) {
+    return static_cast<uint64_t>(object.GetUUID());
+  } else {
+    return static_cast<uint64_t>(object.id);
+  }
+}
+} // namespace detail
 
 /** A shared, lifetime-safe handle to a game object. An empty handle is invalid. */
 class Entity {
@@ -26,7 +37,9 @@ public:
   explicit operator bool() const noexcept { return static_cast<bool>(m_Object); }
   bool IsValid() const noexcept { return static_cast<bool>(m_Object); }
 
-  uint32_t GetId() const noexcept { return m_Object ? m_Object->id : 0; }
+  uint64_t GetId() const noexcept {
+    return m_Object ? detail::GetObjectId(*m_Object) : 0;
+  }
   std::string GetName() const { return m_Object ? m_Object->name : std::string{}; }
   bool SetName(const std::string &name) {
     if (!m_Object) return false;
