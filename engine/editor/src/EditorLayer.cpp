@@ -10,10 +10,40 @@
 #include "panels/StatsPanel.hpp"
 #include "panels/ToolbarPanel.hpp"
 #include <algorithm>
+#include <filesystem>
 #include <imgui-SFML.h>
 #include <imgui.h>
 
 namespace Elysium {
+
+namespace {
+constexpr float EditorUiScale = 1.25f;
+constexpr float EditorFontSize = 18.0f;
+
+ImFont *LoadEditorFont(ImFontAtlas *fonts) {
+#if defined(_WIN32)
+  constexpr const char *fontPaths[] = {"C:/Windows/Fonts/segoeui.ttf",
+                                       "C:/Windows/Fonts/arial.ttf"};
+#elif defined(__APPLE__)
+  constexpr const char *fontPaths[] = {"/System/Library/Fonts/SFNS.ttf",
+                                       "/System/Library/Fonts/Supplemental/Arial.ttf"};
+#else
+  constexpr const char *fontPaths[] = {
+      "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+      "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
+      "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"};
+#endif
+
+  for (const char *path : fontPaths) {
+    std::error_code error;
+    if (std::filesystem::exists(path, error)) {
+      if (ImFont *font = fonts->AddFontFromFileTTF(path, EditorFontSize))
+        return font;
+    }
+  }
+  return nullptr;
+}
+}
 
 EditorLayer::EditorLayer() : Layer("EditorLayer") {
   // Configure default scene
@@ -50,6 +80,13 @@ void EditorLayer::Init(sf::RenderWindow &window) {
   ImGuiIO &io = ImGui::GetIO();
   io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+  if (ImFont *font = LoadEditorFont(io.Fonts)) {
+    io.FontDefault = font;
+    if (!ImGui::SFML::UpdateFontTexture())
+      ELYSIUM_CORE_WARN("Failed to update the editor font texture");
+  } else {
+    ELYSIUM_CORE_WARN("No system UI font found; using the default ImGui font");
+  }
 
   // Hook custom memory log sink into spdlog
   auto sink = GetEditorLogSink();
@@ -308,10 +345,14 @@ void EditorLayer::RenderMenuBar(Scene &scene) {
           ApplyModernDarkTheme();
         }
         if (ImGui::MenuItem("ImGui Classic")) {
+          ImGui::GetStyle() = ImGuiStyle();
           ImGui::StyleColorsClassic();
+          ImGui::GetStyle().ScaleAllSizes(EditorUiScale);
         }
         if (ImGui::MenuItem("ImGui Light")) {
+          ImGui::GetStyle() = ImGuiStyle();
           ImGui::StyleColorsLight();
+          ImGui::GetStyle().ScaleAllSizes(EditorUiScale);
         }
         ImGui::EndMenu();
       }
@@ -340,6 +381,7 @@ void EditorLayer::Shutdown() {
 
 void EditorLayer::ApplyModernDarkTheme() {
   ImGuiStyle &style = ImGui::GetStyle();
+  style = ImGuiStyle();
   style.WindowRounding = 5.0f;
   style.ChildRounding = 4.0f;
   style.FrameRounding = 3.0f;
@@ -390,6 +432,7 @@ void EditorLayer::ApplyModernDarkTheme() {
   colors[ImGuiCol_TabUnfocusedActive] = ImVec4(0.16f, 0.18f, 0.24f, 1.00f);
   colors[ImGuiCol_DockingPreview] = ImVec4(0.35f, 0.65f, 1.00f, 0.70f);
   colors[ImGuiCol_DockingEmptyBg] = ImVec4(0.10f, 0.10f, 0.12f, 1.00f);
+  style.ScaleAllSizes(EditorUiScale);
 }
 
 } // namespace Elysium
