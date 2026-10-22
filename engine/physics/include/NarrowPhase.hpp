@@ -41,15 +41,6 @@ public:
   }
 
 private:
-  static void ResolveBoxBox(RigidBody *a, const Collider &colA, RigidBody *b,
-                            const Collider &colB) {
-    std::vector<Vec3> vertsA = colA.GetWorldVertices(*a);
-    std::vector<Vec3> vertsB = colB.GetWorldVertices(*b);
-    SATResult sat = SAT::TestPolygonPolygon(vertsA, vertsB);
-    if (sat.collided) {
-      ApplyImpulse(a, b, sat.normal, sat.depth);
-    }
-  }
 
   static void ResolvePolygonPolygon(RigidBody *a, const Collider &colA, RigidBody *b,
                                     const Collider &colB) {
