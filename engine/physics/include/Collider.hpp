@@ -101,6 +101,25 @@ public:
       float i = (1.0f / 12.0f) * mass * (w * w + h * h);
       localInertiaTensor = Mat3::Diagonal(i, i, i);
       radius = halfExtents.Magnitude();
+    } else if (type == ColliderType::Polygon) {
+      float maxDistSq = 0.0f;
+      for (const auto& v : localVertices) {
+        float distSq = v.MagnitudeSquared();
+        if (distSq > maxDistSq) maxDistSq = distSq;
+      }
+      radius = std::sqrt(maxDistSq);
+      // Shoelace formula for polygon area
+      float area = 0.0f;
+      for (size_t i = 0; i < localVertices.size(); ++i) {
+        const Vec3& p1 = localVertices[i];
+        const Vec3& p2 = localVertices[(i + 1) % localVertices.size()];
+        area += (p1.x * p2.y - p2.x * p1.y);
+      }
+      area = std::abs(area) * 0.5f;
+      if (area <= 0.0f) area = 1.0f;
+      mass = area * density;
+      float i = (1.0f / 6.0f) * mass * (radius * radius);
+      localInertiaTensor = Mat3::Diagonal(i, i, i);
     }
   }
 
