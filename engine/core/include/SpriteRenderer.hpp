@@ -20,7 +20,7 @@ public:
       : color(col), size(sz), radius(0.5f), isCircle(false), isTextured(false) {}
   SpriteRenderer(sf::Color col, float r)
       : color(col), radius(r), isCircle(true), isTextured(false) {}
-  SpriteRenderer(const Texture& tex, sf::Color col = sf::Color::White, sf::Vector2f sz)
+  SpriteRenderer(const Texture& tex, sf::Color col = sf::Color::White, sf::Vector2f sz = sf::Vector2f(1.0f, 1.0f))
       : texture(tex), color(col), size(sz), isCircle(false), isTextured(true) {}
 };
 
