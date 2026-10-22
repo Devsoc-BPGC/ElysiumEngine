@@ -26,10 +26,16 @@ void SceneViewportPanel::OnImGuiRender(EditorContext &context, Scene &scene,
     unsigned int height =
         static_cast<unsigned int>(std::max(1.0f, viewportAvail.y));
 
-    // Dynamic resize of the off-screen RenderTexture
-    if (m_currentTextureSize.x != width || m_currentTextureSize.y != height) {
+    // Dynamic resize of the off-screen RenderTexture. After a failed resize
+    // the old target can't be trusted, so skip drawing and retry next frame
+    bool targetReady = viewportAvail.x >= 1.0f && viewportAvail.y >= 1.0f;
+    if (targetReady &&
+        (m_currentTextureSize.x != width || m_currentTextureSize.y != height)) {
       if (m_viewportTexture.resize(sf::Vector2u(width, height))) {
         m_currentTextureSize = sf::Vector2u(width, height);
+      } else {
+        m_currentTextureSize = {0, 0};
+        targetReady = false;
       }
     }
 
@@ -47,11 +53,13 @@ void SceneViewportPanel::OnImGuiRender(EditorContext &context, Scene &scene,
     renderer.drawPhysicsColliders = context.drawPhysicsColliders;
     renderer.drawAABBs = context.drawAABBs;
     renderer.pixelsPerMeter = context.pixelsPerMeter;
-    renderer.Render(m_viewportTexture, scene, view);
-    m_viewportTexture.display();
+    if (targetReady) {
+      renderer.Render(m_viewportTexture, scene, view);
+      m_viewportTexture.display();
 
-    // Display texture in ImGui
-    ImGui::Image(m_viewportTexture);
+      // Display texture in ImGui
+      ImGui::Image(m_viewportTexture);
+    }
 
     // Independent Viewport Camera Controls
     if (context.isViewportHovered) {

@@ -22,6 +22,20 @@ struct EditorCamera {
   }
 };
 
+// Drives the Game Preview. Kept separate from EditorCamera so navigating one
+// view never moves the other.
+struct GameCamera {
+  sf::Vector2f center = {8.0f, 6.0f}; // Framing center in meters
+  float viewHeight = 15.0f;           // World meters visible vertically
+  float aspectRatio = 16.0f / 9.0f;   // Output aspect; <= 0 fills the panel
+
+  void Reset() {
+    center = {8.0f, 6.0f};
+    viewHeight = 15.0f;
+    aspectRatio = 16.0f / 9.0f;
+  }
+};
+
 struct EditorStats {
   float fps = 0.0f;
   float frameTimeMs = 0.0f;
@@ -36,12 +50,14 @@ struct EditorContext {
   ScenePlayState playState = ScenePlayState::Edit;
   std::shared_ptr<GameObject> selectedEntity = nullptr;
   EditorCamera camera;
+  GameCamera gameCamera;
   EditorStats stats;
 
   // Visual settings
   bool drawDebugGrid = true;
   bool drawPhysicsColliders = true;
   bool drawAABBs = false;
+  bool gamePreviewDebugVisuals = false; // Editor-only visuals in Game Preview
   float pixelsPerMeter = 50.0f;
 
   // Viewport geometry (in pixels)

@@ -5,6 +5,7 @@
 #include "Log.h"
 #include "panels/ConsolePanel.hpp"
 #include "panels/EntityInspectorPanel.hpp"
+#include "panels/GamePreviewPanel.hpp"
 #include "panels/SceneHierarchyPanel.hpp"
 #include "panels/SceneViewportPanel.hpp"
 #include "panels/StatsPanel.hpp"
@@ -66,6 +67,7 @@ void EditorLayer::Init(sf::RenderWindow &window) {
   // Instantiate standard editor panels
   AddPanel<ToolbarPanel>();
   AddPanel<SceneViewportPanel>();
+  AddPanel<GamePreviewPanel>();
   AddPanel<SceneHierarchyPanel>();
   AddPanel<EntityInspectorPanel>();
   AddPanel<ConsolePanel>();
