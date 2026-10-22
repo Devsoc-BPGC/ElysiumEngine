@@ -96,6 +96,21 @@ public:
       scene.AddGameObject(playerBox);
     }
 
+    // 3. Textured rectangle
+    {
+      auto texturedRec = std::make_shared<GameObject>("Textured Rectangle");
+      texturedRec->position = Vec3(8.0f, 6.0f, 0.0f);
+      auto &rb = texturedRec->CreateRigidBody();
+      rb.restitution = 0.4f;
+      rb.friction = 0.3f;
+      rb.AddColliders(Collider::CreateBox(Vec3(0.5f, 0.5f, 0.0f), 1.0f));
+      auto texture = std::make_shared<Texture>("../../app/res/textures/Wall.png");
+      scene.AddTexture(texture);
+      texturedRec->AddComponent<SpriteRenderer>(*texture, sf::Color::White,
+                                              sf::Vector2f(1.0f, 1.0f));
+      scene.AddGameObject(texturedRec);
+    }
+
     PushOverlay(editorLayer);
   }
 
