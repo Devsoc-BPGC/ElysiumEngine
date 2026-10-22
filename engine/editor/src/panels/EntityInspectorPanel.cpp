@@ -1,4 +1,5 @@
 #include "panels/EntityInspectorPanel.hpp"
+#include "AudioSourceComponent.hpp"
 #include "Collider.hpp"
 #include "Log.h"
 #include "SpriteRenderer.hpp"
@@ -40,7 +41,8 @@ void EntityInspectorPanel::OnImGuiRender(EditorContext &context, Scene &scene,
     ImGui::SameLine();
     ImGui::Checkbox("Active", &entity.active);
 
-    ImGui::TextDisabled("Entity ID: %u", entity.id);
+    ImGui::TextDisabled("Entity ID: %llu",
+                        static_cast<unsigned long long>(static_cast<uint64_t>(entity.GetUUID())));
     ImGui::Separator();
 
     // 1. Transform Component
@@ -55,7 +57,10 @@ void EntityInspectorPanel::OnImGuiRender(EditorContext &context, Scene &scene,
     // 4. SpriteRenderer Component
     DrawSpriteRendererComponent(context, entity);
 
-    // 5. Custom Components
+    // 5. AudioSource Component
+    DrawAudioSourceComponent(context, entity);
+
+    // 6. Custom Components
     DrawCustomComponents(context, entity);
 
     ImGui::Spacing();
@@ -90,6 +95,12 @@ void EntityInspectorPanel::OnImGuiRender(EditorContext &context, Scene &scene,
         entity.AddComponent<SpriteRenderer>(sf::Color(255, 100, 100),
                                             sf::Vector2f(1.0f, 1.0f));
         ELYSIUM_INFO("Added SpriteRenderer to entity: {}", entity.name);
+      }
+
+      if (!entity.GetComponent<AudioSourceComponent>() &&
+          ImGui::MenuItem("Audio Source")) {
+        entity.AddComponent<AudioSourceComponent>();
+        ELYSIUM_INFO("Added AudioSourceComponent to entity: {}", entity.name);
       }
 
       ImGui::EndPopup();
@@ -305,6 +316,65 @@ void EntityInspectorPanel::DrawSpriteRendererComponent(EditorContext &context,
                                 static_cast<uint8_t>(color[1] * 255.0f),
                                 static_cast<uint8_t>(color[2] * 255.0f),
                                 static_cast<uint8_t>(color[3] * 255.0f));
+    }
+  }
+}
+
+void EntityInspectorPanel::DrawAudioSourceComponent(EditorContext &context,
+                                                    GameObject &entity) {
+  (void)context;
+  auto *audio = entity.GetComponent<AudioSourceComponent>();
+  if (!audio)
+    return;
+
+  if (ImGui::CollapsingHeader("Audio Source", ImGuiTreeNodeFlags_DefaultOpen)) {
+    // Filepath buffer input
+    char pathBuffer[512];
+    std::strncpy(pathBuffer, audio->filepath.c_str(), sizeof(pathBuffer) - 1);
+    pathBuffer[sizeof(pathBuffer) - 1] = '\0';
+    if (ImGui::InputText("Sound File", pathBuffer, sizeof(pathBuffer))) {
+      audio->filepath = pathBuffer;
+    }
+
+    // Playback preview controls
+    ImGui::Spacing();
+    if (ImGui::Button("Play")) {
+      audio->Play();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Pause")) {
+      audio->Pause();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Stop")) {
+      audio->Stop();
+    }
+
+    ImGui::SameLine();
+    if (audio->IsPlaying()) {
+      ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.2f, 1.0f), "[Playing]");
+    } else if (audio->IsPaused()) {
+      ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "[Paused]");
+    } else {
+      ImGui::TextDisabled("[Stopped]");
+    }
+
+    ImGui::Spacing();
+    ImGui::SliderFloat("Volume", &audio->volume, 0.0f, 100.0f, "%.1f");
+    ImGui::SliderFloat("Pitch", &audio->pitch, 0.1f, 3.0f, "%.2f");
+
+    ImGui::Checkbox("Play On Awake", &audio->playOnAwake);
+    ImGui::SameLine();
+    ImGui::Checkbox("Loop", &audio->loop);
+
+    ImGui::Separator();
+    ImGui::Checkbox("Spatial Audio (3D)", &audio->isSpatial);
+
+    if (audio->isSpatial) {
+      ImGui::DragFloat("Min Distance", &audio->minDistance, 0.1f, 0.1f, 100.0f);
+      ImGui::DragFloat("Attenuation", &audio->attenuation, 0.05f, 0.0f, 10.0f);
+      ImGui::TextDisabled("Source Pos: (%.2f, %.2f, %.2f)", entity.position.x,
+                          entity.position.y, entity.position.z);
     }
   }
 }

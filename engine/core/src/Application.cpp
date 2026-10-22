@@ -1,4 +1,5 @@
 #include "Application.hpp"
+#include "AudioEngine.hpp"
 #include "Log.h"
 
 namespace Elysium {
@@ -11,11 +12,19 @@ Application::Application(const std::string &name) {
   }
   s_Instance = this;
 
+  m_AudioEngine = std::make_unique<AudioEngine>();
+  m_AudioEngine->Init();
+
   m_Window = std::make_unique<Window>(WindowProps(name));
   m_Window->SetEventCallback([this](Event &e) { OnEvent(e); });
 }
 
-Application::~Application() { s_Instance = nullptr; }
+Application::~Application() {
+  if (m_AudioEngine) {
+    m_AudioEngine->Shutdown();
+  }
+  s_Instance = nullptr;
+}
 
 void Application::PushLayer(Layer *layer) { m_LayerStack.PushLayer(layer); }
 
