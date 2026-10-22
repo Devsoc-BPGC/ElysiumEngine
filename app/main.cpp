@@ -5,6 +5,7 @@
 #include <Elysium.hpp>
 #include <cstdlib>
 #include <memory>
+#include <ScriptingAPI.hpp>
 
 class LifeSpan : public Component {
 public:
@@ -19,40 +20,43 @@ public:
   }
 };
 
-class PlayerController : public Component {
+class BoxController : public Elysium::Script {
 public:
   float speed = 10.0f;
 
-  void Update(float dt) override {
-    (void)dt;
-    if (!gameObject->rigidBody)
-      return;
+  void OnCreate() override {
+    // Tint cyan on start to visually confirm script wrapper control
+    entity->SetColor(Elysium::ColorRGBA::Cyan());
+  }
 
-    Vec3 velocity(0, 0, 0);
-    if (Input::IsKeyDown(sf::Keyboard::Key::A))
+  void OnUpdate(float dt) override {
+    (void)dt;
+    Elysium::Vector2 velocity(0.0f, 0.0f);
+
+    if (Elysium::IsKeyDown("A"))
       velocity.x -= 1.0f;
-    if (Input::IsKeyDown(sf::Keyboard::Key::D))
+    if (Elysium::IsKeyDown("D"))
       velocity.x += 1.0f;
-    if (Input::IsKeyDown(sf::Keyboard::Key::W))
+    if (Elysium::IsKeyDown("W"))
       velocity.y -= 1.0f;
-    if (Input::IsKeyDown(sf::Keyboard::Key::S))
+    if (Elysium::IsKeyDown("S"))
       velocity.y += 1.0f;
 
-    if (velocity.MagnitudeSquared() > 0) {
+    if (velocity.MagnitudeSquared() > 0.0f) {
       velocity = velocity.Normalized() * speed;
-      gameObject->rigidBody->linearVelocity.x = velocity.x;
-      gameObject->rigidBody->linearVelocity.y = velocity.y;
+      entity->SetVelocity(velocity);
     } else {
-      // Apply damping if no input
-      gameObject->rigidBody->linearVelocity.x *= 0.9f;
-      gameObject->rigidBody->linearVelocity.y *= 0.9f;
+      // Apply damping if no directional input
+      Elysium::Vector2 currentVel = entity->GetVelocity();
+      entity->SetVelocity(currentVel.x * 0.9f, currentVel.y * 0.9f);
     }
 
-    if (Input::IsKeyPressed(sf::Keyboard::Key::Space)) {
-      gameObject->rigidBody->linearVelocity.y = -8.0f; // Jump impulse
+    if (Elysium::IsKeyPressed("Space")) {
+      entity->ApplyImpulse(0.0f, -8.0f); // Jump impulse
     }
   }
 };
+
 
 class Sandbox : public Elysium::Application {
 public:
@@ -61,6 +65,7 @@ public:
 
     auto *editorLayer = new Elysium::EditorLayer();
     auto &scene = editorLayer->GetScene();
+    Elysium::SetActiveScene(&scene);
 
     // Populate Initial Demo Scene Entities
 
@@ -82,18 +87,10 @@ public:
       scene.AddGameObject(ball);
     }
 
-    // 2. Dynamic Box with PlayerController
+    // 2. Dynamic Box with Script Wrapper (WASD Controls)
     {
-      auto playerBox = std::make_shared<GameObject>("Player Box");
-      playerBox->position = Vec3(8.0f, 4.0f, 0.0f);
-      auto &rb = playerBox->CreateRigidBody();
-      rb.restitution = 0.4f;
-      rb.friction = 0.3f;
-      rb.AddColliders(Collider::CreateBox(Vec3(0.5f, 0.5f, 0.0f), 1.0f));
-      playerBox->AddComponent<SpriteRenderer>(sf::Color(160, 100, 220),
-                                              sf::Vector2f(1.0f, 1.0f));
-      playerBox->AddComponent<PlayerController>();
-      scene.AddGameObject(playerBox);
+      auto playerBox = Elysium::SpawnBox("Scripted Box (WASD)", 8.0f, 4.0f, 1.0f, 1.0f);
+      playerBox.AttachScript<BoxController>();
     }
 
     PushOverlay(editorLayer);

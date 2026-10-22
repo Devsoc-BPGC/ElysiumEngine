@@ -14,6 +14,10 @@ list(APPEND ENGINE_SOURCES ${CORE_SOURCES})
 file(GLOB_RECURSE EDITOR_SOURCES editor/src/*.cpp)
 list(APPEND ENGINE_SOURCES ${EDITOR_SOURCES})
 
+# Scripting sources
+file(GLOB_RECURSE SCRIPTING_SOURCES scripting/src/*.cpp)
+list(APPEND ENGINE_SOURCES ${SCRIPTING_SOURCES})
+
 # Changed from SHARED to STATIC to avoid DLL export issues on Windows
 add_library(ElysiumEngine STATIC ${ENGINE_SOURCES})
 
@@ -21,6 +25,7 @@ target_include_directories(ElysiumEngine PUBLIC
     core/include
     physics/include
     editor/include
+    scripting/include
     events
 )
 
