@@ -32,18 +32,9 @@ public:
         } else if (colA.type == ColliderType::Box &&
                    colB.type == ColliderType::Sphere) {
           ResolveSphereBox(b, colB, a, colA);
-        } else if (colA.type == ColliderType::Box &&
-                   colB.type == ColliderType::Box) {
-          ResolveBoxBox(a, colA, b, colB);
-        } else if (colA.type == ColliderType::Polygon &&
-                   colB.type == ColliderType::Polygon) {
+        } else if ((colA.type == ColliderType::Box || colA.type == ColliderType::Polygon) &&
+                   (colB.type == ColliderType::Box || colB.type == ColliderType::Polygon)) {
           ResolvePolygonPolygon(a, colA, b, colB);
-        } else if (colA.type == ColliderType::Box &&
-                   colB.type == ColliderType::Polygon) {
-          ResolvePolygonPolygon(a, colA, b, colB); // Boxes are 4-vertex polygons
-        } else if (colA.type == ColliderType::Polygon &&
-                   colB.type == ColliderType::Box) {
-          ResolvePolygonPolygon(b, colB, a, colA);
         }
       }
     }
