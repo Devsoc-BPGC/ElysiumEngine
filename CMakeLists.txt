@@ -176,6 +176,7 @@ if(BUILD_TESTING)
     elysium_add_test(FrictionTest              test/FrictionTest.cpp)
     elysium_add_test(RigidBodyDecouplingTest   test/RigidBodyDecouplingTest.cpp)
     elysium_add_test(UUIDEntityTest            test/UUIDEntityTest.cpp)
+    elysium_add_test(SATTest                   test/SATTest.cpp)
 endif()
 
 # ============================================================

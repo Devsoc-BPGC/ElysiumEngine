@@ -2,8 +2,10 @@
 #define COLLIDER_HPP
 
 #include "CoreMath.hpp"
+#include <vector>
 
-enum class ColliderType { Sphere, Box };
+enum class ColliderType { Sphere, Box, Polygon };
+struct RigidBody;
 
 class Collider {
 public:
@@ -19,7 +21,7 @@ public:
   // Shape-specific data
   float radius;     // For Sphere/Circle
   Vec3 halfExtents; // For Box
-
+  std::vector<Vec3> localVertices;  // For Polygon (Local coordinates)
   /**
    * @brief Constructor for a Circle (Sphere in 3D math terms).
    * @param r Radius of the circle.
@@ -73,6 +75,15 @@ public:
     return c;
   }
 
+  static Collider CreatePolygon(const std::vector<Vec3>& verts, float density = 1.0f, Vec3 offset = Vec3(0, 0, 0)) {
+    Collider c;
+    c.type = ColliderType::Polygon;
+    c.localVertices = verts;
+    c.localCentroid = offset;
+    c.RecalculateProperties(density);
+    return c;
+  }
+
   /**
    * @brief Recalculates mass and local inertia tensor based on shape and
    * density.
@@ -90,8 +101,28 @@ public:
       float i = (1.0f / 12.0f) * mass * (w * w + h * h);
       localInertiaTensor = Mat3::Diagonal(i, i, i);
       radius = halfExtents.Magnitude();
+    } else if (type == ColliderType::Polygon) {
+      float maxDistSq = 0.0f;
+      for (const auto& v : localVertices) {
+        float distSq = v.MagnitudeSquared();
+        if (distSq > maxDistSq) maxDistSq = distSq;
+      }
+      radius = std::sqrt(maxDistSq);
+      // Shoelace formula for polygon area
+      float area = 0.0f;
+      for (size_t i = 0; i < localVertices.size(); ++i) {
+        const Vec3& p1 = localVertices[i];
+        const Vec3& p2 = localVertices[(i + 1) % localVertices.size()];
+        area += (p1.x * p2.y - p2.x * p1.y);
+      }
+      area = std::abs(area) * 0.5f;
+      if (area <= 0.0f) area = 1.0f;
+      mass = area * density;
+      float i = (1.0f / 6.0f) * mass * (radius * radius);
+      localInertiaTensor = Mat3::Diagonal(i, i, i);
     }
   }
-};
 
+  std::vector<Vec3> GetWorldVertices(const RigidBody& body) const;
+};
 #endif
