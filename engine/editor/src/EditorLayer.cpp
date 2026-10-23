@@ -51,6 +51,8 @@ void EditorLayer::Init(sf::RenderWindow &window) {
   ImGuiIO &io = ImGui::GetIO();
   io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+  // Larger default font for better readability
+  io.FontGlobalScale = 1.4f;
 
   // Hook custom memory log sink into spdlog
   auto sink = GetEditorLogSink();
@@ -325,6 +327,8 @@ void EditorLayer::RenderMenuBar(Scene &scene) {
         }
         ImGui::EndMenu();
       }
+      ImGui::SliderFloat("UI Scale", &ImGui::GetIO().FontGlobalScale, 0.8f,
+                         2.0f, "%.2f");
       ImGui::Separator();
       ImGui::MenuItem("Show Debug Grid", nullptr, &m_context.drawDebugGrid);
       ImGui::MenuItem("Show Colliders", nullptr,
@@ -357,6 +361,14 @@ void EditorLayer::ApplyModernDarkTheme() {
   style.ScrollbarRounding = 4.0f;
   style.GrabRounding = 3.0f;
   style.TabRounding = 4.0f;
+  // Roomier spacing to match the larger font
+  style.WindowPadding = ImVec2(10.0f, 10.0f);
+  style.FramePadding = ImVec2(8.0f, 5.0f);
+  style.ItemSpacing = ImVec2(10.0f, 7.0f);
+  style.ItemInnerSpacing = ImVec2(8.0f, 6.0f);
+  style.IndentSpacing = 24.0f;
+  style.ScrollbarSize = 16.0f;
+  style.GrabMinSize = 14.0f;
 
   style.WindowBorderSize = 1.0f;
   style.FrameBorderSize = 0.5f;
