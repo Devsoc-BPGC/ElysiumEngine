@@ -10,9 +10,11 @@
 #include "panels/StatsPanel.hpp"
 #include "panels/ToolbarPanel.hpp"
 #include <algorithm>
+#include <filesystem>
 #include <imgui-SFML.h>
 #include <imgui.h>
 #include "AudioSourceComponent.hpp"
+
 
 namespace Elysium {
 
@@ -43,7 +45,7 @@ void EditorLayer::Init(sf::RenderWindow &window) {
   m_window = &window;
 
   // Initialize ImGui-SFML binding
-  if (!ImGui::SFML::Init(window)) {
+  if (!ImGui::SFML::Init(window,false)) {
     ELYSIUM_CORE_ERROR("Failed to initialize ImGui-SFML");
     return;
   }
@@ -51,8 +53,25 @@ void EditorLayer::Init(sf::RenderWindow &window) {
   ImGuiIO &io = ImGui::GetIO();
   io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-  // Larger default font for better readability
-  io.FontGlobalScale = 1.4f;
+  // Load a simple, readable font (falls back to the default if not found)
+  const char *fontPaths[] = {
+      "engine/editor/fonts/Roboto-Regular.ttf",
+      "../engine/editor/fonts/Roboto-Regular.ttf",
+      "../../engine/editor/fonts/Roboto-Regular.ttf",
+      "../../../engine/editor/fonts/Roboto-Regular.ttf"};
+  ImFont *font = nullptr;
+  for (const char *path : fontPaths) {
+    if (std::filesystem::exists(path)) {
+      font = io.Fonts->AddFontFromFileTTF(path, 18.0f);
+      if (font)
+        break;
+    }
+  }
+  if (!font) {
+    ELYSIUM_CORE_ERROR("Failed to load editor font, using default");
+    io.Fonts->AddFontDefault();
+  }
+  ImGui::SFML::UpdateFontTexture();
 
   // Hook custom memory log sink into spdlog
   auto sink = GetEditorLogSink();
