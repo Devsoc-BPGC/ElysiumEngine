@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <imgui-SFML.h>
 #include <imgui.h>
+#include "AudioSourceComponent.hpp"
 
 namespace Elysium {
 
@@ -384,6 +385,15 @@ void EditorLayer::RenderMenuBar(Scene &scene) {
         auto &rb = entity->CreateRigidBody();
         scene.AddGameObject(entity);
         m_context.selectedEntity = entity;
+      }
+      if (ImGui::MenuItem("Create Audio Source")) {
+        auto entity = std::make_shared<GameObject>("Audio Source");
+        entity->position =
+            Vec3(m_context.camera.center.x, m_context.camera.center.y, 0.0f);
+        auto &as = entity->AddComponent<AudioSourceComponent>();
+        scene.AddGameObject(entity);
+        m_context.selectedEntity = entity;
+        ELYSIUM_INFO("Added AudioSourceComponent to entity: {}", entity->GetComponent<AudioSourceComponent>() != nullptr);
       }
       ImGui::EndMenu();
     }
