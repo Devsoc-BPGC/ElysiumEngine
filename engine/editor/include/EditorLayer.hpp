@@ -49,6 +49,7 @@ public:
   void ApplyModernDarkTheme();
 
   void OnProjectLoaded();
+  void ResetLayout();
   void NewProjectDialog();
   void OpenProjectDialog();
 
@@ -69,6 +70,9 @@ public:
   Scene m_scene;
   SimpleRenderer m_renderer{50.0f};
   float m_lastDt = 0.016f;
+
+  std::string m_ImGuiIniPath;
+  bool m_ResetLayoutScheduled = false;
 };
 
 } // namespace Elysium

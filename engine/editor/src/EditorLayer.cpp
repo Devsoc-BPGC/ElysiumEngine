@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <imgui-SFML.h>
 #include <imgui.h>
+#include <imgui_internal.h>
 #include "AudioSourceComponent.hpp"
 
 namespace Elysium {
@@ -56,6 +57,15 @@ void EditorLayer::Init(sf::RenderWindow &window) {
   io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
+  // Configure ImGui layout persistence: tie to active project or disable to avoid cwd pollution
+  if (auto project = Project::GetActive()) {
+    m_ImGuiIniPath = (project->GetProjectDirectory() / "imgui.ini").string();
+    io.IniFilename = m_ImGuiIniPath.c_str();
+  } else {
+    m_ImGuiIniPath.clear();
+    io.IniFilename = nullptr;
+  }
+
   // Hook custom memory log sink into spdlog
   auto sink = GetEditorLogSink();
   if (Log::GetCoreLogger()) {
@@ -77,13 +87,35 @@ void EditorLayer::Init(sf::RenderWindow &window) {
   }
 
   // Instantiate standard editor panels
-  AddPanel<ToolbarPanel>();
-  AddPanel<SceneViewportPanel>();
-  AddPanel<SceneHierarchyPanel>();
-  AddPanel<EntityInspectorPanel>();
-  AddPanel<ContentBrowserPanel>();
-  AddPanel<ConsolePanel>();
-  AddPanel<StatsPanel>();
+  auto &toolbar = AddPanel<ToolbarPanel>();
+  auto &viewportPanel = AddPanel<SceneViewportPanel>();
+  auto &sceneHierarchy = AddPanel<SceneHierarchyPanel>();
+  auto &inspector = AddPanel<EntityInspectorPanel>();
+  auto &contentBrowser = AddPanel<ContentBrowserPanel>();
+  auto &console = AddPanel<ConsolePanel>();
+  auto &stats = AddPanel<StatsPanel>();
+
+  // Configure panel visibility flags:
+  // Open by default: Viewport, Hierarchy, Content Browser, Console, Inspector
+  viewportPanel.isOpen = true;
+  sceneHierarchy.isOpen = true;
+  contentBrowser.isOpen = true;
+  console.isOpen = true;
+  inspector.isOpen = true;
+
+  // Closed / Hidden by default: Stats & Profiler, Toolbar (floats / handles itself or auxiliary)
+  toolbar.isOpen = false;
+  stats.isOpen = false;
+
+  // If active project has no existing imgui.ini or no project active, schedule programmatic default layout
+  if (auto project = Project::GetActive()) {
+    std::filesystem::path iniFile = project->GetProjectDirectory() / "imgui.ini";
+    if (!std::filesystem::exists(iniFile)) {
+      m_ResetLayoutScheduled = true;
+    }
+  } else {
+    m_ResetLayoutScheduled = true;
+  }
 
   m_isInitialized = true;
   ELYSIUM_CORE_INFO("Elysium EditorLayer attached with Dear ImGui Docking");
@@ -203,7 +235,70 @@ void EditorLayer::OnProjectLoaded() {
     m_window->setTitle("Elysium Game Engine — " + config.Name + " [" + config.ProjectDirectory.string() + "]");
   }
 
+  // 3. Update ImGui layout persistence to project directory and reload docking states immediately
+  m_ImGuiIniPath = (project->GetProjectDirectory() / "imgui.ini").string();
+  ImGuiIO &io = ImGui::GetIO();
+  io.IniFilename = m_ImGuiIniPath.c_str();
+
+  if (std::filesystem::exists(m_ImGuiIniPath)) {
+    ImGui::LoadIniSettingsFromDisk(m_ImGuiIniPath.c_str());
+  } else {
+    m_ResetLayoutScheduled = true;
+  }
+
   ELYSIUM_INFO("Editor: Switched to Project '{}' ({})", config.Name, config.ProjectDirectory.string());
+}
+
+void EditorLayer::ResetLayout() {
+  const ImGuiViewport *viewport = ImGui::GetMainViewport();
+  ImGuiID dockspace_id = ImGui::GetID("ElysiumEditorDockSpace");
+
+  ImGui::DockBuilderRemoveNode(dockspace_id); // Clear existing layout
+  ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace);
+  ImGui::DockBuilderSetNodeSize(dockspace_id, viewport->Size);
+
+  // Split main dockspace: Right (Inspector) vs Main Region
+  ImGuiID dock_main_id = dockspace_id;
+  ImGuiID dock_right_id =
+      ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Right, 0.25f, nullptr, &dock_main_id);
+
+  // Split Main Region: Bottom (Console) vs Center/Left Region
+  ImGuiID dock_bottom_id =
+      ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Down, 0.25f, nullptr, &dock_main_id);
+
+  // Split Center/Left Region: Left Column vs Center Viewport
+  ImGuiID dock_left_id =
+      ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Left, 0.25f, nullptr, &dock_main_id);
+
+  // Split Left Column: Top Left (Hierarchy) vs Bottom Left (Content Browser)
+  ImGuiID dock_top_left_id =
+      ImGui::DockBuilderSplitNode(dock_left_id, ImGuiDir_Up, 0.50f, nullptr, &dock_left_id);
+
+  // Dock panels to respective IDs by exact window title strings
+  ImGui::DockBuilderDockWindow("Scene Viewport", dock_main_id);
+  ImGui::DockBuilderDockWindow("Scene Hierarchy", dock_top_left_id);
+  ImGui::DockBuilderDockWindow("Content Browser", dock_left_id);
+  ImGui::DockBuilderDockWindow("Console", dock_bottom_id);
+  ImGui::DockBuilderDockWindow("Entity Inspector", dock_right_id);
+
+  ImGui::DockBuilderFinish(dockspace_id);
+
+  // Configure panel visibility flags:
+  // Open: Viewport, Hierarchy, Content Browser, Console, Inspector
+  // Closed / Hidden: Stats & Profiler, Toolbar, and auxiliary panels
+  for (auto &panel : m_panels) {
+    if (panel->name == "Scene Viewport" ||
+        panel->name == "Scene Hierarchy" ||
+        panel->name == "Content Browser" ||
+        panel->name == "Console" ||
+        panel->name == "Entity Inspector") {
+      panel->isOpen = true;
+    } else {
+      panel->isOpen = false;
+    }
+  }
+
+  ELYSIUM_CORE_INFO("Editor: Reset layout to default workspace configuration");
 }
 
 void EditorLayer::SetupDockSpace() {
@@ -232,6 +327,11 @@ void EditorLayer::SetupDockSpace() {
 
   ImGuiID dockspaceId = ImGui::GetID("ElysiumEditorDockSpace");
   ImGui::DockSpace(dockspaceId, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_None);
+
+  if (m_ResetLayoutScheduled) {
+    ResetLayout();
+    m_ResetLayoutScheduled = false;
+  }
 }
 
 void EditorLayer::NewProjectDialog() {
@@ -402,6 +502,10 @@ void EditorLayer::RenderMenuBar(Scene &scene) {
     if (ImGui::BeginMenu("View")) {
       for (auto &panel : m_panels) {
         ImGui::MenuItem(panel->name.c_str(), nullptr, &panel->isOpen);
+      }
+      ImGui::Separator();
+      if (ImGui::MenuItem("Reset Layout")) {
+        ResetLayout();
       }
       ImGui::EndMenu();
     }
