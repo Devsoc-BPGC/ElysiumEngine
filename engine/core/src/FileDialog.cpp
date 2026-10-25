@@ -14,183 +14,7 @@
 
 namespace Elysium {
 
-#if defined(ELYSIUM_PLATFORM_LINUX) || defined(__linux__)
-
-static std::string RunCommandAndReadOutput(const std::string &cmd) {
-  FILE *pipe = popen(cmd.c_str(), "r");
-  if (!pipe) {
-    return "";
-  }
-
-  char buffer[1024];
-  std::string result;
-  while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
-    result += buffer;
-  }
-  pclose(pipe);
-
-  // Trim trailing newline / carriage return
-  while (!result.empty() && (result.back() == '\n' || result.back() == '\r')) {
-    result.pop_back();
-  }
-  return result;
-}
-
-static bool HasZenity() {
-  static int status = -1;
-  if (status == -1) {
-    int ret = std::system("which zenity >/dev/null 2>&1");
-    status = (ret == 0) ? 1 : 0;
-  }
-  return status == 1;
-}
-
-static bool HasKdialog() {
-  static int status = -1;
-  if (status == -1) {
-    int ret = std::system("which kdialog >/dev/null 2>&1");
-    status = (ret == 0) ? 1 : 0;
-  }
-  return status == 1;
-}
-
-std::optional<std::filesystem::path> FileDialog::OpenFile(
-    const std::string &title,
-    const std::filesystem::path &defaultPath,
-    const std::vector<FileDialogFilter> &filters) {
-
-  if (HasZenity()) {
-    std::ostringstream cmd;
-    cmd << "zenity --file-selection --title=\"" << title << "\"";
-    if (!defaultPath.empty()) {
-      cmd << " --filename=\"" << defaultPath.string() << "\"";
-    }
-    for (const auto &f : filters) {
-      cmd << " --file-filter=\"" << f.name << " | " << f.spec << "\"";
-    }
-    cmd << " 2>/dev/null";
-
-    std::string out = RunCommandAndReadOutput(cmd.str());
-    if (!out.empty()) {
-      return std::filesystem::path(out);
-    }
-    return std::nullopt;
-  }
-
-  if (HasKdialog()) {
-    std::ostringstream cmd;
-    cmd << "kdialog --title \"" << title << "\" --getopenfilename";
-    if (!defaultPath.empty()) {
-      cmd << " \"" << defaultPath.string() << "\"";
-    } else {
-      cmd << " :";
-    }
-    if (!filters.empty()) {
-      cmd << " \"";
-      for (size_t i = 0; i < filters.size(); ++i) {
-        if (i > 0) cmd << " ";
-        cmd << filters[i].spec;
-      }
-      cmd << "\"";
-    }
-    cmd << " 2>/dev/null";
-
-    std::string out = RunCommandAndReadOutput(cmd.str());
-    if (!out.empty()) {
-      return std::filesystem::path(out);
-    }
-    return std::nullopt;
-  }
-
-  ELYSIUM_CORE_WARN("FileDialog: Neither zenity nor kdialog is installed on this Linux system.");
-  return std::nullopt;
-}
-
-std::optional<std::filesystem::path> FileDialog::SaveFile(
-    const std::string &title,
-    const std::filesystem::path &defaultPath,
-    const std::vector<FileDialogFilter> &filters) {
-
-  if (HasZenity()) {
-    std::ostringstream cmd;
-    cmd << "zenity --file-selection --save --confirm-overwrite --title=\"" << title << "\"";
-    if (!defaultPath.empty()) {
-      cmd << " --filename=\"" << defaultPath.string() << "\"";
-    }
-    for (const auto &f : filters) {
-      cmd << " --file-filter=\"" << f.name << " | " << f.spec << "\"";
-    }
-    cmd << " 2>/dev/null";
-
-    std::string out = RunCommandAndReadOutput(cmd.str());
-    if (!out.empty()) {
-      return std::filesystem::path(out);
-    }
-    return std::nullopt;
-  }
-
-  if (HasKdialog()) {
-    std::ostringstream cmd;
-    cmd << "kdialog --title \"" << title << "\" --getsavefilename";
-    if (!defaultPath.empty()) {
-      cmd << " \"" << defaultPath.string() << "\"";
-    } else {
-      cmd << " :";
-    }
-    cmd << " 2>/dev/null";
-
-    std::string out = RunCommandAndReadOutput(cmd.str());
-    if (!out.empty()) {
-      return std::filesystem::path(out);
-    }
-    return std::nullopt;
-  }
-
-  ELYSIUM_CORE_WARN("FileDialog: Neither zenity nor kdialog is installed on this Linux system.");
-  return std::nullopt;
-}
-
-std::optional<std::filesystem::path> FileDialog::SelectFolder(
-    const std::string &title,
-    const std::filesystem::path &defaultPath) {
-
-  if (HasZenity()) {
-    std::ostringstream cmd;
-    cmd << "zenity --file-selection --directory --title=\"" << title << "\"";
-    if (!defaultPath.empty()) {
-      cmd << " --filename=\"" << defaultPath.string() << "/\"";
-    }
-    cmd << " 2>/dev/null";
-
-    std::string out = RunCommandAndReadOutput(cmd.str());
-    if (!out.empty()) {
-      return std::filesystem::path(out);
-    }
-    return std::nullopt;
-  }
-
-  if (HasKdialog()) {
-    std::ostringstream cmd;
-    cmd << "kdialog --title \"" << title << "\" --getexistingdirectory";
-    if (!defaultPath.empty()) {
-      cmd << " \"" << defaultPath.string() << "\"";
-    } else {
-      cmd << " :";
-    }
-    cmd << " 2>/dev/null";
-
-    std::string out = RunCommandAndReadOutput(cmd.str());
-    if (!out.empty()) {
-      return std::filesystem::path(out);
-    }
-    return std::nullopt;
-  }
-
-  ELYSIUM_CORE_WARN("FileDialog: Neither zenity nor kdialog is installed on this Linux system.");
-  return std::nullopt;
-}
-
-#elif defined(ELYSIUM_PLATFORM_WINDOWS) || defined(_WIN32)
+#if defined(ELYSIUM_PLATFORM_WINDOWS) || defined(_WIN32)
 
 std::optional<std::filesystem::path> FileDialog::OpenFile(
     const std::string &title,
@@ -283,6 +107,188 @@ std::optional<std::filesystem::path> FileDialog::SelectFolder(
     }
     CoTaskMemFree(pidl);
   }
+  return std::nullopt;
+}
+
+#elif defined(ELYSIUM_PLATFORM_LINUX) || defined(__linux__)
+
+static std::string RunCommandAndReadOutput(const std::string &cmd) {
+  FILE *pipe = popen(cmd.c_str(), "r");
+  if (!pipe) {
+    return "";
+  }
+
+  char buffer[1024];
+  std::string result;
+  while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
+    result += buffer;
+  }
+  pclose(pipe);
+
+  // Trim trailing newline / carriage return
+  while (!result.empty() && (result.back() == '\n' || result.back() == '\r')) {
+    result.pop_back();
+  }
+  return result;
+}
+
+static bool HasZenity() {
+  static int status = -1;
+  if (status == -1) {
+    int ret = std::system("which zenity >/dev/null 2>&1");
+    status = (ret == 0) ? 1 : 0;
+  }
+  return status == 1;
+}
+
+static bool HasKdialog() {
+  static int status = -1;
+  if (status == -1) {
+    int ret = std::system("which kdialog >/dev/null 2>&1");
+    status = (ret == 0) ? 1 : 0;
+  }
+  return status == 1;
+}
+
+std::optional<std::filesystem::path> FileDialog::OpenFile(
+    const std::string &title,
+    const std::filesystem::path &defaultPath,
+    const std::vector<FileDialogFilter> &filters) {
+
+  if (HasZenity()) {
+    std::ostringstream cmd;
+    cmd << "zenity --file-selection --title=\"" << title << "\"";
+    if (!defaultPath.empty()) {
+      cmd << " --filename=\"" << defaultPath.string() << "\"";
+    }
+    for (const auto &f : filters) {
+      cmd << " --file-filter=\"" << f.name << " | " << f.spec << "\"";
+    }
+    cmd << " 2>/dev/null";
+
+    std::string out = RunCommandAndReadOutput(cmd.str());
+    if (!out.empty()) {
+      return std::filesystem::path(out);
+    }
+    return std::nullopt;
+  }
+
+  if (HasKdialog()) {
+    std::ostringstream cmd;
+    cmd << "kdialog --title \"" << title << "\" --getopenfilename";
+    if (!defaultPath.empty()) {
+      cmd << " \"" << defaultPath.string() << "\"";
+    } else {
+      cmd << " \":\"";
+    }
+    if (!filters.empty()) {
+      cmd << " \"";
+      for (size_t i = 0; i < filters.size(); ++i) {
+        if (i > 0) cmd << "; ";
+        cmd << filters[i].spec;
+      }
+      cmd << "\"";
+    }
+    cmd << " 2>/dev/null";
+
+    std::string out = RunCommandAndReadOutput(cmd.str());
+    if (!out.empty()) {
+      return std::filesystem::path(out);
+    }
+    return std::nullopt;
+  }
+
+  ELYSIUM_CORE_WARN("FileDialog: Neither zenity nor kdialog is installed on this Linux system.");
+  return std::nullopt;
+}
+
+std::optional<std::filesystem::path> FileDialog::SaveFile(
+    const std::string &title,
+    const std::filesystem::path &defaultPath,
+    const std::vector<FileDialogFilter> &filters) {
+
+  if (HasZenity()) {
+    std::ostringstream cmd;
+    cmd << "zenity --file-selection --save --confirm-overwrite --title=\"" << title << "\"";
+    if (!defaultPath.empty()) {
+      cmd << " --filename=\"" << defaultPath.string() << "\"";
+    }
+    for (const auto &f : filters) {
+      cmd << " --file-filter=\"" << f.name << " | " << f.spec << "\"";
+    }
+    cmd << " 2>/dev/null";
+
+    std::string out = RunCommandAndReadOutput(cmd.str());
+    if (!out.empty()) {
+      return std::filesystem::path(out);
+    }
+    return std::nullopt;
+  }
+
+  if (HasKdialog()) {
+    std::ostringstream cmd;
+    cmd << "kdialog --title \"" << title << "\" --getsavefilename";
+    if (!defaultPath.empty()) {
+      cmd << " \"" << defaultPath.string() << "\"";
+    } else {
+      cmd << " \":\"";
+    }
+    if (!filters.empty()) {
+      cmd << " \"";
+      for (size_t i = 0; i < filters.size(); ++i) {
+        if (i > 0) cmd << "; ";
+        cmd << filters[i].spec;
+      }
+      cmd << "\"";
+    }
+    cmd << " 2>/dev/null";
+
+    std::string out = RunCommandAndReadOutput(cmd.str());
+    if (!out.empty()) {
+      return std::filesystem::path(out);
+    }
+    return std::nullopt;
+  }
+
+  ELYSIUM_CORE_WARN("FileDialog: Neither zenity nor kdialog is installed on this Linux system.");
+  return std::nullopt;
+}
+
+std::optional<std::filesystem::path> FileDialog::SelectFolder(
+    const std::string &title,
+    const std::filesystem::path &defaultPath) {
+
+  if (HasZenity()) {
+    std::ostringstream cmd;
+    cmd << "zenity --file-selection --directory --title=\"" << title << "\"";
+    if (!defaultPath.empty()) {
+      cmd << " --filename=\"" << defaultPath.string() << "\"";
+    }
+    cmd << " 2>/dev/null";
+
+    std::string out = RunCommandAndReadOutput(cmd.str());
+    if (!out.empty()) {
+      return std::filesystem::path(out);
+    }
+    return std::nullopt;
+  }
+
+  if (HasKdialog()) {
+    std::ostringstream cmd;
+    cmd << "kdialog --title \"" << title << "\" --getexistingdirectory";
+    if (!defaultPath.empty()) {
+      cmd << " \"" << defaultPath.string() << "\"";
+    }
+    cmd << " 2>/dev/null";
+
+    std::string out = RunCommandAndReadOutput(cmd.str());
+    if (!out.empty()) {
+      return std::filesystem::path(out);
+    }
+    return std::nullopt;
+  }
+
+  ELYSIUM_CORE_WARN("FileDialog: Neither zenity nor kdialog is installed on this Linux system.");
   return std::nullopt;
 }
 
