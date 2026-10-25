@@ -1,9 +1,11 @@
 #include "EditorLayer.hpp"
 #include "Application.hpp"
+#include "AssetManager.hpp"
 #include "Collider.hpp"
 #include "EditorLogSink.hpp"
 #include "Log.h"
 #include "panels/ConsolePanel.hpp"
+#include "panels/ContentBrowserPanel.hpp"
 #include "panels/EntityInspectorPanel.hpp"
 #include "panels/SceneHierarchyPanel.hpp"
 #include "panels/SceneViewportPanel.hpp"
@@ -63,11 +65,15 @@ void EditorLayer::Init(sf::RenderWindow &window) {
   // Apply professional editor styling
   ApplyModernDarkTheme();
 
+  // Initialize Asset Registry
+  AssetManager::Get().Init("assets");
+
   // Instantiate standard editor panels
   AddPanel<ToolbarPanel>();
   AddPanel<SceneViewportPanel>();
   AddPanel<SceneHierarchyPanel>();
   AddPanel<EntityInspectorPanel>();
+  AddPanel<ContentBrowserPanel>();
   AddPanel<ConsolePanel>();
   AddPanel<StatsPanel>();
 
@@ -331,6 +337,7 @@ void EditorLayer::Shutdown() {
   if (!m_isInitialized)
     return;
 
+  AssetManager::Get().Shutdown();
   m_panels.clear();
   ImGui::SFML::Shutdown();
   m_isInitialized = false;
