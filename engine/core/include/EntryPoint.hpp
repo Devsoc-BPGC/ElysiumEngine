@@ -8,7 +8,7 @@
 #include "Application.hpp"
 #include "Log.h"
 
-#ifdef ELYSIUM_PLATFORM_LINUX
+#if defined(ELYSIUM_PLATFORM_WINDOWS) || defined(ELYSIUM_PLATFORM_LINUX) || defined(ELYSIUM_PLATFORM_MAC) || defined(ELYSIUM_PLATFORM_MACOS) || defined(_WIN32) || defined(__linux__) || defined(__APPLE__)
 
 /**
  * @brief External declaration of the client factory function.
@@ -22,6 +22,8 @@ extern Elysium::Application *Elysium::CreateApplication();
  * @return Exit status code.
  */
 int main(int argc, char **argv) {
+  (void)argc;
+  (void)argv;
   Elysium::Log::Init();
   auto app = Elysium::CreateApplication();
   app->Run();
@@ -30,3 +32,4 @@ int main(int argc, char **argv) {
 }
 
 #endif
+
