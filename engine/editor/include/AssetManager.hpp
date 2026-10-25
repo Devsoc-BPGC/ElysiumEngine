@@ -111,8 +111,10 @@ public:
   void SetAssetDirectory(const std::filesystem::path &dir);
   [[nodiscard]] const std::filesystem::path &GetAssetDirectory() const;
 
-  bool SaveManifest(const std::filesystem::path &manifestPath = "assets/assets.meta");
-  bool LoadManifest(const std::filesystem::path &manifestPath = "assets/assets.meta");
+  void ReloadProjectAssets(const std::filesystem::path &projectAssetDirectory);
+
+  bool SaveManifest(const std::filesystem::path &manifestPath = "");
+  bool LoadManifest(const std::filesystem::path &manifestPath = "");
 
   // Registry Queries & Registration
   AssetHandle RegisterAsset(const std::filesystem::path &relativeOrFullPath,

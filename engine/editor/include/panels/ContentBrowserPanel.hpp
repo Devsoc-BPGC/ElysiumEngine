@@ -17,13 +17,14 @@ namespace Elysium {
  */
 class ContentBrowserPanel : public EditorPanel {
 public:
-  explicit ContentBrowserPanel(const std::filesystem::path &assetDirectory = "assets");
+  explicit ContentBrowserPanel(const std::filesystem::path &assetDirectory = "");
   ~ContentBrowserPanel() override = default;
 
   void OnImGuiRender(EditorContext &context, Scene &scene,
                      SimpleRenderer &renderer) override;
 
   void Refresh();
+  void SetRootDirectory(const std::filesystem::path &dir);
 
 private:
   void RenderToolbar();

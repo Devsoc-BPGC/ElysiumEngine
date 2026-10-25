@@ -85,6 +85,39 @@ const std::filesystem::path &AssetManager::GetAssetDirectory() const {
   return m_AssetDirectory;
 }
 
+void AssetManager::ReloadProjectAssets(const std::filesystem::path &projectAssetDirectory) {
+  // 1. Save current manifest and flush cache
+  SaveManifest();
+  ClearCache();
+
+  {
+    std::lock_guard<std::mutex> lock(m_RegistryMutex);
+    m_Registry.clear();
+    m_PathToHandle.clear();
+    m_AssetDirectory = projectAssetDirectory;
+
+    std::error_code ec;
+    if (!std::filesystem::exists(m_AssetDirectory, ec)) {
+      std::filesystem::create_directories(m_AssetDirectory, ec);
+    }
+  }
+
+  // 2. Load manifest from new project asset directory
+  std::filesystem::path manifestPath = projectAssetDirectory / "assets.meta";
+  if (std::filesystem::exists(manifestPath)) {
+    LoadManifest(manifestPath);
+  }
+
+  // 3. Scan directory for untracked / new files
+  ScanAssetDirectory();
+
+  // 4. Save up-to-date manifest
+  SaveManifest(manifestPath);
+
+  ELYSIUM_CORE_INFO("AssetManager: Reloaded assets for '{}' (Total registered: {})",
+                    projectAssetDirectory.string(), m_Registry.size());
+}
+
 std::filesystem::path AssetManager::NormalizePath(const std::filesystem::path &path) const {
   std::filesystem::path p = path.lexically_normal();
   std::string s = p.generic_string();
@@ -94,9 +127,14 @@ std::filesystem::path AssetManager::NormalizePath(const std::filesystem::path &p
 bool AssetManager::SaveManifest(const std::filesystem::path &manifestPath) {
   std::lock_guard<std::mutex> lock(m_RegistryMutex);
 
-  std::filesystem::path actualPath = manifestPath.is_relative() 
-                                     ? (m_AssetDirectory / manifestPath.filename())
-                                     : manifestPath;
+  std::filesystem::path actualPath;
+  if (manifestPath.empty()) {
+    actualPath = m_AssetDirectory / "assets.meta";
+  } else if (manifestPath.is_relative()) {
+    actualPath = m_AssetDirectory / manifestPath.filename();
+  } else {
+    actualPath = manifestPath;
+  }
 
   std::ofstream out(actualPath);
   if (!out.is_open()) {
@@ -121,9 +159,14 @@ bool AssetManager::SaveManifest(const std::filesystem::path &manifestPath) {
 }
 
 bool AssetManager::LoadManifest(const std::filesystem::path &manifestPath) {
-  std::filesystem::path actualPath = manifestPath.is_relative()
-                                     ? (m_AssetDirectory / manifestPath.filename())
-                                     : manifestPath;
+  std::filesystem::path actualPath;
+  if (manifestPath.empty()) {
+    actualPath = m_AssetDirectory / "assets.meta";
+  } else if (manifestPath.is_relative()) {
+    actualPath = m_AssetDirectory / manifestPath.filename();
+  } else {
+    actualPath = manifestPath;
+  }
 
   if (!std::filesystem::exists(actualPath)) {
     return false;

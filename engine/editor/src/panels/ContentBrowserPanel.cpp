@@ -1,5 +1,6 @@
 #include "panels/ContentBrowserPanel.hpp"
 #include "Log.h"
+#include "Project.hpp"
 #include <algorithm>
 #include <cstring>
 #include <imgui-SFML.h>
@@ -12,21 +13,50 @@ ContentBrowserPanel::ContentBrowserPanel(const std::filesystem::path &assetDirec
     : EditorPanel("Content Browser"),
       m_RootDirectory(assetDirectory),
       m_CurrentDirectory(assetDirectory) {
-  if (!std::filesystem::exists(m_RootDirectory)) {
-    std::error_code ec;
-    std::filesystem::create_directories(m_RootDirectory, ec);
+  if (m_RootDirectory.empty()) {
+    std::filesystem::path activeAssets = Project::GetActiveAssetDirectory();
+    if (!activeAssets.empty()) {
+      m_RootDirectory = activeAssets;
+      m_CurrentDirectory = activeAssets;
+    }
   }
 
-  // Push root to history
-  m_History.push_back(m_CurrentDirectory);
-  m_HistoryIndex = 0;
+  if (!m_RootDirectory.empty()) {
+    if (!std::filesystem::exists(m_RootDirectory)) {
+      std::error_code ec;
+      std::filesystem::create_directories(m_RootDirectory, ec);
+    }
+    m_History.push_back(m_CurrentDirectory);
+    m_HistoryIndex = 0;
+
+    std::error_code ec;
+    if (std::filesystem::exists(m_RootDirectory)) {
+      m_LastWriteTime = std::filesystem::last_write_time(m_RootDirectory, ec);
+    }
+  }
 
   InitIcons();
+}
 
-  std::error_code ec;
-  if (std::filesystem::exists(m_RootDirectory)) {
-    m_LastWriteTime = std::filesystem::last_write_time(m_RootDirectory, ec);
+void ContentBrowserPanel::SetRootDirectory(const std::filesystem::path &dir) {
+  m_RootDirectory = dir;
+  m_CurrentDirectory = dir;
+  m_History.clear();
+  m_HistoryIndex = -1;
+
+  if (!m_RootDirectory.empty()) {
+    std::error_code ec;
+    if (!std::filesystem::exists(m_RootDirectory, ec)) {
+      std::filesystem::create_directories(m_RootDirectory, ec);
+    }
+    m_History.push_back(m_CurrentDirectory);
+    m_HistoryIndex = 0;
+    if (std::filesystem::exists(m_RootDirectory, ec)) {
+      m_LastWriteTime = std::filesystem::last_write_time(m_RootDirectory, ec);
+    }
   }
+
+  Refresh();
 }
 
 void ContentBrowserPanel::InitIcons() {
@@ -235,10 +265,35 @@ void ContentBrowserPanel::OnImGuiRender(EditorContext &context, Scene &scene,
   if (!isOpen)
     return;
 
-  CheckFileSystemChanges();
+  // Dynamically synchronize root directory with active project
+  std::filesystem::path activeAssets = Project::GetActiveAssetDirectory();
+  if (!activeAssets.empty() && activeAssets != m_RootDirectory) {
+    SetRootDirectory(activeAssets);
+  }
 
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(6.0f, 6.0f));
   if (ImGui::Begin(name.c_str(), &isOpen)) {
+    if (!Project::GetActive() || m_RootDirectory.empty() || !std::filesystem::exists(m_RootDirectory)) {
+      // Placeholder state: No Project Loaded
+      ImVec2 windowSize = ImGui::GetWindowSize();
+      const char *titleText = "No Project Loaded";
+      const char *hintText = "Create or Open a project via File -> New Project... or File -> Open Project...";
+      ImVec2 titleSize = ImGui::CalcTextSize(titleText);
+      ImVec2 hintSize = ImGui::CalcTextSize(hintText);
+
+      ImGui::SetCursorPos(ImVec2((windowSize.x - titleSize.x) * 0.5f, (windowSize.y - titleSize.y) * 0.4f));
+      ImGui::TextColored(ImVec4(0.85f, 0.85f, 0.85f, 1.0f), "%s", titleText);
+
+      ImGui::SetCursorPos(ImVec2((windowSize.x - hintSize.x) * 0.5f, (windowSize.y - titleSize.y) * 0.4f + 30.0f));
+      ImGui::TextDisabled("%s", hintText);
+
+      ImGui::End();
+      ImGui::PopStyleVar();
+      return;
+    }
+
+    CheckFileSystemChanges();
+
     RenderToolbar();
     ImGui::Separator();
 
@@ -299,7 +354,9 @@ void ContentBrowserPanel::RenderToolbar() {
 
   std::error_code ec;
   std::filesystem::path rel = std::filesystem::relative(m_CurrentDirectory, m_RootDirectory, ec);
-  std::string displayPath = ec || rel.empty() || rel == "." ? "assets" : ("assets/" + rel.generic_string());
+  std::string rootName = m_RootDirectory.filename().string();
+  if (rootName.empty()) rootName = "Assets";
+  std::string displayPath = ec || rel.empty() || rel == "." ? rootName : (rootName + "/" + rel.generic_string());
   ImGui::TextColored(ImVec4(0.4f, 0.75f, 1.0f, 1.0f), "%s", displayPath.c_str());
 
   // Search Filter on right side
@@ -319,7 +376,9 @@ void ContentBrowserPanel::RenderToolbar() {
 }
 
 void ContentBrowserPanel::RenderFolderTree() {
-  if (ImGui::TreeNodeEx("assets", ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_OpenOnArrow)) {
+  std::string rootName = m_RootDirectory.filename().string();
+  if (rootName.empty()) rootName = "Assets";
+  if (ImGui::TreeNodeEx(rootName.c_str(), ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_OpenOnArrow)) {
     if (ImGui::IsItemClicked()) {
       NavigateTo(m_RootDirectory);
     }
