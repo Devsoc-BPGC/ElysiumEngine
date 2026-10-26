@@ -5,12 +5,12 @@
 
 namespace Elysium {
 
-SceneViewportPanel::SceneViewportPanel() : EditorPanel("Viewport") {}
+SceneViewportPanel::SceneViewportPanel() : EditorPanel("Scene Viewport") {}
 
 void SceneViewportPanel::OnImGuiRender(EditorContext &context, Scene &scene,
                                        SimpleRenderer &renderer) {
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-  if (ImGui::Begin("Viewport", &isOpen,
+  if (ImGui::Begin("Scene Viewport", &isOpen,
                    ImGuiWindowFlags_NoScrollbar |
                        ImGuiWindowFlags_NoScrollWithMouse)) {
     ImVec2 viewportAvail = ImGui::GetContentRegionAvail();

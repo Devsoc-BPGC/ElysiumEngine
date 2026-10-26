@@ -97,7 +97,7 @@ set(SFML_BUILD_TEST_PROGRAMS OFF CACHE BOOL "" FORCE)
 set(SFML_BUILD_DOC           OFF CACHE BOOL "" FORCE)
 set(SFML_INSTALL             OFF CACHE BOOL "" FORCE)
 set(SFML_BUILD_NETWORK       OFF CACHE BOOL "" FORCE)
-set(SFML_BUILD_AUDIO         OFF CACHE BOOL "" FORCE)
+set(SFML_BUILD_AUDIO         ON  CACHE BOOL "" FORCE)
 
 add_subdirectory(external/SFML)
 
@@ -132,6 +132,7 @@ add_executable(ElysiumApp app/main.cpp)
 target_link_libraries(ElysiumApp PUBLIC
     ElysiumEngine
     SFML::Graphics
+    SFML::Audio
     SFML::Window
     SFML::System
     spdlog::spdlog_header_only
@@ -174,6 +175,9 @@ if(BUILD_TESTING)
     elysium_add_test(BoundaryTest              test/BoundaryTest.cpp)
     elysium_add_test(FrictionTest              test/FrictionTest.cpp)
     elysium_add_test(RigidBodyDecouplingTest   test/RigidBodyDecouplingTest.cpp)
+    elysium_add_test(UUIDEntityTest            test/UUIDEntityTest.cpp)
+    elysium_add_test(AssetManagerTest          test/AssetManagerTest.cpp)
+    elysium_add_test(ProjectTest               test/ProjectTest.cpp)
     elysium_add_test(SceneCloneTest            test/SceneCloneTest.cpp)
 endif()
 

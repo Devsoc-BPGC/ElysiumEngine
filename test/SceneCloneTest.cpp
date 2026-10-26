@@ -1,5 +1,9 @@
+#include "AudioSourceComponent.hpp"
+#include "Entity.hpp"
 #include "GameObject.hpp"
+#include "Log.h"
 #include "Scene.hpp"
+#include "Script.hpp"
 #include "SpriteRenderer.hpp"
 #include <cmath>
 #include <iostream>
@@ -29,9 +33,18 @@ public:
   }
 };
 
+class TestScript : public Elysium::Script {
+public:
+  std::unique_ptr<Component> Clone() const override {
+    return std::make_unique<TestScript>(*this);
+  }
+};
+
 } // namespace
 
 int main() {
+  Elysium::Log::Init(); // GameObject and Scene log through the engine
+
   Scene scene;
   scene.physicsWorld.gravity = Vec3(0.0f, 9.81f, 0.0f);
   scene.physicsWorld.SetBoundaries(Vec3(8.0f, 6.0f, 0.0f),
@@ -43,6 +56,11 @@ int main() {
   rb.AddColliders(Collider::CreateSphere(0.5f, 1.0f));
   ball->AddComponent<SpriteRenderer>(sf::Color(240, 80, 80), 0.5f);
   ball->AddComponent<CounterComponent>();
+  auto &audio = ball->AddComponent<Elysium::AudioSourceComponent>();
+  audio.volume = 42.0f;
+  audio.loop = true;
+  audio.isSpatial = true;
+  Elysium::Entity(ball).AttachScript<TestScript>();
   scene.AddGameObject(ball);
 
   auto marker = std::make_shared<GameObject>("Marker");
@@ -62,7 +80,11 @@ int main() {
   // Objects are new instances carrying the same data
   Check(ballCopy != ball && markerCopy != marker,
         "objects are new instances, not shared");
-  Check(ballCopy->id == ball->id, "copy keeps the original id");
+  Check(ballCopy->GetUUID() == ball->GetUUID(), "copy keeps the original UUID");
+  Check(copy->GetEntityByUUID(ball->GetUUID()) == ballCopy.get(),
+        "copy's UUID lookup finds the copied object");
+  Check(scene.GetEntityByUUID(ball->GetUUID()) == ball.get(),
+        "original's UUID lookup still finds the original");
   Check(ballCopy->name == "Ball" && markerCopy->name == "Marker",
         "names copied");
   Check(ballCopy->rigidBody != nullptr &&
@@ -74,7 +96,8 @@ int main() {
         "object without a rigid body still has none");
 
   // Components are copied and point at their new owner
-  Check(ballCopy->components.size() == 2, "components copied");
+  Check(ballCopy->components.size() == ball->components.size(),
+        "components copied");
   bool ownersOk = true;
   for (const auto &comp : ballCopy->components) {
     ownersOk = ownersOk && comp->gameObject == ballCopy.get();
@@ -84,6 +107,22 @@ int main() {
   Check(spriteCopy && spriteCopy->isCircle &&
             spriteCopy->color == sf::Color(240, 80, 80),
         "SpriteRenderer data copied");
+
+  // Audio sources copy their settings; each side keeps its own sound
+  auto *audioCopy = ballCopy->GetComponent<Elysium::AudioSourceComponent>();
+  Check(audioCopy && audioCopy != &audio && audioCopy->volume == 42.0f &&
+            audioCopy->loop && audioCopy->isSpatial,
+        "audio source settings copied");
+
+  // Scripts drive the copy, not the original
+  auto *scriptCopy = ballCopy->GetComponent<TestScript>();
+  auto *scriptOriginal = ball->GetComponent<TestScript>();
+  Check(scriptCopy && scriptCopy->entity &&
+            scriptCopy->entity->GetInternalObject() == ballCopy,
+        "copied script's Entity points at the copy");
+  Check(scriptOriginal && scriptOriginal->entity &&
+            scriptOriginal->entity->GetInternalObject() == ball,
+        "original script's Entity still points at the original");
 
   // The copy's physics world simulates the copied bodies, with the same
   // settings as the original
@@ -116,6 +155,9 @@ int main() {
   copy->Update(1.0f / 60.0f);
   Check(copy->objects.size() == 1 && scene.objects.size() == 2,
         "removing an object in the copy leaves the original scene");
+  Check(copy->GetEntityByUUID(marker->GetUUID()) == nullptr &&
+            scene.GetEntityByUUID(marker->GetUUID()) == marker.get(),
+        "removal updates only the copy's UUID lookup");
 
   if (g_failures > 0) {
     std::cout << g_failures << " check(s) failed" << std::endl;

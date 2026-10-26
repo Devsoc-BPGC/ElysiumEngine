@@ -4,7 +4,7 @@
 #include "Component.hpp"
 #include "CoreMath.hpp"
 #include "RigidBody.hpp"
-#include <cstdint>
+#include "UUID.hpp"
 #include <memory>
 #include <string>
 #include <typeindex>
@@ -13,8 +13,7 @@
 
 class GameObject {
 public:
-  inline static uint32_t s_NextID = 1;
-  uint32_t id = s_NextID++;
+  Elysium::UUID m_UUID;
   std::string name;
   bool active = true;
 
@@ -29,9 +28,10 @@ public:
   // Generic components
   std::vector<std::unique_ptr<Component>> components;
 
-  GameObject(const std::string &initialName = "New GameObject")
-      : name(initialName), position(0, 0, 0), rotation(Quat()), scale(1, 1, 1) {
-  }
+  GameObject(const std::string &initialName = "New GameObject");
+  GameObject(Elysium::UUID uuid, const std::string &initialName = "New GameObject");
+
+  Elysium::UUID GetUUID() const noexcept { return m_UUID; }
 
   template <typename T, typename... Args> T &AddComponent(Args &&...args) {
     auto comp = std::make_unique<T>(std::forward<Args>(args)...);
@@ -69,11 +69,10 @@ public:
 
   /**
    * @brief Deep-copies this GameObject: transform, RigidBody and components.
-   * @note The copy keeps this object's id so the two can be matched up.
+   * @note The copy keeps this object's UUID so the two can be matched up.
    */
   std::shared_ptr<GameObject> Clone() const {
-    auto copy = std::make_shared<GameObject>(name);
-    copy->id = id;
+    auto copy = std::make_shared<GameObject>(m_UUID, name);
     copy->active = active;
     copy->position = position;
     copy->rotation = rotation;
@@ -86,6 +85,11 @@ public:
         compCopy->gameObject = copy.get();
         copy->components.push_back(std::move(compCopy));
       }
+    }
+    // Once the copy is complete, let components rebind anything else that
+    // still refers to the original (e.g. a script's Entity handle)
+    for (auto &comp : copy->components) {
+      comp->OnCloned(copy);
     }
     return copy;
   }
@@ -117,5 +121,9 @@ public:
     }
   }
 };
+
+namespace Elysium {
+using GameObject = ::GameObject;
+}
 
 #endif

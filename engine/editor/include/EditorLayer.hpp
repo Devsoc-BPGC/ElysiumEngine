@@ -45,10 +45,15 @@ public:
 
   bool IsInitialized() const { return m_isInitialized; }
 
-private:
   void SetupDockSpace();
   void RenderMenuBar(Scene &scene);
+  void RenderProjectModals();
   void ApplyModernDarkTheme();
+
+  void OnProjectLoaded();
+  void ResetLayout();
+  void NewProjectDialog();
+  void OpenProjectDialog();
 
   bool OnKeyPressed(KeyPressedEvent &e);
 
@@ -57,11 +62,22 @@ private:
   std::vector<std::unique_ptr<EditorPanel>> m_panels;
   bool m_isInitialized = false;
 
+  // Project Modals State
+  bool m_ShowNewProjectModal = false;
+  bool m_ShowOpenProjectModal = false;
+  char m_NewProjectNameBuffer[128] = "MyProject";
+  char m_NewProjectPathBuffer[512] = "projects/MyProject";
+  char m_OpenProjectPathBuffer[512] = "";
+
   Scene m_scene;
   std::unique_ptr<Scene> m_runtimeScene; // Simulated copy of m_scene in Play
   GamePreviewPanel *m_gamePreview = nullptr;
+  Scene *m_activeSceneBeforePlay = nullptr; // Restored when Play stops
   SimpleRenderer m_renderer{50.0f};
   float m_lastDt = 0.016f;
+
+  std::string m_ImGuiIniPath;
+  bool m_ResetLayoutScheduled = false;
 };
 
 } // namespace Elysium

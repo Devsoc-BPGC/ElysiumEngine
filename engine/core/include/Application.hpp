@@ -13,6 +13,8 @@
 
 namespace Elysium {
 
+class AudioEngine;
+
 class ELYSIUM_API Application {
 public:
   Application(const std::string &name = "Elysium Application");
@@ -27,6 +29,9 @@ public:
   Window &GetWindow() { return *m_Window; }
   const Window &GetWindow() const { return *m_Window; }
 
+  AudioEngine &GetAudioEngine() { return *m_AudioEngine; }
+  const AudioEngine &GetAudioEngine() const { return *m_AudioEngine; }
+
   void Close() { m_Running = false; }
 
   static Application &Get() { return *s_Instance; }
@@ -36,6 +41,7 @@ private:
   bool OnWindowResize(WindowResizeEvent &e);
 
   std::unique_ptr<Window> m_Window;
+  std::unique_ptr<AudioEngine> m_AudioEngine;
   LayerStack m_LayerStack;
   bool m_Running = true;
   bool m_Minimized = false;

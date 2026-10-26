@@ -39,7 +39,7 @@ The `engine/editor` module provides a dockable, modular game engine editor built
 ### Scene Viewport vs. Game Preview
 The editor shows the scene through two independent views. Both can be open at once; neither replaces the other.
 
-| | **Viewport** (`SceneViewportPanel`) | **Game Preview** (`GamePreviewPanel`) |
+| | **Scene Viewport** (`SceneViewportPanel`) | **Game Preview** (`GamePreviewPanel`) |
 |---|---|---|
 | Purpose | Selecting entities and manipulating the scene | Seeing the scene as the player will |
 | Scene shown | The edit scene, never changed by Play | The running copy while playing; the edit scene otherwise |
@@ -49,9 +49,11 @@ The editor shows the scene through two independent views. Both can be open at on
 
 Each view owns its own `sf::RenderTexture`, sized to its own panel; if the panel has no area or a resize fails, that view skips the frame and retries rather than drawing into a target of the wrong size. They share one `SimpleRenderer`; the Game Preview restores the renderer's flags and counters after drawing, so the Stats panel keeps reporting the scene viewport's numbers.
 
-**Play Mode behaviour.** Pressing **Play** (or **Step**) copies the scene with `Scene::Clone()` and simulates only the copy. The Viewport, Scene Hierarchy and Inspector keep showing the untouched edit scene, while the Game Preview opens, comes to the front, and shows the running copy through the game camera. In Edit mode the preview shows the edit scene labelled *NOT PLAYING*; while paused or stepping it is labelled *PAUSED*. **Stop** discards the copy, so the scene is exactly as it was before Play. Edits made while playing go to the edit scene, not the running game.
+**Play Mode behaviour.** Pressing **Play** (or **Step**) copies the scene with `Scene::Clone()` and simulates only the copy. The Scene Viewport, Scene Hierarchy and Inspector keep showing the untouched edit scene, while the Game Preview opens, comes to the front, and shows the running copy through the game camera. In Edit mode the preview shows the edit scene labelled *NOT PLAYING*; while paused or stepping it is labelled *PAUSED*. **Stop** discards the copy, so the scene is exactly as it was before Play. Edits made while playing go to the edit scene, not the running game.
 
-**Opening and closing.** On first launch the Game Preview opens as a floating window so both views are visible without switching tabs; dock it anywhere and the layout is saved to `imgui.ini`. Closing it (its × button or **View → Game Preview**) only stops it rendering; its render texture is kept and resized as needed when it is reopened. Starting Play reopens it if it was closed.
+Scripts in the copy are re-pointed at the copied objects, and the scripting world's active scene is switched to the copy until Stop, so `SpawnBox`, `FindEntity` and similar act on the running game. Audio sources copy their settings, not their playing sound. A script that stores `Entity` handles to *other* objects still refers to the edit scene's objects, so look those up during play instead.
+
+**Opening and closing.** The Game Preview starts closed and opens automatically when Play starts, floating over the Scene Viewport's top-right corner so both views stay visible; dock it anywhere you like. It can also be opened in Edit mode from **View → Game Preview**. Closing it (its × button or the same menu item) only stops it rendering; its render texture is kept and resized as needed when it is reopened.
 
 ### Component Reflection & Mutability
 The `EntityInspectorPanel` reflects components attached to `context.selectedEntity`:
