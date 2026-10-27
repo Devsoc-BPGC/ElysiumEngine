@@ -204,15 +204,7 @@ bool EditorLayer::OnKeyPressed(KeyPressedEvent &e) {
 
   // Delete: Delete selected entity
   if (e.GetKeyCode() == sf::Keyboard::Key::Delete && m_context.selectedEntity) {
-    if (m_context.selectedEntity->rigidBody) {
-      m_scene.physicsWorld.RemoveBody(
-          m_context.selectedEntity->rigidBody.get());
-    }
-    auto it = std::find(m_scene.objects.begin(), m_scene.objects.end(),
-                        m_context.selectedEntity);
-    if (it != m_scene.objects.end()) {
-      m_scene.objects.erase(it);
-    }
+    m_scene.DestroyEntityByUUID(m_context.selectedEntity->GetUUID());
     m_context.selectedEntity = nullptr;
     return true;
   }
@@ -396,7 +388,7 @@ void EditorLayer::RenderMenuBar(Scene &scene) {
       ImGui::Separator();
 
       if (ImGui::MenuItem("New Scene", "Ctrl+N")) {
-        scene.objects.clear();
+        scene.Clear();
         m_context.selectedEntity = nullptr;
         ELYSIUM_INFO("New Scene created");
       }
@@ -427,15 +419,7 @@ void EditorLayer::RenderMenuBar(Scene &scene) {
       if (ImGui::MenuItem("Delete Selected Entity", "Del", false,
                           hasSelection)) {
         if (m_context.selectedEntity) {
-          if (m_context.selectedEntity->rigidBody) {
-            scene.physicsWorld.RemoveBody(
-                m_context.selectedEntity->rigidBody.get());
-          }
-          auto it = std::find(scene.objects.begin(), scene.objects.end(),
-                              m_context.selectedEntity);
-          if (it != scene.objects.end()) {
-            scene.objects.erase(it);
-          }
+          scene.DestroyEntityByUUID(m_context.selectedEntity->GetUUID());
           m_context.selectedEntity = nullptr;
         }
       }
@@ -463,7 +447,7 @@ void EditorLayer::RenderMenuBar(Scene &scene) {
         m_context.camera.Reset();
       }
       if (ImGui::MenuItem("Clear All Objects")) {
-        scene.objects.clear();
+        scene.Clear();
         m_context.selectedEntity = nullptr;
       }
       ImGui::EndMenu();
