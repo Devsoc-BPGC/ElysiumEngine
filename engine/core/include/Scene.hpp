@@ -13,7 +13,7 @@ class Scene {
 public:
   std::vector<std::shared_ptr<GameObject>> objects;
   std::unordered_map<Elysium::UUID, std::shared_ptr<GameObject>> m_EntityMap;
-  std::vector<std::shared_ptr<Texture>> textures;
+  std::vector<std::shared_ptr<const Texture>> textures;
   PhysicsWorld physicsWorld;
 
   Scene();
@@ -22,7 +22,7 @@ public:
   GameObject *GetEntityByUUID(Elysium::UUID uuid);
   bool DestroyEntityByUUID(Elysium::UUID uuid);
 
-  void AddTexture(std::shared_ptr<Texture> texture);
+  void AddTexture(std::shared_ptr<const Texture> texture);
 
   void Update(float dt);
 };

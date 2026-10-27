@@ -27,7 +27,7 @@ GameObject *Scene::GetEntityByUUID(Elysium::UUID uuid) {
   return nullptr;
 }
 
-void Scene::AddTexture(std::shared_ptr<Texture> texture) {
+void Scene::AddTexture(std::shared_ptr<const Texture> texture) {
   if (!texture)
     return;
 

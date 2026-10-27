@@ -95,7 +95,7 @@ public:
       auto *sprite = obj->GetComponent<SpriteRenderer>();
       if (sprite) {
         if (sprite->isTextured) {
-          sf::Sprite spriteRenderer(sprite->texture.GetTexture());
+          sf::Sprite spriteRenderer(sprite->texture->GetTexture());
           spriteRenderer.setOrigin(
               {sprite->size.x * 0.5f * ptm, sprite->size.y * 0.5f * ptm});
           spriteRenderer.setPosition({obj->position.x * ptm, obj->position.y * ptm});
