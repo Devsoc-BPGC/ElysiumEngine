@@ -19,6 +19,8 @@ Elysium has evolved from a standalone 2D physics engine into a full-featured 2D 
   - [5. Scene, Entities & Components](#5-scene-entities--components)
   - [6. 2D Physics Simulation](#6-2d-physics-simulation)
   - [7. Audio Subsystem & Spatial Sound](#7-audio-subsystem--spatial-sound)
+  - [8. Asset Management & Registry](#8-asset-management--registry)
+  - [9. Project Architecture & Native File Dialogs](#9-project-architecture--native-file-dialogs)
 - [Prerequisites & Dependencies](#prerequisites--dependencies)
 - [Building & Running](#building--running)
 - [Developer & Contributor Guide](#developer--contributor-guide)
@@ -102,6 +104,23 @@ Elysium follows a modular, decoupled engine design:
   - Persistent, unique 64-bit identifiers assigned to all `GameObject`s with full support for explicit IDs during scene deserialization.
   - O(1) hash map scene lookups and safe deletion (`Scene::GetEntityByUUID`, `Scene::DestroyEntityByUUID`).
   - Safe, lightweight templated `EntityHandle` reference wrapper preventing dangling pointer crashes.
+- **Asset Manager & Registry (`AssetManager`)**:
+  - Centralized static/singleton system mapping 64-bit UUID `AssetHandle`s to assets (`sf::Texture`, `sf::Font`, `sf::SoundBuffer`, `Scene`).
+  - Thread-safe dual-mutex asset caching eliminating redundant disk reads or GPU/audio memory allocations.
+  - Manifest serialization (`assets.meta`) persisting asset UUID-to-path relationships across engine sessions.
+- **Interactive Content Browser Panel (`ContentBrowserPanel`)**:
+  - ImGui panel inheriting from `EditorPanel` with folder tree navigation on the left and directory content grid on the right.
+  - Navigation history stack (Back, Forward, Up), path breadcrumbs, search filtering, and thumbnail resizing.
+  - Procedural visual icons tailored for folders, textures, audio files, fonts, and scene documents.
+  - Automatic filesystem watcher and manual refresh button.
+  - Drag-and-drop source with payload support (`CONTENT_BROWSER_ITEM_TEXTURE`, `CONTENT_BROWSER_ITEM_AUDIO`, etc.) received directly by component inspectors (e.g. dragging `.png` into `SpriteRenderer`).
+- **Project Management System (`Project` & `ProjectSerializer`)**:
+  - Dynamic project architecture driven by `.elyproj` project files tracking active project directories, asset roots, and start scenes.
+  - Automatic project directory initialization creating `<Project>/Assets/`, `<Project>/Assets/Scenes/`, and `<Project>/Assets/assets.meta`.
+  - Canonical absolute path resolution removing hardcoded workspace dependencies.
+- **Cross-Platform Native File Dialogs (`FileDialog`)**:
+  - Native OS folder selector and file picker dialogs on Linux (Zenity/KDialog), Windows (Win32 `IFileDialog` / `GetOpenFileName`), and macOS (`osascript`).
+  - Seamlessly integrated with `File -> New Project...` and `File -> Open Project...` in the editor menu bar.
 - **2D Physics Simulation**:
   - Continuous impulse-based rigid body dynamics, broadphase spatial hash grid, and narrowphase SAT collision response.
 - **Audio Subsystem**:
@@ -142,6 +161,9 @@ ElysiumEngine/
 │   │   │   ├── Scene.hpp                # Scene container and physics world binding
 │   │   │   ├── SimpleRenderer.hpp       # Off-screen & target-agnostic 2D renderer
 │   │   │   ├── Input.hpp                # Static keyboard and mouse polling
+│   │   │   ├── FileDialog.hpp           # Cross-platform native file and folder pickers
+│   │   │   ├── Project.hpp              # Project configuration and active management
+│   │   │   ├── ProjectSerializer.hpp    # YAML/JSON project serialization (.elyproj)
 │   │   │   ├── Log.h                    # spdlog logging macros
 │   │   │   ├── Core.hpp                 # Platform macros and DLL exports
 │   │   │   ├── EntryPoint.hpp           # Platform main() bootstrap
@@ -150,7 +172,10 @@ ElysiumEngine/
 │   │       ├── Application.cpp          # Engine game loop and event distribution
 │   │       ├── AudioEngine.cpp          # Audio subsystem, sound pool & buffer cache
 │   │       ├── AudioSourceComponent.cpp # AudioSourceComponent lifecycle & spatialization
+│   │       ├── FileDialog.cpp           # Native OS dialog implementation (Linux/Win/Mac)
 │   │       ├── GameObject.cpp           # GameObject lifecycle & logging
+│   │       ├── Project.cpp              # Project initialization, loading, and directories
+│   │       ├── ProjectSerializer.cpp    # .elyproj serialization and deserialization
 │   │       ├── Scene.cpp                # Scene entity registry and physics integration
 │   │       ├── UUID.cpp                 # 64-bit Mersenne Twister & entropy generator
 │   │       ├── Window.cpp               # SFML 3 event pump and translation
@@ -159,11 +184,13 @@ ElysiumEngine/
 │   │       └── Log.cpp                  # spdlog initialization
 │   ├── editor/                 # Dear ImGui Editor UI module
 │   │   ├── include/
-│   │   │   ├── EditorLayer.hpp     # Engine layer driving ImGui lifecycle & docking
-│   │   │   ├── EditorContext.hpp   # Shared state (camera, selection, play state, stats)
-│   │   │   ├── EditorPanel.hpp     # Abstract modular editor panel interface
-│   │   │   ├── EditorLogSink.hpp   # spdlog memory sink for in-editor console
-│   │   │   └── panels/             # Concrete panel definitions
+│   │   │   ├── AssetManager.hpp        # Centralized asset manager, registry, and caching
+│   │   │   ├── EditorLayer.hpp         # Engine layer driving ImGui lifecycle & docking
+│   │   │   ├── EditorContext.hpp       # Shared state (camera, selection, play state, stats)
+│   │   │   ├── EditorPanel.hpp         # Abstract modular editor panel interface
+│   │   │   ├── EditorLogSink.hpp       # spdlog memory sink for in-editor console
+│   │   │   └── panels/                 # Concrete panel definitions
+│   │   │       ├── ContentBrowserPanel.hpp   # Interactive directory tree & grid asset browser
 │   │   │       ├── SceneViewportPanel.hpp    # Off-screen texture & pan/zoom camera
 │   │   │       ├── SceneHierarchyPanel.hpp   # Entity list, search, add/delete
 │   │   │       ├── EntityInspectorPanel.hpp  # Component reflection and mutation
@@ -171,9 +198,11 @@ ElysiumEngine/
 │   │   │       ├── ConsolePanel.hpp          # Filtered log viewer
 │   │   │       └── StatsPanel.hpp            # Profiler, FPS plot, and timings
 │   │   └── src/
-│   │       ├── EditorLayer.cpp     # DockSpace, theme, menu bar, and shortcuts
-│   │       ├── EditorLogSink.cpp   # Circular log buffer implementation
-│   │       └── panels/             # Panel implementations
+│   │       ├── AssetManager.cpp        # Thread-safe caching and manifest serialization
+│   │       ├── EditorLayer.cpp         # DockSpace, theme, menu bar, and shortcuts
+│   │       ├── EditorLogSink.cpp       # Circular log buffer implementation
+│   │       └── panels/                 # Panel implementations
+│   │           └── ContentBrowserPanel.cpp   # Folder tree, grid, thumbnails, and drag-and-drop
 │   ├── events/                 # Event system architecture
 │   │   ├── Event.hpp           # Base Event, EventDispatcher, categories
 │   │   ├── ApplicationEvent.hpp# WindowCloseEvent, WindowResizeEvent
@@ -198,10 +227,12 @@ ElysiumEngine/
 │   ├── SFML/                   # SFML 3.2.0 source
 │   └── spdlog/                 # spdlog header-only logging
 └── test/                       # Unit tests and benchmarks
+    ├── AssetManagerTest.cpp
     ├── BoundaryTest.cpp
     ├── BroadPhasePerformanceTest.cpp
     ├── FrictionTest.cpp
     ├── PhysicsPerformanceTest.cpp
+    ├── ProjectTest.cpp
     ├── RigidBodyDecouplingTest.cpp
     └── UUIDEntityTest.cpp
 ```
@@ -381,6 +412,62 @@ Elysium features a decoupled, high-level audio system built with **SFML 3.2**:
 
 ---
 
+### 8. Asset Management & Registry
+
+Elysium provides a centralized, thread-safe asset management pipeline centered on 64-bit [`UUID`](file:///home/mrgreenapple24/projects/ElysiumEngine/engine/core/include/UUID.hpp) handles:
+
+- **Asset Handles & Metadata**:
+  - Every asset is identified by an [`AssetHandle`](file:///home/mrgreenapple24/projects/ElysiumEngine/engine/editor/include/AssetManager.hpp) (`UUID`).
+  - [`AssetMetadata`](file:///home/mrgreenapple24/projects/ElysiumEngine/engine/editor/include/AssetManager.hpp) stores the handle, `AssetType` (`Texture`, `Font`, `Audio`, `Scene`), normalized relative file path, and memory residency state.
+  - Deduced automatically from file extensions (`.png`, `.jpg`, `.wav`, `.ogg`, `.ttf`, `.elyscene`).
+
+- **Thread-Safe Caching (`Load<T>`)**:
+  - Assets are cached in memory using dual-mutex synchronization, preventing redundant disk I/O and GPU/audio allocations:
+    ```cpp
+    // Fast O(1) cached lookup or thread-safe lazy load
+    std::shared_ptr<sf::Texture> texture = AssetManager::Get().Load<sf::Texture>(handle);
+    ```
+
+- **Manifest Persistence (`assets.meta`)**:
+  - Automatically reads and serializes the asset manifest across sessions, resolving relative project paths to persistent 64-bit UUIDs across engine and editor restarts.
+
+- **Interactive Content Browser (`ContentBrowserPanel`)**:
+  - Split-view editor panel featuring an interactive folder tree on the left and an adaptive thumbnail grid on the right.
+  - Complete navigation history (Back, Forward, Up), path breadcrumbs, search filtering, and thumbnail scaling.
+  - Drag-and-drop source using engine payloads (`CONTENT_BROWSER_ITEM_TEXTURE`, `CONTENT_BROWSER_ITEM_AUDIO`, etc.) received directly by component slots (e.g., dropping `.png` onto a `SpriteRenderer` slot).
+
+---
+
+### 9. Project Architecture & Native File Dialogs
+
+Elysium organizes games into standalone, portable projects decoupled from the engine binary:
+
+- **Project Configuration (`ProjectConfig`)**:
+  - Encapsulates `Name`, `ProjectDirectory` (canonical absolute path), `AssetDirectory` (relative to project, defaults to `Assets`), and `StartScenePath`.
+  - Serialized to/from `.elyproj` files using [`ProjectSerializer`](file:///home/mrgreenapple24/projects/ElysiumEngine/engine/core/include/ProjectSerializer.hpp).
+
+- **Project Creation & Directory Initialization**:
+  - Creating a new project automatically establishes the full workspace hierarchy:
+    ```text
+    /path/to/MyGame/
+    ├── MyGame.elyproj        # Project configuration
+    └── Assets/               # Project-isolated asset root
+        ├── assets.meta       # Initialized registry manifest
+        └── Scenes/           # Default scene storage
+    ```
+
+- **Cross-Platform Native File Dialogs (`FileDialog`)**:
+  - Native OS directory selector and file picker dialogs without external dependencies:
+    - **Linux**: Invokes native `zenity` (or `kdialog` fallback).
+    - **Windows**: Win32 `IFileDialog` / `GetOpenFileNameA` and `SHBrowseForFolderA`.
+    - **macOS**: Native `osascript` AppleScript dialogs.
+  - Triggered directly from the Editor menu:
+    - `File -> New Project...` (`Ctrl+Shift+N`): Select any folder on disk to initialize a project.
+    - `File -> Open Project...` (`Ctrl+Shift+O`): Browse and load existing `.elyproj` files.
+  - Dynamically updates the window title, dockspace header, and reloads `AssetManager` and `ContentBrowserPanel` to the selected project root.
+
+---
+
 ## Prerequisites & Dependencies
 
 ### System Requirements
@@ -525,6 +612,9 @@ Upcoming milestones as detailed in [`PLAN.md`](file:///home/mrgreenapple24/proje
 - [ ] **Entity Component System (ECS)**: Transitioning internal storage to `EnTT`.
 - [ ] **Scripting Engine**: Embedding Lua via `sol2` for dynamic runtime gameplay scripting.
 - [x] **Audio Subsystem**: Integrating SFML 3.2's spatial audio module, buffer caching, and sound pooling.
+- [x] **Asset Registry & Cache**: 64-bit UUID asset handles, thread-safe memory caching, and manifest serialization (`assets.meta`).
+- [x] **Content Browser Panel**: Directory tree navigation, thumbnail grid, file watcher, and drag-and-drop integration.
+- [x] **Project Management & Native Dialogs**: Standalone `.elyproj` project files, directory auto-initialization, and OS file/folder pickers.
 
 ---
 

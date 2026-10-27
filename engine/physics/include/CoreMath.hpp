@@ -15,9 +15,106 @@ static const float EPSILON = 0.0001f;
 /** @brief Mathematical constant PI. */
 static const float PI = 3.14159265359f;
 
+struct Vec2;
 struct Vec3;
 struct Mat3;
 struct Quat;
+
+/**
+ * @struct Vec2
+ * @brief A standard 2D vector representing points or directions.
+ */
+struct Vec2 {
+  float x, y;
+
+  /** @brief Default constructor (initializes to 0,0). */
+  Vec2() : x(0.0f), y(0.0f) {}
+  /** @brief Parameterized constructor. */
+  Vec2(float _x, float _y) : x(_x), y(_y) {}
+  /** @brief Conversion constructor from Vec3 (drops z component). */
+  inline Vec2(const Vec3 &v);
+
+  // --- Basic Arithmetic ---
+  Vec2 operator+(const Vec2 &v) const { return Vec2(x + v.x, y + v.y); }
+  Vec2 operator-(const Vec2 &v) const { return Vec2(x - v.x, y - v.y); }
+  Vec2 operator*(float s) const { return Vec2(x * s, y * s); }
+  Vec2 operator/(float s) const {
+    return (s != 0.0f) ? Vec2(x / s, y / s) : Vec2(0.0f, 0.0f);
+  }
+  Vec2 operator-() const { return Vec2(-x, -y); }
+
+  Vec2 &operator+=(const Vec2 &v) {
+    x += v.x;
+    y += v.y;
+    return *this;
+  }
+  Vec2 &operator-=(const Vec2 &v) {
+    x -= v.x;
+    y -= v.y;
+    return *this;
+  }
+  Vec2 &operator*=(float s) {
+    x *= s;
+    y *= s;
+    return *this;
+  }
+
+  bool operator==(const Vec2 &v) const { return x == v.x && y == v.y; }
+  bool operator!=(const Vec2 &v) const { return !(*this == v); }
+
+  /**
+   * @brief Calculates the scalar dot product.
+   * @return Positive if vectors face the same direction, 0 if perpendicular.
+   */
+  float Dot(const Vec2 &v) const { return x * v.x + y * v.y; }
+
+  /**
+   * @brief Calculates the 2D cross product (scalar/perp-dot product).
+   * @return The signed area of the parallelogram formed by the two vectors.
+   */
+  float Cross(const Vec2 &v) const { return x * v.y - y * v.x; }
+
+  /** @brief Returns the geometric length of the vector. */
+  float Magnitude() const { return std::sqrt(x * x + y * y); }
+
+  /** @brief Returns the squared length (avoids a costly sqrt). */
+  float MagnitudeSquared() const { return x * x + y * y; }
+
+  /** @brief Scales the vector to a unit length of 1.0. */
+  void Normalize() {
+    float m = Magnitude();
+    if (m > EPSILON) {
+      *this *= (1.0f / m);
+    }
+  }
+
+  /** @brief Returns a copy of the vector scaled to unit length. */
+  Vec2 Normalized() const {
+    Vec2 v = *this;
+    v.Normalize();
+    return v;
+  }
+
+  /** @brief Calculates the Euclidean distance to another vector. */
+  float DistanceTo(const Vec2 &v) const { return (*this - v).Magnitude(); }
+
+  /** @brief Multiplies components individually (Hadamard product). */
+  Vec2 ComponentProduct(const Vec2 &v) const { return Vec2(x * v.x, y * v.y); }
+
+  /** @brief Sets all components to zero. */
+  void Zero() {
+    x = 0.0f;
+    y = 0.0f;
+  }
+};
+
+/** @brief Scale vector by float. */
+inline Vec2 operator*(float s, const Vec2 &v) {
+  return Vec2(v.x * s, v.y * s);
+}
+
+/** @brief Type alias for Vec2 for API consistency. */
+using Vector2 = Vec2;
 
 /**
  * @struct Vec3
@@ -30,6 +127,9 @@ struct Vec3 {
   Vec3() : x(0), y(0), z(0) {}
   /** @brief Parameterized constructor. */
   Vec3(float _x, float _y, float _z) : x(_x), y(_y), z(_z) {}
+  /** @brief Conversion constructor from Vec2. */
+  Vec3(const Vec2 &v, float _z = 0.0f) : x(v.x), y(v.y), z(_z) {}
+
 
   // --- Basic Arithmetic ---
   Vec3 operator+(const Vec3 &v) const {
@@ -113,6 +213,9 @@ struct Vec3 {
 inline Vec3 operator*(float s, const Vec3 &v) {
   return Vec3(v.x * s, v.y * s, v.z * s);
 }
+
+inline Vec2::Vec2(const Vec3 &v) : x(v.x), y(v.y) {}
+
 
 /**
  * @struct Mat3

@@ -1,10 +1,12 @@
 #include "panels/EntityInspectorPanel.hpp"
+#include "AssetManager.hpp"
 #include "AudioSourceComponent.hpp"
 #include "Collider.hpp"
 #include "Log.h"
 #include "SpriteRenderer.hpp"
 #include <cmath>
 #include <cstring>
+#include <imgui-SFML.h>
 #include <imgui.h>
 
 namespace Elysium {
@@ -317,6 +319,47 @@ void EntityInspectorPanel::DrawSpriteRendererComponent(EditorContext &context,
                                 static_cast<uint8_t>(color[2] * 255.0f),
                                 static_cast<uint8_t>(color[3] * 255.0f));
     }
+
+    // Texture slot with Drag-and-Drop Target
+    ImGui::Spacing();
+    ImGui::Text("Texture Slot:");
+
+    std::string textureLabel = "[ None (Solid Color) ]";
+    if (sprite->textureHandle != 0) {
+      const auto &meta = AssetManager::Get().GetMetadata(sprite->textureHandle);
+      if (static_cast<uint64_t>(meta.handle) != 0) {
+        textureLabel = meta.filePath.filename().string() + " (" +
+                       std::to_string(static_cast<uint64_t>(sprite->textureHandle)) + ")";
+      } else {
+        textureLabel = "Handle: " + std::to_string(static_cast<uint64_t>(sprite->textureHandle));
+      }
+    }
+
+    ImVec2 slotSize(ImGui::GetContentRegionAvail().x - 60.0f, 32.0f);
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.14f, 0.16f, 0.20f, 1.0f));
+    ImGui::Button(textureLabel.c_str(), slotSize);
+    ImGui::PopStyleColor();
+
+    // Drag-and-Drop Target for Texture
+    if (ImGui::BeginDragDropTarget()) {
+      if (const ImGuiPayload *payload =
+              ImGui::AcceptDragDropPayload(AssetPayloads::TEXTURE)) {
+        uint64_t droppedHandle = *reinterpret_cast<const uint64_t *>(payload->Data);
+        sprite->textureHandle = droppedHandle;
+        ELYSIUM_INFO("EntityInspector: Assigned texture handle {} to entity '{}'",
+                     droppedHandle, entity.name);
+      }
+      ImGui::EndDragDropTarget();
+    }
+
+    ImGui::SameLine();
+    if (ImGui::Button("Clear##Tex")) {
+      sprite->textureHandle = 0;
+    }
+
+    if (ImGui::IsItemHovered()) {
+      ImGui::SetTooltip("Clear assigned texture");
+    }
   }
 }
 
@@ -328,12 +371,27 @@ void EntityInspectorPanel::DrawAudioSourceComponent(EditorContext &context,
     return;
 
   if (ImGui::CollapsingHeader("Audio Source", ImGuiTreeNodeFlags_DefaultOpen)) {
-    // Filepath buffer input
+    // Filepath buffer input with drag-and-drop target
     char pathBuffer[512];
     std::strncpy(pathBuffer, audio->filepath.c_str(), sizeof(pathBuffer) - 1);
     pathBuffer[sizeof(pathBuffer) - 1] = '\0';
     if (ImGui::InputText("Sound File", pathBuffer, sizeof(pathBuffer))) {
       audio->filepath = pathBuffer;
+    }
+
+    // Drag-and-drop target for audio files
+    if (ImGui::BeginDragDropTarget()) {
+      if (const ImGuiPayload *payload =
+              ImGui::AcceptDragDropPayload(AssetPayloads::AUDIO)) {
+        uint64_t droppedHandle = *reinterpret_cast<const uint64_t *>(payload->Data);
+        const auto &meta = AssetManager::Get().GetMetadata(droppedHandle);
+        if (static_cast<uint64_t>(meta.handle) != 0) {
+          audio->filepath = meta.filePath.generic_string();
+          ELYSIUM_INFO("EntityInspector: Dropped audio file '{}' onto entity '{}'",
+                       audio->filepath, entity.name);
+        }
+      }
+      ImGui::EndDragDropTarget();
     }
 
     // Playback preview controls

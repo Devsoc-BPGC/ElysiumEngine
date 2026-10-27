@@ -93,3 +93,16 @@ void Scene::Update(float dt) {
     obj->SyncPhysics();
   }
 }
+
+void Scene::Clear() {
+  for (auto &obj : objects) {
+    if (obj && obj->rigidBody) {
+      physicsWorld.RemoveBody(obj->rigidBody.get());
+    }
+  }
+
+  objects.clear();
+  m_EntityMap.clear();
+
+  ELYSIUM_CORE_INFO("Scene cleared");
+}

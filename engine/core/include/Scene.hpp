@@ -21,6 +21,7 @@ public:
   void AddGameObject(std::shared_ptr<GameObject> obj);
   GameObject *GetEntityByUUID(Elysium::UUID uuid);
   bool DestroyEntityByUUID(Elysium::UUID uuid);
+  void Clear();
 
   void AddTexture(std::shared_ptr<const Texture> texture);
 

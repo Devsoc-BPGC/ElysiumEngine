@@ -33,3 +33,7 @@ docs
 build
 
 *.log
+
+# ImGui & Workspace Configuration
+imgui.ini
+*.ini

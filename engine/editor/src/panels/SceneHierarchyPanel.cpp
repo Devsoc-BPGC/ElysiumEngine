@@ -2,6 +2,7 @@
 #include "Collider.hpp"
 #include "Log.h"
 #include <algorithm>
+#include "AudioSourceComponent.hpp"
 
 namespace Elysium {
 
@@ -33,44 +34,22 @@ void SceneHierarchyPanel::OnImGuiRender(EditorContext &context, Scene &scene,
         context.selectedEntity = entity;
         ELYSIUM_INFO("Created new Empty Entity");
       }
-
-      if (ImGui::MenuItem("Dynamic Ball (Sphere)")) {
-        auto entity = std::make_shared<GameObject>("Dynamic Ball");
+      if (ImGui::MenuItem("Create Rigid Body")) {
+        auto entity = std::make_shared<GameObject>("Rigid Body");
         entity->position =
             Vec3(context.camera.center.x, context.camera.center.y, 0.0f);
         auto &rb = entity->CreateRigidBody();
-        rb.AddColliders(Collider::CreateSphere(0.5f, 1.0f));
         scene.AddGameObject(entity);
         context.selectedEntity = entity;
-        ELYSIUM_INFO("Created Dynamic Ball at ({:.2f}, {:.2f})",
-                     entity->position.x, entity->position.y);
       }
-
-      if (ImGui::MenuItem("Dynamic Box")) {
-        auto entity = std::make_shared<GameObject>("Dynamic Box");
+      if (ImGui::MenuItem("Create Audio Source")) {
+        auto entity = std::make_shared<GameObject>("Audio Source");
         entity->position =
             Vec3(context.camera.center.x, context.camera.center.y, 0.0f);
-        auto &rb = entity->CreateRigidBody();
-        rb.AddColliders(Collider::CreateBox(Vec3(0.5f, 0.5f, 0.0f), 1.0f));
+        auto &as = entity->AddComponent<AudioSourceComponent>();
         scene.AddGameObject(entity);
         context.selectedEntity = entity;
-        ELYSIUM_INFO("Created Dynamic Box at ({:.2f}, {:.2f})",
-                     entity->position.x, entity->position.y);
-      }
-
-      if (ImGui::MenuItem("Static Wall / Platform")) {
-        auto entity = std::make_shared<GameObject>("Static Platform");
-        entity->position =
-            Vec3(context.camera.center.x, context.camera.center.y, 0.0f);
-        auto &rb = entity->CreateRigidBody();
-        rb.isStatic = true;
-        rb.inverseMass = 0.0f;
-        rb.mass = 0.0f;
-        rb.AddColliders(Collider::CreateBox(Vec3(3.0f, 0.3f, 0.0f), 0.0f));
-        scene.AddGameObject(entity);
-        context.selectedEntity = entity;
-        ELYSIUM_INFO("Created Static Platform at ({:.2f}, {:.2f})",
-                     entity->position.x, entity->position.y);
+        ELYSIUM_INFO("Added AudioSourceComponent to entity: {}", entity->GetComponent<AudioSourceComponent>() != nullptr);
       }
 
       ImGui::EndPopup();
@@ -141,15 +120,8 @@ void SceneHierarchyPanel::OnImGuiRender(EditorContext &context, Scene &scene,
       if (context.selectedEntity == entityToDelete) {
         context.selectedEntity = nullptr;
       }
-      if (entityToDelete->rigidBody) {
-        scene.physicsWorld.RemoveBody(entityToDelete->rigidBody.get());
-      }
-      auto it =
-          std::find(scene.objects.begin(), scene.objects.end(), entityToDelete);
-      if (it != scene.objects.end()) {
-        ELYSIUM_INFO("Deleted Entity: {}", entityToDelete->name);
-        scene.objects.erase(it);
-      }
+      ELYSIUM_INFO("Deleted Entity: {}", entityToDelete->name);
+      scene.DestroyEntityByUUID(entityToDelete->GetUUID());
     }
 
     // Right-click on blank window space

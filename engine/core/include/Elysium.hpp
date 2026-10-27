@@ -16,6 +16,8 @@
 #include "KeyCodes.hpp"
 #include "Layer.hpp"
 #include "MouseCodes.hpp"
+#include "Project.hpp"
+#include "ProjectSerializer.hpp"
 #include "Scene.hpp"
 #include "Timestep.hpp"
 #include "UUID.hpp"

@@ -1,9 +1,13 @@
 #include "EditorLayer.hpp"
 #include "Application.hpp"
+#include "AssetManager.hpp"
 #include "Collider.hpp"
 #include "EditorLogSink.hpp"
+#include "FileDialog.hpp"
 #include "Log.h"
+#include "Project.hpp"
 #include "panels/ConsolePanel.hpp"
+#include "panels/ContentBrowserPanel.hpp"
 #include "panels/EntityInspectorPanel.hpp"
 #include "panels/SceneHierarchyPanel.hpp"
 #include "panels/SceneViewportPanel.hpp"
@@ -12,6 +16,8 @@
 #include <algorithm>
 #include <imgui-SFML.h>
 #include <imgui.h>
+#include <imgui_internal.h>
+#include "AudioSourceComponent.hpp"
 
 namespace Elysium {
 
@@ -51,6 +57,15 @@ void EditorLayer::Init(sf::RenderWindow &window) {
   io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
+  // Configure ImGui layout persistence: tie to active project or disable to avoid cwd pollution
+  if (auto project = Project::GetActive()) {
+    m_ImGuiIniPath = (project->GetProjectDirectory() / "imgui.ini").string();
+    io.IniFilename = m_ImGuiIniPath.c_str();
+  } else {
+    m_ImGuiIniPath.clear();
+    io.IniFilename = nullptr;
+  }
+
   // Hook custom memory log sink into spdlog
   auto sink = GetEditorLogSink();
   if (Log::GetCoreLogger()) {
@@ -63,13 +78,44 @@ void EditorLayer::Init(sf::RenderWindow &window) {
   // Apply professional editor styling
   ApplyModernDarkTheme();
 
+  // Initialize Project / Asset Registry
+  if (auto project = Project::GetActive()) {
+    AssetManager::Get().Init(project->GetAssetDirectory());
+  } else {
+    // Default fallback project initialization or assets directory
+    AssetManager::Get().Init("assets");
+  }
+
   // Instantiate standard editor panels
-  AddPanel<ToolbarPanel>();
-  AddPanel<SceneViewportPanel>();
-  AddPanel<SceneHierarchyPanel>();
-  AddPanel<EntityInspectorPanel>();
-  AddPanel<ConsolePanel>();
-  AddPanel<StatsPanel>();
+  auto &toolbar = AddPanel<ToolbarPanel>();
+  auto &viewportPanel = AddPanel<SceneViewportPanel>();
+  auto &sceneHierarchy = AddPanel<SceneHierarchyPanel>();
+  auto &inspector = AddPanel<EntityInspectorPanel>();
+  auto &contentBrowser = AddPanel<ContentBrowserPanel>();
+  auto &console = AddPanel<ConsolePanel>();
+  auto &stats = AddPanel<StatsPanel>();
+
+  // Configure panel visibility flags:
+  // Open by default: Viewport, Hierarchy, Content Browser, Console, Inspector
+  viewportPanel.isOpen = true;
+  sceneHierarchy.isOpen = true;
+  contentBrowser.isOpen = true;
+  console.isOpen = true;
+  inspector.isOpen = true;
+
+  // Closed / Hidden by default: Stats & Profiler, Toolbar (floats / handles itself or auxiliary)
+  toolbar.isOpen = false;
+  stats.isOpen = false;
+
+  // If active project has no existing imgui.ini or no project active, schedule programmatic default layout
+  if (auto project = Project::GetActive()) {
+    std::filesystem::path iniFile = project->GetProjectDirectory() / "imgui.ini";
+    if (!std::filesystem::exists(iniFile)) {
+      m_ResetLayoutScheduled = true;
+    }
+  } else {
+    m_ResetLayoutScheduled = true;
+  }
 
   m_isInitialized = true;
   ELYSIUM_CORE_INFO("Elysium EditorLayer attached with Dear ImGui Docking");
@@ -116,6 +162,8 @@ void EditorLayer::OnImGuiRender() {
     }
   }
 
+  RenderProjectModals();
+
   ImGui::SFML::Render(*m_window);
 
   m_context.stats.renderTimeMs =
@@ -156,20 +204,93 @@ bool EditorLayer::OnKeyPressed(KeyPressedEvent &e) {
 
   // Delete: Delete selected entity
   if (e.GetKeyCode() == sf::Keyboard::Key::Delete && m_context.selectedEntity) {
-    if (m_context.selectedEntity->rigidBody) {
-      m_scene.physicsWorld.RemoveBody(
-          m_context.selectedEntity->rigidBody.get());
-    }
-    auto it = std::find(m_scene.objects.begin(), m_scene.objects.end(),
-                        m_context.selectedEntity);
-    if (it != m_scene.objects.end()) {
-      m_scene.objects.erase(it);
-    }
+    m_scene.DestroyEntityByUUID(m_context.selectedEntity->GetUUID());
     m_context.selectedEntity = nullptr;
     return true;
   }
 
   return false;
+}
+
+void EditorLayer::OnProjectLoaded() {
+  auto project = Project::GetActive();
+  if (!project) return;
+
+  const auto &config = project->GetConfig();
+  std::filesystem::path assetsDir = project->GetAssetDirectory();
+
+  // 1. Reload Asset Manager with project asset directory
+  AssetManager::Get().ReloadProjectAssets(assetsDir);
+
+  // 2. Update window title
+  if (m_window) {
+    m_window->setTitle("Elysium Game Engine — " + config.Name + " [" + config.ProjectDirectory.string() + "]");
+  }
+
+  // 3. Update ImGui layout persistence to project directory and reload docking states immediately
+  m_ImGuiIniPath = (project->GetProjectDirectory() / "imgui.ini").string();
+  ImGuiIO &io = ImGui::GetIO();
+  io.IniFilename = m_ImGuiIniPath.c_str();
+
+  if (std::filesystem::exists(m_ImGuiIniPath)) {
+    ImGui::LoadIniSettingsFromDisk(m_ImGuiIniPath.c_str());
+  } else {
+    m_ResetLayoutScheduled = true;
+  }
+
+  ELYSIUM_INFO("Editor: Switched to Project '{}' ({})", config.Name, config.ProjectDirectory.string());
+}
+
+void EditorLayer::ResetLayout() {
+  const ImGuiViewport *viewport = ImGui::GetMainViewport();
+  ImGuiID dockspace_id = ImGui::GetID("ElysiumEditorDockSpace");
+
+  ImGui::DockBuilderRemoveNode(dockspace_id); // Clear existing layout
+  ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace);
+  ImGui::DockBuilderSetNodeSize(dockspace_id, viewport->Size);
+
+  // Split main dockspace: Right (Inspector) vs Main Region
+  ImGuiID dock_main_id = dockspace_id;
+  ImGuiID dock_right_id =
+      ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Right, 0.25f, nullptr, &dock_main_id);
+
+  // Split Main Region: Bottom (Console) vs Center/Left Region
+  ImGuiID dock_bottom_id =
+      ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Down, 0.25f, nullptr, &dock_main_id);
+
+  // Split Center/Left Region: Left Column vs Center Viewport
+  ImGuiID dock_left_id =
+      ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Left, 0.25f, nullptr, &dock_main_id);
+
+  // Split Left Column: Top Left (Hierarchy) vs Bottom Left (Content Browser)
+  ImGuiID dock_top_left_id =
+      ImGui::DockBuilderSplitNode(dock_left_id, ImGuiDir_Up, 0.50f, nullptr, &dock_left_id);
+
+  // Dock panels to respective IDs by exact window title strings
+  ImGui::DockBuilderDockWindow("Scene Viewport", dock_main_id);
+  ImGui::DockBuilderDockWindow("Scene Hierarchy", dock_top_left_id);
+  ImGui::DockBuilderDockWindow("Content Browser", dock_left_id);
+  ImGui::DockBuilderDockWindow("Console", dock_bottom_id);
+  ImGui::DockBuilderDockWindow("Entity Inspector", dock_right_id);
+
+  ImGui::DockBuilderFinish(dockspace_id);
+
+  // Configure panel visibility flags:
+  // Open: Viewport, Hierarchy, Content Browser, Console, Inspector
+  // Closed / Hidden: Stats & Profiler, Toolbar, and auxiliary panels
+  for (auto &panel : m_panels) {
+    if (panel->name == "Scene Viewport" ||
+        panel->name == "Scene Hierarchy" ||
+        panel->name == "Content Browser" ||
+        panel->name == "Console" ||
+        panel->name == "Entity Inspector") {
+      panel->isOpen = true;
+    } else {
+      panel->isOpen = false;
+    }
+  }
+
+  ELYSIUM_CORE_INFO("Editor: Reset layout to default workspace configuration");
 }
 
 void EditorLayer::SetupDockSpace() {
@@ -188,19 +309,86 @@ void EditorLayer::SetupDockSpace() {
   ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
 
-  ImGui::Begin("ElysiumDockSpaceHost", nullptr, windowFlags);
+  std::string hostWindowName = "ElysiumDockSpaceHost";
+  if (auto project = Project::GetActive()) {
+    hostWindowName += " - " + project->GetConfig().Name;
+  }
+
+  ImGui::Begin(hostWindowName.c_str(), nullptr, windowFlags);
   ImGui::PopStyleVar(3);
 
   ImGuiID dockspaceId = ImGui::GetID("ElysiumEditorDockSpace");
   ImGui::DockSpace(dockspaceId, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_None);
+
+  if (m_ResetLayoutScheduled) {
+    ResetLayout();
+    m_ResetLayoutScheduled = false;
+  }
+}
+
+void EditorLayer::NewProjectDialog() {
+  std::filesystem::path defaultDir = std::filesystem::current_path();
+  if (auto proj = Project::GetActive()) {
+    defaultDir = proj->GetProjectDirectory().parent_path();
+  }
+
+  auto selectedFolder = FileDialog::SelectFolder("Select Project Root Directory", defaultDir);
+  if (selectedFolder.has_value()) {
+    std::filesystem::path folderPath = *selectedFolder;
+    std::string projName = folderPath.filename().string();
+    if (projName.empty()) {
+      projName = "NewProject";
+    }
+
+    auto project = Project::NewProject(folderPath, projName);
+    if (project) {
+      OnProjectLoaded();
+    } else {
+      ELYSIUM_ERROR("Failed to create new project at '{}'", folderPath.string());
+    }
+  }
+}
+
+void EditorLayer::OpenProjectDialog() {
+  std::filesystem::path defaultDir = std::filesystem::current_path();
+  if (auto proj = Project::GetActive()) {
+    defaultDir = proj->GetProjectDirectory();
+  }
+
+  std::vector<FileDialogFilter> filters = {
+      {"Elysium Project (*.elyproj)", "*.elyproj"}};
+
+  auto selectedFile = FileDialog::OpenFile("Open Elysium Project", defaultDir, filters);
+  if (selectedFile.has_value()) {
+    std::filesystem::path projFile = *selectedFile;
+    auto project = Project::LoadProject(projFile);
+    if (project) {
+      OnProjectLoaded();
+    } else {
+      ELYSIUM_ERROR("Failed to open project file at '{}'", projFile.string());
+    }
+  }
 }
 
 void EditorLayer::RenderMenuBar(Scene &scene) {
   if (ImGui::BeginMenuBar()) {
     // 1. File Menu
     if (ImGui::BeginMenu("File")) {
+      if (ImGui::MenuItem("New Project...", "Ctrl+Shift+N")) {
+        NewProjectDialog();
+      }
+      if (ImGui::MenuItem("Open Project...", "Ctrl+Shift+O")) {
+        OpenProjectDialog();
+      }
+      if (ImGui::MenuItem("Save Project", nullptr, false, Project::GetActive() != nullptr)) {
+        Project::SaveActiveProject();
+        AssetManager::Get().SaveManifest();
+        ELYSIUM_INFO("Project and Manifest saved");
+      }
+      ImGui::Separator();
+
       if (ImGui::MenuItem("New Scene", "Ctrl+N")) {
-        scene.objects.clear();
+        scene.Clear();
         m_context.selectedEntity = nullptr;
         ELYSIUM_INFO("New Scene created");
       }
@@ -231,15 +419,7 @@ void EditorLayer::RenderMenuBar(Scene &scene) {
       if (ImGui::MenuItem("Delete Selected Entity", "Del", false,
                           hasSelection)) {
         if (m_context.selectedEntity) {
-          if (m_context.selectedEntity->rigidBody) {
-            scene.physicsWorld.RemoveBody(
-                m_context.selectedEntity->rigidBody.get());
-          }
-          auto it = std::find(scene.objects.begin(), scene.objects.end(),
-                              m_context.selectedEntity);
-          if (it != scene.objects.end()) {
-            scene.objects.erase(it);
-          }
+          scene.DestroyEntityByUUID(m_context.selectedEntity->GetUUID());
           m_context.selectedEntity = nullptr;
         }
       }
@@ -267,7 +447,7 @@ void EditorLayer::RenderMenuBar(Scene &scene) {
         m_context.camera.Reset();
       }
       if (ImGui::MenuItem("Clear All Objects")) {
-        scene.objects.clear();
+        scene.Clear();
         m_context.selectedEntity = nullptr;
       }
       ImGui::EndMenu();
@@ -290,6 +470,15 @@ void EditorLayer::RenderMenuBar(Scene &scene) {
         scene.AddGameObject(entity);
         m_context.selectedEntity = entity;
       }
+      if (ImGui::MenuItem("Create Audio Source")) {
+        auto entity = std::make_shared<GameObject>("Audio Source");
+        entity->position =
+            Vec3(m_context.camera.center.x, m_context.camera.center.y, 0.0f);
+        auto &as = entity->AddComponent<AudioSourceComponent>();
+        scene.AddGameObject(entity);
+        m_context.selectedEntity = entity;
+        ELYSIUM_INFO("Added AudioSourceComponent to entity: {}", entity->GetComponent<AudioSourceComponent>() != nullptr);
+      }
       ImGui::EndMenu();
     }
 
@@ -297,6 +486,10 @@ void EditorLayer::RenderMenuBar(Scene &scene) {
     if (ImGui::BeginMenu("View")) {
       for (auto &panel : m_panels) {
         ImGui::MenuItem(panel->name.c_str(), nullptr, &panel->isOpen);
+      }
+      ImGui::Separator();
+      if (ImGui::MenuItem("Reset Layout")) {
+        ResetLayout();
       }
       ImGui::EndMenu();
     }
@@ -327,10 +520,136 @@ void EditorLayer::RenderMenuBar(Scene &scene) {
   }
 }
 
+void EditorLayer::RenderProjectModals() {
+  // 1. New Project Modal Dialog
+  if (m_ShowNewProjectModal) {
+    ImGui::OpenPopup("New Project");
+  }
+
+  ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+  ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+  ImGui::SetNextWindowSize(ImVec2(520.0f, 220.0f), ImGuiCond_Appearing);
+
+  if (ImGui::BeginPopupModal("New Project", &m_ShowNewProjectModal, ImGuiWindowFlags_AlwaysAutoResize)) {
+    ImGui::Text("Create a new Elysium Engine project.");
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    ImGui::InputText("Project Name", m_NewProjectNameBuffer, sizeof(m_NewProjectNameBuffer));
+
+    // Update default path suggestion if user modifies name
+    if (ImGui::IsItemDeactivatedAfterEdit()) {
+      std::string suggestedPath = "projects/" + std::string(m_NewProjectNameBuffer);
+      std::strncpy(m_NewProjectPathBuffer, suggestedPath.c_str(), sizeof(m_NewProjectPathBuffer) - 1);
+    }
+
+    ImGui::InputText("Directory", m_NewProjectPathBuffer, sizeof(m_NewProjectPathBuffer));
+    ImGui::SameLine();
+    if (ImGui::Button("Browse...##NewDir")) {
+      auto sel = FileDialog::SelectFolder("Select Directory for Project", m_NewProjectPathBuffer);
+      if (sel.has_value()) {
+        std::strncpy(m_NewProjectPathBuffer, sel->string().c_str(), sizeof(m_NewProjectPathBuffer) - 1);
+      }
+    }
+    ImGui::TextDisabled("Structure: <Directory>/Assets, <Directory>/Assets/Scenes, assets.meta");
+
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    if (ImGui::Button("Create", ImVec2(120.0f, 0.0f))) {
+      std::filesystem::path dirPath = m_NewProjectPathBuffer;
+      std::string name = m_NewProjectNameBuffer;
+
+      auto project = Project::NewProject(dirPath, name);
+      if (project) {
+        OnProjectLoaded();
+      }
+      m_ShowNewProjectModal = false;
+      ImGui::CloseCurrentPopup();
+    }
+
+    ImGui::SameLine();
+    if (ImGui::Button("Cancel", ImVec2(120.0f, 0.0f))) {
+      m_ShowNewProjectModal = false;
+      ImGui::CloseCurrentPopup();
+    }
+
+    ImGui::EndPopup();
+  }
+
+  // 2. Open Project Modal Dialog
+  if (m_ShowOpenProjectModal) {
+    ImGui::OpenPopup("Open Project");
+  }
+
+  ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+  ImGui::SetNextWindowSize(ImVec2(560.0f, 240.0f), ImGuiCond_Appearing);
+
+  if (ImGui::BeginPopupModal("Open Project", &m_ShowOpenProjectModal, ImGuiWindowFlags_AlwaysAutoResize)) {
+    ImGui::Text("Enter or browse for an existing .elyproj file:");
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    ImGui::InputText("Project File (.elyproj)", m_OpenProjectPathBuffer, sizeof(m_OpenProjectPathBuffer));
+    ImGui::SameLine();
+    if (ImGui::Button("Browse...##OpenFile")) {
+      auto sel = FileDialog::OpenFile("Open Project File", "", {{"Elysium Project (*.elyproj)", "*.elyproj"}});
+      if (sel.has_value()) {
+        std::strncpy(m_OpenProjectPathBuffer, sel->string().c_str(), sizeof(m_OpenProjectPathBuffer) - 1);
+      }
+    }
+
+    // Display available projects found in working directory or subdirectories
+    ImGui::Spacing();
+    ImGui::TextDisabled("Quick Select Found Projects:");
+    std::error_code ec;
+    int foundCount = 0;
+    for (const auto &entry : std::filesystem::recursive_directory_iterator(".", ec)) {
+      if (entry.is_regular_file() && entry.path().extension() == ".elyproj") {
+        std::string pStr = entry.path().lexically_normal().string();
+        if (ImGui::SmallButton(pStr.c_str())) {
+          std::strncpy(m_OpenProjectPathBuffer, pStr.c_str(), sizeof(m_OpenProjectPathBuffer) - 1);
+        }
+        foundCount++;
+        if (foundCount >= 5) break;
+      }
+    }
+    if (foundCount == 0) {
+      ImGui::TextDisabled("  (No .elyproj files discovered in working directory)");
+    }
+
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    if (ImGui::Button("Open", ImVec2(120.0f, 0.0f))) {
+      std::filesystem::path projPath = m_OpenProjectPathBuffer;
+      auto project = Project::LoadProject(projPath);
+      if (project) {
+        OnProjectLoaded();
+      }
+      m_ShowOpenProjectModal = false;
+      ImGui::CloseCurrentPopup();
+    }
+
+    ImGui::SameLine();
+    if (ImGui::Button("Cancel", ImVec2(120.0f, 0.0f))) {
+      m_ShowOpenProjectModal = false;
+      ImGui::CloseCurrentPopup();
+    }
+
+    ImGui::EndPopup();
+  }
+}
+
 void EditorLayer::Shutdown() {
   if (!m_isInitialized)
     return;
 
+  AssetManager::Get().Shutdown();
   m_panels.clear();
   ImGui::SFML::Shutdown();
   m_isInitialized = false;
