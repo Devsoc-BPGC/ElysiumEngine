@@ -22,8 +22,13 @@ public:
   // selecting its tab if docked
   void RequestFocus() { m_focusRequested = true; }
 
+  // Puts the panel back over the scene viewport's top-right corner at its
+  // default size, and keeps it there until the user moves it
+  void PinToSceneViewport();
+
 private:
   bool EnsureTarget(unsigned int width, unsigned int height);
+  void TrackPinnedPlacement();
 
   sf::RenderTexture m_previewTexture;
   sf::Vector2u m_currentTextureSize = {0, 0};
@@ -33,6 +38,12 @@ private:
   bool m_windowCreated = false;
   sf::Vector2f m_lastViewportPos = {-1.0f, -1.0f};
   sf::Vector2f m_lastViewportSize = {-1.0f, -1.0f};
+
+  // While pinned, the window follows the scene viewport's top-right corner
+  bool m_pinned = true;
+  bool m_placed = false;
+  sf::Vector2f m_pinnedPos = {-1.0f, -1.0f};
+  sf::Vector2f m_windowSize;
 };
 
 } // namespace Elysium

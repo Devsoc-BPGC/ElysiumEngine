@@ -325,6 +325,11 @@ void EditorLayer::ResetLayout() {
     }
   }
 
+  // The Game Preview floats outside the dock layout; put it back in its
+  // default spot over the Scene Viewport
+  if (m_gamePreview)
+    m_gamePreview->PinToSceneViewport();
+
   ELYSIUM_CORE_INFO("Editor: Reset layout to default workspace configuration");
 }
 
