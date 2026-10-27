@@ -99,8 +99,10 @@ void EditorLayer::Init(sf::RenderWindow &window) {
   auto &stats = AddPanel<StatsPanel>();
 
   // Configure panel visibility flags:
-  // Open by default: Viewport, Hierarchy, Content Browser, Console, Inspector
+  // Open by default: Viewport, Game Preview, Hierarchy, Content Browser,
+  // Console, Inspector
   viewportPanel.isOpen = true;
+  m_gamePreview->isOpen = true;
   sceneHierarchy.isOpen = true;
   contentBrowser.isOpen = true;
   console.isOpen = true;
@@ -109,8 +111,6 @@ void EditorLayer::Init(sf::RenderWindow &window) {
   // Closed / Hidden by default: Stats & Profiler, Toolbar (floats / handles itself or auxiliary)
   toolbar.isOpen = false;
   stats.isOpen = false;
-  // Game Preview opens itself when Play starts
-  m_gamePreview->isOpen = false;
 
   // If active project has no existing imgui.ini or no project active, schedule programmatic default layout
   if (auto project = Project::GetActive()) {
@@ -309,10 +309,12 @@ void EditorLayer::ResetLayout() {
   ImGui::DockBuilderFinish(dockspace_id);
 
   // Configure panel visibility flags:
-  // Open: Viewport, Hierarchy, Content Browser, Console, Inspector
+  // Open: Viewport, Game Preview, Hierarchy, Content Browser, Console,
+  // Inspector
   // Closed / Hidden: Stats & Profiler, Toolbar, and auxiliary panels
   for (auto &panel : m_panels) {
     if (panel->name == "Scene Viewport" ||
+        panel->name == "Game Preview" ||
         panel->name == "Scene Hierarchy" ||
         panel->name == "Content Browser" ||
         panel->name == "Console" ||

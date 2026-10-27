@@ -28,6 +28,11 @@ private:
   sf::RenderTexture m_previewTexture;
   sf::Vector2u m_currentTextureSize = {0, 0};
   bool m_focusRequested = false;
+
+  // The window is only created once the scene viewport's geometry has settled
+  bool m_windowCreated = false;
+  sf::Vector2f m_lastViewportPos = {-1.0f, -1.0f};
+  sf::Vector2f m_lastViewportSize = {-1.0f, -1.0f};
 };
 
 } // namespace Elysium

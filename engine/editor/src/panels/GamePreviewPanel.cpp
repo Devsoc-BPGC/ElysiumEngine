@@ -39,6 +39,20 @@ bool GamePreviewPanel::EnsureTarget(unsigned int width, unsigned int height) {
 
 void GamePreviewPanel::OnImGuiRender(EditorContext &context, Scene &scene,
                                      SimpleRenderer &renderer) {
+  // The first-use position below comes from the scene viewport's geometry,
+  // which only settles a frame or two after the default dock layout is built.
+  // Hold off creating the window until it stops changing, or the preview
+  // lands on top of whichever panel happened to be there first.
+  if (!m_windowCreated) {
+    bool settled = context.viewportPos == m_lastViewportPos &&
+                   context.viewportSize == m_lastViewportSize;
+    m_lastViewportPos = context.viewportPos;
+    m_lastViewportSize = context.viewportSize;
+    if (!settled)
+      return;
+    m_windowCreated = true;
+  }
+
   // First use: float over the scene viewport's top-right corner rather than
   // docking as a tab on top of it, so both views are visible at once. The
   // scene viewport renders earlier in the frame, so its geometry is current.

@@ -53,7 +53,7 @@ Each view owns its own `sf::RenderTexture`, sized to its own panel; if the panel
 
 Scripts in the copy are re-pointed at the copied objects, and the scripting world's active scene is switched to the copy until Stop, so `SpawnBox`, `FindEntity` and similar act on the running game. Audio sources copy their settings, not their playing sound. A script that stores `Entity` handles to *other* objects still refers to the edit scene's objects, so look those up during play instead.
 
-**Opening and closing.** The Game Preview starts closed and opens automatically when Play starts, floating over the Scene Viewport's top-right corner so both views stay visible; dock it anywhere you like. It can also be opened in Edit mode from **View → Game Preview**. Closing it (its × button or the same menu item) only stops it rendering; its render texture is kept and resized as needed when it is reopened.
+**Opening and closing.** The Game Preview is open by default, floating over the Scene Viewport's top-right corner so both views stay visible; dock it anywhere you like. If it has been closed (its × button or **View → Game Preview**), starting Play reopens it and brings it to the front. Closing it only stops it rendering; its render texture is kept and resized as needed when it is reopened.
 
 ### Component Reflection & Mutability
 The `EntityInspectorPanel` reflects components attached to `context.selectedEntity`:
