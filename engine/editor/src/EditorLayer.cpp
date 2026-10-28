@@ -18,30 +18,15 @@ namespace Elysium {
 
 namespace {
 constexpr float EditorUiScale = 1.25f;
-constexpr float EditorFontSize = 18.0f;
+constexpr float EditorFontSize = 20.0f;
+constexpr char EditorFontPath[] = "assets/fonts/Roboto-Medium.ttf";
 
 ImFont *LoadEditorFont(ImFontAtlas *fonts) {
-#if defined(_WIN32)
-  constexpr const char *fontPaths[] = {"C:/Windows/Fonts/segoeui.ttf",
-                                       "C:/Windows/Fonts/arial.ttf"};
-#elif defined(__APPLE__)
-  constexpr const char *fontPaths[] = {"/System/Library/Fonts/SFNS.ttf",
-                                       "/System/Library/Fonts/Supplemental/Arial.ttf"};
-#else
-  constexpr const char *fontPaths[] = {
-      "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-      "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
-      "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"};
-#endif
+  std::error_code error;
+  if (!std::filesystem::exists(EditorFontPath, error))
+    return nullptr;
 
-  for (const char *path : fontPaths) {
-    std::error_code error;
-    if (std::filesystem::exists(path, error)) {
-      if (ImFont *font = fonts->AddFontFromFileTTF(path, EditorFontSize))
-        return font;
-    }
-  }
-  return nullptr;
+  return fonts->AddFontFromFileTTF(EditorFontPath, EditorFontSize);
 }
 }
 
@@ -85,7 +70,7 @@ void EditorLayer::Init(sf::RenderWindow &window) {
     if (!ImGui::SFML::UpdateFontTexture())
       ELYSIUM_CORE_WARN("Failed to update the editor font texture");
   } else {
-    ELYSIUM_CORE_WARN("No system UI font found; using the default ImGui font");
+    ELYSIUM_CORE_WARN("Bundled editor font is unavailable; using the default ImGui font");
   }
 
   // Hook custom memory log sink into spdlog
