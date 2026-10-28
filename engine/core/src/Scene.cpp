@@ -27,6 +27,13 @@ GameObject *Scene::GetEntityByUUID(Elysium::UUID uuid) {
   return nullptr;
 }
 
+void Scene::AddTexture(std::shared_ptr<const Texture> texture) {
+  if (!texture)
+    return;
+
+  textures.push_back(texture);
+}
+
 bool Scene::DestroyEntityByUUID(Elysium::UUID uuid) {
   auto it = m_EntityMap.find(uuid);
   if (it == m_EntityMap.end()) {

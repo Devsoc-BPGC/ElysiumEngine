@@ -94,28 +94,41 @@ public:
       // Render SpriteRenderer component if attached
       auto *sprite = obj->GetComponent<SpriteRenderer>();
       if (sprite) {
-        if (sprite->isCircle) {
-          float screenRadius = sprite->radius * ptm;
-          sf::CircleShape shape(screenRadius);
-          shape.setFillColor(sprite->color);
-          shape.setOrigin({screenRadius, screenRadius});
-          shape.setPosition({obj->position.x * ptm, obj->position.y * ptm});
-          target.draw(shape);
-          drawCalls++;
-          primitivesCount++;
-        } else {
-          sf::RectangleShape shape;
-          shape.setSize({sprite->size.x * ptm, sprite->size.y * ptm});
-          shape.setOrigin(
+        if (sprite->isTextured) {
+          sf::Sprite spriteRenderer(sprite->texture->GetTexture());
+          spriteRenderer.setOrigin(
               {sprite->size.x * 0.5f * ptm, sprite->size.y * 0.5f * ptm});
-          shape.setPosition({obj->position.x * ptm, obj->position.y * ptm});
-          shape.setFillColor(sprite->color);
+          spriteRenderer.setPosition({obj->position.x * ptm, obj->position.y * ptm});
+          spriteRenderer.setColor(sprite->color);
           Quat q = obj->rotation;
           float angle = 2.0f * std::atan2(q.z, q.w) * 180.0f / PI;
-          shape.setRotation(sf::degrees(angle));
-          target.draw(shape);
+          spriteRenderer.setRotation(sf::degrees(angle));
+          target.draw(spriteRenderer);
           drawCalls++;
-          primitivesCount++;
+        } else {
+            if (sprite->isCircle) {
+              float screenRadius = sprite->radius * ptm;
+              sf::CircleShape shape(screenRadius);
+              shape.setFillColor(sprite->color);
+              shape.setOrigin({screenRadius, screenRadius});
+              shape.setPosition({obj->position.x * ptm, obj->position.y * ptm});
+              target.draw(shape);
+              drawCalls++;
+              primitivesCount++;
+            } else {
+              sf::RectangleShape shape;
+              shape.setSize({sprite->size.x * ptm, sprite->size.y * ptm});
+              shape.setOrigin(
+                  {sprite->size.x * 0.5f * ptm, sprite->size.y * 0.5f * ptm});
+              shape.setPosition({obj->position.x * ptm, obj->position.y * ptm});
+              shape.setFillColor(sprite->color);
+              Quat q = obj->rotation;
+              float angle = 2.0f * std::atan2(q.z, q.w) * 180.0f / PI;
+              shape.setRotation(sf::degrees(angle));
+              target.draw(shape);
+              drawCalls++;
+              primitivesCount++;
+          }
         }
       }
 
