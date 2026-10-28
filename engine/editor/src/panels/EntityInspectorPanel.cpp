@@ -2,7 +2,9 @@
 #include "AssetManager.hpp"
 #include "AudioSourceComponent.hpp"
 #include "Collider.hpp"
+#include "FileDialog.hpp"
 #include "Log.h"
+#include "Project.hpp"
 #include "SpriteRenderer.hpp"
 #include <cmath>
 #include <cstring>
@@ -320,41 +322,135 @@ void EntityInspectorPanel::DrawSpriteRendererComponent(EditorContext &context,
                                 static_cast<uint8_t>(color[3] * 255.0f));
     }
 
-    // Texture slot with Drag-and-Drop Target
-    ImGui::Spacing();
-    ImGui::Text("Texture Slot:");
-
-    std::string textureLabel = "[ None (Solid Color) ]";
-    if (sprite->isTextured != 0) {
-      const auto &meta = AssetManager::Get().GetMetadata(sprite->isTextured);
-      if (static_cast<uint64_t>(meta.handle) != 0) {
-        textureLabel = meta.filePath.filename().string() + " (" +
-                       std::to_string(static_cast<uint64_t>(sprite->isTextured)) + ")";
+    // Helper lambda to assign and synchronize texture on sprite renderer
+    auto assignTexture = [&](AssetHandle handle, const std::filesystem::path &debugPath = "") {
+      sprite->SetTextureHandle(handle);
+      if (static_cast<uint64_t>(handle) != 0) {
+        auto loadedTex = AssetManager::Get().Load<sf::Texture>(handle);
+        if (loadedTex) {
+          sprite->texture = std::make_shared<const Texture>(*loadedTex);
+          sprite->isTextured = true;
+        }
       } else {
-        textureLabel = "Handle: " + std::to_string(static_cast<uint64_t>(sprite->isTextured));
+        sprite->SetTextureHandle(0);
+      }
+      if (!debugPath.empty()) {
+        ELYSIUM_INFO("Assigned texture '{0}' to entity", debugPath.string());
+      }
+    };
+
+    // Ensure texture is loaded if a handle exists but texture is not yet cached on the sprite
+    if (sprite->textureHandle != 0 && !sprite->texture) {
+      auto loadedTex = AssetManager::Get().Load<sf::Texture>(sprite->textureHandle);
+      if (loadedTex) {
+        sprite->texture = std::make_shared<const Texture>(*loadedTex);
+        sprite->isTextured = true;
       }
     }
 
-    ImVec2 slotSize(ImGui::GetContentRegionAvail().x - 60.0f, 32.0f);
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.14f, 0.16f, 0.20f, 1.0f));
-    ImGui::Button(textureLabel.c_str(), slotSize);
-    ImGui::PopStyleColor();
+    // Texture slot with Thumbnail Preview and Native File Browser Picking
+    ImGui::Spacing();
+    ImGui::Text("Texture Slot:");
+
+    std::shared_ptr<sf::Texture> sfmlTexture = nullptr;
+    std::string textureLabel = "[ None (Texture2D) ]";
+    if (sprite->textureHandle != 0) {
+      const auto &meta = AssetManager::Get().GetMetadata(sprite->textureHandle);
+      if (static_cast<uint64_t>(meta.handle) != 0) {
+        textureLabel = meta.filePath.filename().string() + " (" +
+                       std::to_string(static_cast<uint64_t>(sprite->textureHandle)) + ")";
+      } else {
+        textureLabel = "Handle: " + std::to_string(static_cast<uint64_t>(sprite->textureHandle));
+      }
+      sfmlTexture = AssetManager::Get().Load<sf::Texture>(sprite->textureHandle);
+    }
+
+    bool openFilePicker = false;
+    float previewWidth = ImGui::GetContentRegionAvail().x - 60.0f;
+    if (previewWidth < 60.0f) previewWidth = 60.0f;
+
+    if (sfmlTexture) {
+      ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.14f, 0.16f, 0.20f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.24f, 0.32f, 0.45f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.30f, 0.40f, 0.58f, 1.0f));
+      if (ImGui::ImageButton("##TextureThumb", *sfmlTexture, sf::Vector2f(32.0f, 32.0f))) {
+        openFilePicker = true;
+      }
+      ImGui::PopStyleColor(3);
+
+      ImGui::SameLine();
+      ImVec2 slotSize(previewWidth - 40.0f, 32.0f);
+      ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.14f, 0.16f, 0.20f, 1.0f));
+      if (ImGui::Button(textureLabel.c_str(), slotSize)) {
+        openFilePicker = true;
+      }
+      ImGui::PopStyleColor();
+    } else {
+      ImVec2 slotSize(previewWidth, 32.0f);
+      ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.14f, 0.16f, 0.20f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.24f, 0.32f, 0.45f, 1.0f));
+      if (ImGui::Button(textureLabel.c_str(), slotSize)) {
+        openFilePicker = true;
+      }
+      ImGui::PopStyleColor(2);
+    }
+
+    if (ImGui::IsItemHovered()) {
+      ImGui::SetTooltip("Click to browse texture from disk or drag-and-drop from Content Browser");
+    }
 
     // Drag-and-Drop Target for Texture
     if (ImGui::BeginDragDropTarget()) {
-      if (const ImGuiPayload *payload =
-              ImGui::AcceptDragDropPayload(AssetPayloads::TEXTURE)) {
+      if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM")) {
+        // Can be wide-string path or raw 64-bit uint64_t handle
+        if (payload->DataSize > static_cast<int>(sizeof(uint64_t))) {
+          const wchar_t *path = reinterpret_cast<const wchar_t *>(payload->Data);
+          std::filesystem::path texturePath(path);
+          if (AssetManager::IsTextureFile(texturePath)) {
+            AssetHandle handle = AssetManager::GetOrCreateAssetHandle(texturePath);
+            assignTexture(handle, texturePath);
+          }
+        } else if (payload->DataSize == sizeof(uint64_t)) {
+          uint64_t droppedHandle = *reinterpret_cast<const uint64_t *>(payload->Data);
+          const auto &meta = AssetManager::Get().GetMetadata(droppedHandle);
+          assignTexture(droppedHandle, meta.filePath);
+        }
+      } else if (const ImGuiPayload *payload =
+                     ImGui::AcceptDragDropPayload(AssetPayloads::TEXTURE)) {
         uint64_t droppedHandle = *reinterpret_cast<const uint64_t *>(payload->Data);
-        sprite->isTextured = droppedHandle;
-        ELYSIUM_INFO("EntityInspector: Assigned texture handle {} to entity '{}'",
-                     droppedHandle, entity.name);
+        const auto &meta = AssetManager::Get().GetMetadata(droppedHandle);
+        assignTexture(droppedHandle, meta.filePath);
       }
       ImGui::EndDragDropTarget();
     }
 
+    // Native File Browser Picking Trigger
+    if (openFilePicker) {
+      std::filesystem::path assetDir = Project::GetActiveAssetDirectory();
+      std::vector<FileDialogFilter> filters = {
+          {"Image Files (*.png *.jpg *.tga)", "*.png;*.jpg;*.jpeg;*.tga;*.bmp"},
+          {"All Files (*.*)", "*.*"}};
+      auto selectedFile = FileDialog::OpenFile("Select Texture", assetDir, filters);
+      if (selectedFile.has_value() && !selectedFile->empty()) {
+        std::filesystem::path absPath = *selectedFile;
+        std::error_code ec;
+        std::filesystem::path relPath = std::filesystem::relative(absPath, assetDir, ec);
+        if (ec || relPath.empty()) {
+          relPath = absPath;
+        }
+
+        if (AssetManager::IsTextureFile(absPath)) {
+          AssetHandle handle = AssetManager::GetOrCreateAssetHandle(relPath);
+          assignTexture(handle, relPath);
+        } else {
+          ELYSIUM_WARN("Selected file '{}' is not a recognized texture format", absPath.string());
+        }
+      }
+    }
+
     ImGui::SameLine();
-    if (ImGui::Button("Clear##Tex")) {
-      sprite->isTextured = 0;
+    if (ImGui::Button("X##ClearTex", ImVec2(24.0f, 32.0f)) || ImGui::Button("Clear##Tex")) {
+      assignTexture(0);
     }
 
     if (ImGui::IsItemHovered()) {

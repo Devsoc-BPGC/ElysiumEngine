@@ -14,6 +14,7 @@ public:
   float radius = 0.5f;
   bool isCircle = false;
   bool isTextured = false;
+  uint64_t textureHandle = 0;
 
   SpriteRenderer() = default;
   SpriteRenderer(sf::Color col, sf::Vector2f sz)
@@ -22,6 +23,18 @@ public:
       : color(col), radius(r), isCircle(true), isTextured(false) {}
   SpriteRenderer(std::shared_ptr<const Texture> tex, sf::Color col = sf::Color::White, sf::Vector2f sz = sf::Vector2f(1.0f, 1.0f))
       : texture(tex), color(col), size(sz), isCircle(false), isTextured(true) {}
+
+  void SetTextureHandle(uint64_t handle) {
+    textureHandle = handle;
+    if (handle == 0) {
+      isTextured = false;
+      texture = nullptr;
+    }
+  }
+
+  uint64_t GetTextureHandle() const {
+    return textureHandle;
+  }
 };
 
 #endif // SPRITERENDERER_HPP
