@@ -325,13 +325,13 @@ void EntityInspectorPanel::DrawSpriteRendererComponent(EditorContext &context,
     ImGui::Text("Texture Slot:");
 
     std::string textureLabel = "[ None (Solid Color) ]";
-    if (sprite->textureHandle != 0) {
-      const auto &meta = AssetManager::Get().GetMetadata(sprite->textureHandle);
+    if (sprite->isTextured != 0) {
+      const auto &meta = AssetManager::Get().GetMetadata(sprite->isTextured);
       if (static_cast<uint64_t>(meta.handle) != 0) {
         textureLabel = meta.filePath.filename().string() + " (" +
-                       std::to_string(static_cast<uint64_t>(sprite->textureHandle)) + ")";
+                       std::to_string(static_cast<uint64_t>(sprite->isTextured)) + ")";
       } else {
-        textureLabel = "Handle: " + std::to_string(static_cast<uint64_t>(sprite->textureHandle));
+        textureLabel = "Handle: " + std::to_string(static_cast<uint64_t>(sprite->isTextured));
       }
     }
 
@@ -345,7 +345,7 @@ void EntityInspectorPanel::DrawSpriteRendererComponent(EditorContext &context,
       if (const ImGuiPayload *payload =
               ImGui::AcceptDragDropPayload(AssetPayloads::TEXTURE)) {
         uint64_t droppedHandle = *reinterpret_cast<const uint64_t *>(payload->Data);
-        sprite->textureHandle = droppedHandle;
+        sprite->isTextured = droppedHandle;
         ELYSIUM_INFO("EntityInspector: Assigned texture handle {} to entity '{}'",
                      droppedHandle, entity.name);
       }
@@ -354,7 +354,7 @@ void EntityInspectorPanel::DrawSpriteRendererComponent(EditorContext &context,
 
     ImGui::SameLine();
     if (ImGui::Button("Clear##Tex")) {
-      sprite->textureHandle = 0;
+      sprite->isTextured = 0;
     }
 
     if (ImGui::IsItemHovered()) {
