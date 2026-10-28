@@ -143,6 +143,10 @@ public:
   template <typename T>
   std::shared_ptr<T> Load(const std::filesystem::path &path);
 
+  // Static Utility & Helpers
+  static bool IsTextureFile(const std::filesystem::path &path);
+  static AssetHandle GetOrCreateAssetHandle(const std::filesystem::path &path);
+
   // Explicit Cache Management
   void Unload(AssetHandle handle);
   void ClearCache();

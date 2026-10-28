@@ -519,10 +519,14 @@ void ContentBrowserPanel::RenderThumbnailItem(const std::filesystem::path &itemP
     const char *payloadType = GetPayloadType(type);
     uint64_t rawHandle = static_cast<uint64_t>(handle);
 
-    // Payload contains the 64-bit raw AssetHandle (UUID)
-    ImGui::SetDragDropPayload(payloadType, &rawHandle, sizeof(uint64_t));
+    // Payload containing wide path string (for CONTENT_BROWSER_ITEM)
+    std::wstring itemPathWStr = itemPath.wstring();
+    ImGui::SetDragDropPayload(AssetPayloads::GENERIC, itemPathWStr.c_str(),
+                              (itemPathWStr.size() + 1) * sizeof(wchar_t));
+
+    // Also emit type-specific payload if applicable
     if (std::strcmp(payloadType, AssetPayloads::GENERIC) != 0) {
-      ImGui::SetDragDropPayload(AssetPayloads::GENERIC, &rawHandle, sizeof(uint64_t));
+      ImGui::SetDragDropPayload(payloadType, &rawHandle, sizeof(uint64_t));
     }
 
     // Drag-and-drop preview

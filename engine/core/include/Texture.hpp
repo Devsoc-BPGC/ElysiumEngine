@@ -9,6 +9,8 @@ public:
       : m_texture(sf::Texture()) {}
   Texture(const char* filename)
       : m_texture(filename) {}
+  Texture(const sf::Texture &texture)
+      : m_texture(texture) {}
   
   const sf::Texture &GetTexture () const { return m_texture; }
 private:
