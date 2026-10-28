@@ -140,6 +140,16 @@ target_link_libraries(ElysiumApp PUBLIC
 )
 configure_elysium_target(ElysiumApp)
 
+# Copy the bundled editor font next to the executable for build-directory launches.
+add_custom_command(TARGET ElysiumApp POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+        "$<TARGET_FILE_DIR:ElysiumApp>/assets/fonts"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Roboto-Medium.ttf"
+        "$<TARGET_FILE_DIR:ElysiumApp>/assets/fonts/Roboto-Medium.ttf"
+    COMMENT "Copying bundled editor font next to ElysiumApp"
+    VERBATIM
+)
 # Windows: copy runtime DLLs next to the app (spdlog removed — header-only)
 if(WIN32)
     add_custom_command(TARGET ElysiumApp POST_BUILD
