@@ -111,7 +111,7 @@ void EditorLayer::Init(sf::RenderWindow &window) {
   }
 
   // Instantiate standard editor panels
-  auto &toolbar = AddPanel<ToolbarPanel>();
+  m_toolbar = &AddPanel<ToolbarPanel>();
   m_sceneViewport = &AddPanel<SceneViewportPanel>();
   m_gamePreview = &AddPanel<GamePreviewPanel>();
   auto &sceneHierarchy = AddPanel<SceneHierarchyPanel>();
@@ -121,8 +121,9 @@ void EditorLayer::Init(sf::RenderWindow &window) {
   auto &stats = AddPanel<StatsPanel>();
 
   // Configure panel visibility flags:
-  // Open by default: Viewport, Game Preview, Hierarchy, Content Browser,
-  // Console, Inspector
+  // Open by default: Toolbar, Viewport, Game Preview, Hierarchy, Content
+  // Browser, Console, Inspector
+  m_toolbar->isOpen = true;
   m_sceneViewport->isOpen = true;
   m_gamePreview->isOpen = true;
   sceneHierarchy.isOpen = true;
@@ -130,8 +131,7 @@ void EditorLayer::Init(sf::RenderWindow &window) {
   console.isOpen = true;
   inspector.isOpen = true;
 
-  // Closed / Hidden by default: Stats & Profiler, Toolbar (floats / handles itself or auxiliary)
-  toolbar.isOpen = false;
+  // Closed / Hidden by default: Stats & Profiler
   stats.isOpen = false;
 
   // If active project has no existing imgui.ini or no project active, schedule programmatic default layout
@@ -202,6 +202,13 @@ void EditorLayer::OnImGuiRender() {
   SetupDockSpace();
   RenderMenuBar(m_scene);
   ImGui::End();
+
+  // The Toolbar opens along with the Game Preview, whether at startup, from
+  // the View menu or when Play reopens it
+  const bool gamePreviewOpen = m_gamePreview && m_gamePreview->isOpen;
+  if (gamePreviewOpen && !m_gamePreviewWasOpen && m_toolbar)
+    m_toolbar->isOpen = true;
+  m_gamePreviewWasOpen = gamePreviewOpen;
 
   for (auto &panel : m_panels) {
     if (panel->isOpen) {
@@ -313,7 +320,19 @@ void EditorLayer::ResetLayout() {
   ImGuiID dock_top_left_id =
       ImGui::DockBuilderSplitNode(dock_left_id, ImGuiDir_Up, 0.50f, nullptr, &dock_left_id);
 
+  // Split Center Viewport: a strip on top just tall enough for the Toolbar's
+  // buttons and its vertical padding
+  const float toolbarHeight = ImGui::GetFrameHeight() + 2.0f * 6.0f;
+  const float centerHeight = ImGui::DockBuilderGetNode(dock_main_id)->Size.y;
+  ImGuiID dock_toolbar_id = ImGui::DockBuilderSplitNode(
+      dock_main_id, ImGuiDir_Up, toolbarHeight / std::max(centerHeight, toolbarHeight),
+      nullptr, &dock_main_id);
+  // No tab bar, and nothing else can be docked into it
+  ImGui::DockBuilderGetNode(dock_toolbar_id)->LocalFlags |=
+      ImGuiDockNodeFlags_NoTabBar | ImGuiDockNodeFlags_NoDockingOverMe;
+
   // Dock panels to respective IDs by exact window title strings
+  ImGui::DockBuilderDockWindow("##Toolbar", dock_toolbar_id);
   ImGui::DockBuilderDockWindow("Scene Viewport", dock_main_id);
   ImGui::DockBuilderDockWindow("Game Preview", dock_main_id); // as a second tab
   ImGui::DockBuilderDockWindow("Scene Hierarchy", dock_top_left_id);
@@ -324,11 +343,12 @@ void EditorLayer::ResetLayout() {
   ImGui::DockBuilderFinish(dockspace_id);
 
   // Configure panel visibility flags:
-  // Open: Viewport, Game Preview, Hierarchy, Content Browser, Console,
-  // Inspector
-  // Closed / Hidden: Stats & Profiler, Toolbar, and auxiliary panels
+  // Open: Toolbar, Viewport, Game Preview, Hierarchy, Content Browser,
+  // Console, Inspector
+  // Closed / Hidden: Stats & Profiler, and auxiliary panels
   for (auto &panel : m_panels) {
-    if (panel->name == "Scene Viewport" ||
+    if (panel->name == "Toolbar" ||
+        panel->name == "Scene Viewport" ||
         panel->name == "Game Preview" ||
         panel->name == "Scene Hierarchy" ||
         panel->name == "Content Browser" ||
@@ -709,6 +729,7 @@ void EditorLayer::Shutdown() {
 
   AssetManager::Get().Shutdown();
   m_panels.clear();
+  m_toolbar = nullptr;
   m_sceneViewport = nullptr;
   m_gamePreview = nullptr;
   if (m_runtimeScene) {

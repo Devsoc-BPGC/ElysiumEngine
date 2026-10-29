@@ -55,6 +55,8 @@ Scripts in the copy are re-pointed at the copied objects, and the scripting worl
 
 **Opening and closing.** The Game Preview is open by default as a second tab beside the Scene Viewport, which starts in front. Starting Play brings the Game Preview tab to the front; click the Scene Viewport tab to switch back, or drag either tab into another part of the window to see both views at once. If the Game Preview has been closed (its × button or **View → Game Preview**), starting Play reopens it and brings it to the front. **View → Reset Layout** puts it back beside the Scene Viewport. Closing it only stops it rendering; its render texture is kept and resized as needed when it is reopened.
 
+The **Toolbar** (Play / Stop, Pause, Step) opens along with the Game Preview: at startup, from **View → Game Preview**, and when Play reopens it. The default layout docks it in a thin strip above the Scene Viewport and Game Preview. Closing it from **View → Toolbar** keeps it closed until the Game Preview is next opened.
+
 ### Component Reflection & Mutability
 The `EntityInspectorPanel` reflects components attached to `context.selectedEntity`:
 - **Transform**: Position, Rotation (degrees around Z), Scale. Edits immediately invoke `entity->SyncTransform()`.
