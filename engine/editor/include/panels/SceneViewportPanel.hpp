@@ -14,9 +14,14 @@ public:
   void OnImGuiRender(EditorContext &context, Scene &scene,
                      SimpleRenderer &renderer) override;
 
+  // Brings the panel to the front on the next frame, selecting its tab if
+  // docked
+  void RequestFocus() { m_focusRequested = true; }
+
 private:
   sf::RenderTexture m_viewportTexture;
   sf::Vector2u m_currentTextureSize = {0, 0};
+  bool m_focusRequested = false;
 };
 
 } // namespace Elysium

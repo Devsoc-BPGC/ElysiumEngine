@@ -20,36 +20,9 @@ constexpr AspectPreset kAspectPresets[] = {
     {"Free (fill panel)", 0.0f},
 };
 
-// Default floating size, and its gap from the scene viewport's corner
-constexpr float kDefaultWidth = 480.0f;
-constexpr float kDefaultHeight = 290.0f;
-constexpr float kViewportMargin = 12.0f;
-
 } // namespace
 
-GamePreviewPanel::GamePreviewPanel()
-    : EditorPanel("Game Preview"), m_windowSize(kDefaultWidth, kDefaultHeight) {}
-
-void GamePreviewPanel::PinToSceneViewport() {
-  m_pinned = true;
-  m_pinnedPos = {-1.0f, -1.0f}; // never a real anchor, so it is applied next frame
-  m_windowSize = {kDefaultWidth, kDefaultHeight};
-}
-
-void GamePreviewPanel::TrackPinnedPlacement() {
-  // Any position or size we didn't set means the user moved, resized or
-  // docked the window (or it was restored from imgui.ini), so leave it there
-  const ImVec2 pos = ImGui::GetWindowPos();
-  const ImVec2 size = ImGui::GetWindowSize();
-  const bool collapsed = ImGui::IsWindowCollapsed();
-  const bool docked = ImGui::IsWindowDocked();
-  if (m_pinned &&
-      (docked || pos.x != m_pinnedPos.x || pos.y != m_pinnedPos.y ||
-       (!collapsed && (size.x != m_windowSize.x || size.y != m_windowSize.y))))
-    m_pinned = false;
-  if (!collapsed && !docked)
-    m_windowSize = {size.x, size.y};
-}
+GamePreviewPanel::GamePreviewPanel() : EditorPanel("Game Preview") {}
 
 bool GamePreviewPanel::EnsureTarget(unsigned int width, unsigned int height) {
   if (m_currentTextureSize.x == width && m_currentTextureSize.y == height)
@@ -66,37 +39,12 @@ bool GamePreviewPanel::EnsureTarget(unsigned int width, unsigned int height) {
 
 void GamePreviewPanel::OnImGuiRender(EditorContext &context, Scene &scene,
                                      SimpleRenderer &renderer) {
-  // The first-use position below comes from the scene viewport's geometry,
-  // which only settles a frame or two after the default dock layout is built.
-  // Hold off creating the window until it stops changing, or the preview
-  // lands on top of whichever panel happened to be there first.
-  if (!m_windowCreated) {
-    bool settled = context.viewportPos == m_lastViewportPos &&
-                   context.viewportSize == m_lastViewportSize;
-    m_lastViewportPos = context.viewportPos;
-    m_lastViewportSize = context.viewportSize;
-    if (!settled)
-      return;
-    m_windowCreated = true;
-  }
-
-  // Float over the scene viewport's top-right corner rather than docking as a
-  // tab on top of it, so both views are visible at once. While pinned, follow
-  // that corner when the viewport moves or resizes (e.g. the editor window is
-  // resized). The scene viewport renders earlier in the frame, so its
-  // geometry is current.
-  const sf::Vector2f anchor(
-      std::floor(std::max(0.0f, context.viewportPos.x + context.viewportSize.x -
-                                    m_windowSize.x - kViewportMargin)),
-      std::floor(context.viewportPos.y + kViewportMargin));
-  if (m_pinned && anchor != m_pinnedPos) {
-    // The very first placement gives way to one restored from imgui.ini
-    const ImGuiCond cond = m_placed ? ImGuiCond_Always : ImGuiCond_FirstUseEver;
-    ImGui::SetNextWindowPos(ImVec2(anchor.x, anchor.y), cond);
-    ImGui::SetNextWindowSize(ImVec2(m_windowSize.x, m_windowSize.y), cond);
-    m_pinnedPos = anchor;
-    m_placed = true;
-  }
+  // The default layout docks the preview as a tab beside the scene viewport.
+  // Do the same when no saved layout places it, e.g. a project's imgui.ini
+  // from before the Game Preview existed. The scene viewport renders earlier
+  // in the frame, so its dock node is current.
+  if (context.viewportDockId != 0)
+    ImGui::SetNextWindowDockID(context.viewportDockId, ImGuiCond_FirstUseEver);
 
   if (m_focusRequested) {
     ImGui::SetNextWindowCollapsed(false);
@@ -105,11 +53,9 @@ void GamePreviewPanel::OnImGuiRender(EditorContext &context, Scene &scene,
   }
 
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-  const bool visible = ImGui::Begin("Game Preview", &isOpen,
-                                    ImGuiWindowFlags_NoScrollbar |
-                                        ImGuiWindowFlags_NoScrollWithMouse);
-  TrackPinnedPlacement();
-  if (visible) {
+  if (ImGui::Begin("Game Preview", &isOpen,
+                   ImGuiWindowFlags_NoScrollbar |
+                       ImGuiWindowFlags_NoScrollWithMouse)) {
     ImVec2 avail = ImGui::GetContentRegionAvail();
     ImVec2 origin = ImGui::GetCursorScreenPos();
     GameCamera &cam = context.gameCamera;

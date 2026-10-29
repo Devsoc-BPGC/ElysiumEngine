@@ -9,10 +9,18 @@ SceneViewportPanel::SceneViewportPanel() : EditorPanel("Scene Viewport") {}
 
 void SceneViewportPanel::OnImGuiRender(EditorContext &context, Scene &scene,
                                        SimpleRenderer &renderer) {
+  if (m_focusRequested) {
+    ImGui::SetNextWindowFocus();
+    m_focusRequested = false;
+  }
+
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-  if (ImGui::Begin("Scene Viewport", &isOpen,
-                   ImGuiWindowFlags_NoScrollbar |
-                       ImGuiWindowFlags_NoScrollWithMouse)) {
+  const bool visible = ImGui::Begin("Scene Viewport", &isOpen,
+                                    ImGuiWindowFlags_NoScrollbar |
+                                        ImGuiWindowFlags_NoScrollWithMouse);
+  // Known even while another tab hides this one
+  context.viewportDockId = ImGui::GetWindowDockID();
+  if (visible) {
     ImVec2 viewportAvail = ImGui::GetContentRegionAvail();
     context.viewportPos = sf::Vector2f(ImGui::GetCursorScreenPos().x,
                                        ImGui::GetCursorScreenPos().y);

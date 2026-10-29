@@ -71,6 +71,7 @@ struct EditorContext {
   sf::Vector2f viewportSize = {800.0f, 600.0f};
   bool isViewportHovered = false;
   bool isViewportFocused = false;
+  unsigned int viewportDockId = 0; // ImGuiID of its dock node; 0 if floating
 };
 
 } // namespace Elysium

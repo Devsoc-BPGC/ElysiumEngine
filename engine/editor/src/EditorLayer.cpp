@@ -112,7 +112,7 @@ void EditorLayer::Init(sf::RenderWindow &window) {
 
   // Instantiate standard editor panels
   auto &toolbar = AddPanel<ToolbarPanel>();
-  auto &viewportPanel = AddPanel<SceneViewportPanel>();
+  m_sceneViewport = &AddPanel<SceneViewportPanel>();
   m_gamePreview = &AddPanel<GamePreviewPanel>();
   auto &sceneHierarchy = AddPanel<SceneHierarchyPanel>();
   auto &inspector = AddPanel<EntityInspectorPanel>();
@@ -123,7 +123,7 @@ void EditorLayer::Init(sf::RenderWindow &window) {
   // Configure panel visibility flags:
   // Open by default: Viewport, Game Preview, Hierarchy, Content Browser,
   // Console, Inspector
-  viewportPanel.isOpen = true;
+  m_sceneViewport->isOpen = true;
   m_gamePreview->isOpen = true;
   sceneHierarchy.isOpen = true;
   contentBrowser.isOpen = true;
@@ -315,6 +315,7 @@ void EditorLayer::ResetLayout() {
 
   // Dock panels to respective IDs by exact window title strings
   ImGui::DockBuilderDockWindow("Scene Viewport", dock_main_id);
+  ImGui::DockBuilderDockWindow("Game Preview", dock_main_id); // as a second tab
   ImGui::DockBuilderDockWindow("Scene Hierarchy", dock_top_left_id);
   ImGui::DockBuilderDockWindow("Content Browser", dock_left_id);
   ImGui::DockBuilderDockWindow("Console", dock_bottom_id);
@@ -339,10 +340,9 @@ void EditorLayer::ResetLayout() {
     }
   }
 
-  // The Game Preview floats outside the dock layout; put it back in its
-  // default spot over the Scene Viewport
-  if (m_gamePreview)
-    m_gamePreview->PinToSceneViewport();
+  // The Scene Viewport and Game Preview share a node; show the Scene Viewport
+  if (m_sceneViewport)
+    m_sceneViewport->RequestFocus();
 
   ELYSIUM_CORE_INFO("Editor: Reset layout to default workspace configuration");
 }
@@ -709,6 +709,7 @@ void EditorLayer::Shutdown() {
 
   AssetManager::Get().Shutdown();
   m_panels.clear();
+  m_sceneViewport = nullptr;
   m_gamePreview = nullptr;
   if (m_runtimeScene) {
     SetActiveScene(m_activeSceneBeforePlay);

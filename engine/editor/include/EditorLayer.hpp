@@ -15,6 +15,7 @@
 namespace Elysium {
 
 class GamePreviewPanel;
+class SceneViewportPanel;
 
 class EditorLayer : public Layer {
 public:
@@ -71,6 +72,7 @@ public:
 
   Scene m_scene;
   std::unique_ptr<Scene> m_runtimeScene; // Simulated copy of m_scene in Play
+  SceneViewportPanel *m_sceneViewport = nullptr;
   GamePreviewPanel *m_gamePreview = nullptr;
   Scene *m_activeSceneBeforePlay = nullptr; // Restored when Play stops
   SimpleRenderer m_renderer{50.0f};
