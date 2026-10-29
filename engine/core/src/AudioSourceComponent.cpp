@@ -23,6 +23,17 @@ void AudioSourceComponent::Start() {
   }
 }
 
+std::unique_ptr<Component> AudioSourceComponent::Clone() const {
+  auto copy =
+      std::make_unique<AudioSourceComponent>(filepath, playOnAwake, loop);
+  copy->volume = volume;
+  copy->pitch = pitch;
+  copy->isSpatial = isSpatial;
+  copy->minDistance = minDistance;
+  copy->attenuation = attenuation;
+  return copy;
+}
+
 void AudioSourceComponent::EnsureSoundInstance() {
   if (filepath.empty()) {
     if (m_Sound) {

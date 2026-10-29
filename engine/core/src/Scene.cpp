@@ -64,6 +64,35 @@ bool Scene::DestroyEntityByUUID(Elysium::UUID uuid) {
   return true;
 }
 
+std::unique_ptr<Scene> Scene::Clone() const {
+  auto copy = std::make_unique<Scene>();
+  copy->textures = textures; // read-only, so both scenes can share them
+  copy->physicsWorld = physicsWorld; // gravity, boundary, etc.
+  copy->physicsWorld.rigidBodies.clear();
+
+  std::unordered_map<const RigidBody *, RigidBody *> bodyCopies;
+  for (const auto &obj : objects) {
+    if (!obj)
+      continue;
+    auto objCopy = obj->Clone();
+    if (obj->rigidBody) {
+      bodyCopies[obj->rigidBody.get()] = objCopy->rigidBody.get();
+    }
+    copy->m_EntityMap[objCopy->GetUUID()] = objCopy;
+    copy->objects.push_back(std::move(objCopy));
+  }
+
+  // Register bodies in the same order as this scene, so the copy simulates
+  // exactly as this scene would
+  for (const RigidBody *body : physicsWorld.rigidBodies) {
+    auto it = bodyCopies.find(body);
+    if (it != bodyCopies.end()) {
+      copy->physicsWorld.AddBody(it->second);
+    }
+  }
+  return copy;
+}
+
 void Scene::Update(float dt) {
   // 1. Update components
   for (auto &obj : objects) {

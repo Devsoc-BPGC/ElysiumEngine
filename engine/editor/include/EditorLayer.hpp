@@ -14,6 +14,10 @@
 
 namespace Elysium {
 
+class GamePreviewPanel;
+class SceneViewportPanel;
+class ToolbarPanel;
+
 class EditorLayer : public Layer {
 public:
   EditorLayer();
@@ -68,6 +72,12 @@ public:
   char m_OpenProjectPathBuffer[512] = "";
 
   Scene m_scene;
+  std::unique_ptr<Scene> m_runtimeScene; // Simulated copy of m_scene in Play
+  ToolbarPanel *m_toolbar = nullptr;
+  SceneViewportPanel *m_sceneViewport = nullptr;
+  GamePreviewPanel *m_gamePreview = nullptr;
+  bool m_gamePreviewWasOpen = false; // The Toolbar opens along with it
+  Scene *m_activeSceneBeforePlay = nullptr; // Restored when Play stops
   SimpleRenderer m_renderer{50.0f};
   float m_lastDt = 0.016f;
 

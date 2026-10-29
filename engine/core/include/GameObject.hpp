@@ -67,6 +67,33 @@ public:
     return *rigidBody;
   }
 
+  /**
+   * @brief Deep-copies this GameObject: transform, RigidBody and components.
+   * @note The copy keeps this object's UUID so the two can be matched up.
+   */
+  std::shared_ptr<GameObject> Clone() const {
+    auto copy = std::make_shared<GameObject>(m_UUID, name);
+    copy->active = active;
+    copy->position = position;
+    copy->rotation = rotation;
+    copy->scale = scale;
+    if (rigidBody) {
+      copy->rigidBody = std::make_unique<RigidBody>(*rigidBody);
+    }
+    for (const auto &comp : components) {
+      if (auto compCopy = comp->Clone()) {
+        compCopy->gameObject = copy.get();
+        copy->components.push_back(std::move(compCopy));
+      }
+    }
+    // Once the copy is complete, let components rebind anything else that
+    // still refers to the original (e.g. a script's Entity handle)
+    for (auto &comp : copy->components) {
+      comp->OnCloned(copy);
+    }
+    return copy;
+  }
+
   void Update(float dt) {
     for (auto &comp : components) {
       comp->Update(dt);

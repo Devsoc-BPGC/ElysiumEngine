@@ -9,11 +9,12 @@ The `engine/editor` module provides a dockable, modular game engine editor built
 | Header | Source | Description |
 |---|---|---|
 | [`EditorLayer.hpp`](include/EditorLayer.hpp) | [`EditorLayer.cpp`](src/EditorLayer.cpp) | Main engine layer managing ImGui-SFML lifecycle, DockSpace, menu bar, and global shortcuts. |
-| [`EditorContext.hpp`](include/EditorContext.hpp) | — | Shared editor state (play state, active selection, editor camera, performance metrics). |
+| [`EditorContext.hpp`](include/EditorContext.hpp) | — | Shared editor state (play state, active selection, editor and game cameras, performance metrics). |
 | [`EditorPanel.hpp`](include/EditorPanel.hpp) | — | Abstract interface for modular panels (`OnImGuiRender(context, scene, renderer)`). |
 | [`EditorLogSink.hpp`](include/EditorLogSink.hpp) | [`EditorLogSink.cpp`](src/EditorLogSink.cpp) | Thread-safe circular buffer sink hooked into `spdlog` for the Console panel. |
 | **Panels** | | |
 | [`SceneViewportPanel.hpp`](include/panels/SceneViewportPanel.hpp) | [`SceneViewportPanel.cpp`](src/panels/SceneViewportPanel.cpp) | Off-screen `sf::RenderTexture` viewport with independent pan & zoom camera and HUD overlay. |
+| [`GamePreviewPanel.hpp`](include/panels/GamePreviewPanel.hpp) | [`GamePreviewPanel.cpp`](src/panels/GamePreviewPanel.cpp) | Game output through the game camera: fixed aspect ratio (letterboxed), editor-only visuals hidden; shows the simulated copy while playing. |
 | [`SceneHierarchyPanel.hpp`](include/panels/SceneHierarchyPanel.hpp) | [`SceneHierarchyPanel.cpp`](src/panels/SceneHierarchyPanel.cpp) | Entity tree listing with real-time text filter, selection highlight, and Add/Delete actions. |
 | [`EntityInspectorPanel.hpp`](include/panels/EntityInspectorPanel.hpp) | [`EntityInspectorPanel.cpp`](src/panels/EntityInspectorPanel.cpp) | Component reflection for Transform, RigidBody2D, Collider2D, and SpriteRenderer. |
 | [`ToolbarPanel.hpp`](include/panels/ToolbarPanel.hpp) | [`ToolbarPanel.cpp`](src/panels/ToolbarPanel.cpp) | Play, Pause, and Single-Frame Step simulation buttons with mode badges. |
@@ -34,6 +35,27 @@ The `engine/editor` module provides a dockable, modular game engine editor built
 4. `SimpleRenderer::Render()` draws the scene into the render texture.
 5. The texture is displayed in ImGui using `ImGui::Image()`.
 6. Mouse drag and scroll events inside the viewport update the camera independently of the editor UI.
+
+### Scene Viewport vs. Game Preview
+The editor shows the scene through two independent views. Both can be open at once; neither replaces the other.
+
+| | **Scene Viewport** (`SceneViewportPanel`) | **Game Preview** (`GamePreviewPanel`) |
+|---|---|---|
+| Purpose | Selecting entities and manipulating the scene | Seeing the scene as the player will |
+| Scene shown | The edit scene, never changed by Play | The running copy while playing; the edit scene otherwise |
+| Camera | `context.camera` (`EditorCamera`): pan with right/middle drag, zoom with the wheel | `context.gameCamera` (`GameCamera`): no mouse navigation; set from the right-click menu |
+| Framing | Fills the panel; a bigger panel shows more of the world | Fixed world height (`viewHeight`) at a fixed aspect ratio, letterboxed; a bigger panel scales the picture |
+| Editor visuals | Debug grid, colliders and AABBs per the **Options** menu / Stats toggles | Hidden unless **Show Debug Visuals** is enabled in the right-click menu |
+
+Each view owns its own `sf::RenderTexture`, sized to its own panel; if the panel has no area or a resize fails, that view skips the frame and retries rather than drawing into a target of the wrong size. They share one `SimpleRenderer`; the Game Preview restores the renderer's flags and counters after drawing, so the Stats panel keeps reporting the scene viewport's numbers.
+
+**Play Mode behaviour.** Pressing **Play** (or **Step**) copies the scene with `Scene::Clone()` and simulates only the copy. The Scene Viewport, Scene Hierarchy and Inspector keep showing the untouched edit scene, while the Game Preview opens, comes to the front, and shows the running copy through the game camera. In Edit mode the preview shows the edit scene labelled *NOT PLAYING*; while paused or stepping it is labelled *PAUSED*. **Stop** discards the copy, so the scene is exactly as it was before Play. Edits made while playing go to the edit scene, not the running game.
+
+Scripts in the copy are re-pointed at the copied objects, and the scripting world's active scene is switched to the copy until Stop, so `SpawnBox`, `FindEntity` and similar act on the running game. Audio sources copy their settings, not their playing sound. A script that stores `Entity` handles to *other* objects still refers to the edit scene's objects, so look those up during play instead.
+
+**Opening and closing.** The Game Preview is open by default as a second tab beside the Scene Viewport, which starts in front. Starting Play brings the Game Preview tab to the front; click the Scene Viewport tab to switch back, or drag either tab into another part of the window to see both views at once. If the Game Preview has been closed (its × button or **View → Game Preview**), starting Play reopens it and brings it to the front. **View → Reset Layout** puts it back beside the Scene Viewport. Closing it only stops it rendering; its render texture is kept and resized as needed when it is reopened.
+
+The **Toolbar** (Play / Stop, Pause, Step) opens along with the Game Preview: at startup, from **View → Game Preview**, and when Play reopens it. The default layout docks it in a thin strip above the Scene Viewport and Game Preview. Closing it from **View → Toolbar** keeps it closed until the Game Preview is next opened.
 
 ### Component Reflection & Mutability
 The `EntityInspectorPanel` reflects components attached to `context.selectedEntity`:

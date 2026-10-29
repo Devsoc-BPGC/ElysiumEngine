@@ -35,6 +35,10 @@ public:
   uint64_t GetTextureHandle() const {
     return textureHandle;
   }
+
+  std::unique_ptr<Component> Clone() const override {
+    return std::make_unique<SpriteRenderer>(*this);
+  }
 };
 
 #endif // SPRITERENDERER_HPP

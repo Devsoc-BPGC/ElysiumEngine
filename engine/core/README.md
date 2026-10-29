@@ -16,8 +16,8 @@ The `engine/core` module forms the foundational layer of the Elysium Game Engine
 | [`KeyCodes.hpp`](include/KeyCodes.hpp) | — | Framework-independent keyboard key definitions matching SFML 3 keys. |
 | [`MouseCodes.hpp`](include/MouseCodes.hpp) | — | Framework-independent mouse button definitions matching SFML 3 buttons. |
 | [`Input.hpp`](include/Input.hpp) | — | Static polling interface for held/pressed keyboard keys and mouse buttons. |
-| [`GameObject.hpp`](include/GameObject.hpp) | — | Entity class managing transform data, attached RigidBody, and component collection. |
-| [`Component.hpp`](include/Component.hpp) | — | Base class for user-defined components (`Start()`, `Update(dt)`). |
+| [`GameObject.hpp`](include/GameObject.hpp) | — | Entity class managing transform data, attached RigidBody, and component collection. `Clone()` makes a deep copy. |
+| [`Component.hpp`](include/Component.hpp) | — | Base class for user-defined components (`Start()`, `Update(dt)`, and a required `Clone()` used when Play mode copies the scene). |
 | [`SpriteRenderer.hpp`](include/SpriteRenderer.hpp) | — | Visual primitive component (box or circle shapes with tint color). |
 | [`Scene.hpp`](include/Scene.hpp) | — | Scene graph holding entities and managing physics world stepping/synchronization. |
 | [`SimpleRenderer.hpp`](include/SimpleRenderer.hpp) | — | Target-agnostic renderer drawing scene geometry to any `sf::RenderTarget` (e.g. `sf::RenderTexture`). |

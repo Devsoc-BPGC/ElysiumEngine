@@ -6,9 +6,11 @@
 #include "FileDialog.hpp"
 #include "Log.h"
 #include "Project.hpp"
+#include "ScriptingWorld.hpp"
 #include "panels/ConsolePanel.hpp"
 #include "panels/ContentBrowserPanel.hpp"
 #include "panels/EntityInspectorPanel.hpp"
+#include "panels/GamePreviewPanel.hpp"
 #include "panels/SceneHierarchyPanel.hpp"
 #include "panels/SceneViewportPanel.hpp"
 #include "panels/StatsPanel.hpp"
@@ -109,8 +111,9 @@ void EditorLayer::Init(sf::RenderWindow &window) {
   }
 
   // Instantiate standard editor panels
-  auto &toolbar = AddPanel<ToolbarPanel>();
-  auto &viewportPanel = AddPanel<SceneViewportPanel>();
+  m_toolbar = &AddPanel<ToolbarPanel>();
+  m_sceneViewport = &AddPanel<SceneViewportPanel>();
+  m_gamePreview = &AddPanel<GamePreviewPanel>();
   auto &sceneHierarchy = AddPanel<SceneHierarchyPanel>();
   auto &inspector = AddPanel<EntityInspectorPanel>();
   auto &contentBrowser = AddPanel<ContentBrowserPanel>();
@@ -118,15 +121,17 @@ void EditorLayer::Init(sf::RenderWindow &window) {
   auto &stats = AddPanel<StatsPanel>();
 
   // Configure panel visibility flags:
-  // Open by default: Viewport, Hierarchy, Content Browser, Console, Inspector
-  viewportPanel.isOpen = true;
+  // Open by default: Toolbar, Viewport, Game Preview, Hierarchy, Content
+  // Browser, Console, Inspector
+  m_toolbar->isOpen = true;
+  m_sceneViewport->isOpen = true;
+  m_gamePreview->isOpen = true;
   sceneHierarchy.isOpen = true;
   contentBrowser.isOpen = true;
   console.isOpen = true;
   inspector.isOpen = true;
 
-  // Closed / Hidden by default: Stats & Profiler, Toolbar (floats / handles itself or auxiliary)
-  toolbar.isOpen = false;
+  // Closed / Hidden by default: Stats & Profiler
   stats.isOpen = false;
 
   // If active project has no existing imgui.ini or no project active, schedule programmatic default layout
@@ -146,12 +151,31 @@ void EditorLayer::Init(sf::RenderWindow &window) {
 void EditorLayer::OnUpdate(Timestep ts) {
   m_lastDt = ts.GetSeconds();
 
+  // Leaving Edit mode simulates a copy of the scene, so the edit scene (and
+  // the scene viewport showing it) stays unchanged; returning to Edit mode
+  // discards the copy
+  if (m_context.playState != ScenePlayState::Edit && !m_runtimeScene) {
+    m_runtimeScene = m_scene.Clone();
+    // Scripts reach the scene through the scripting world's active scene, so
+    // point them at the copy for the length of the play session
+    m_activeSceneBeforePlay = GetActiveScene();
+    SetActiveScene(m_runtimeScene.get());
+    if (m_gamePreview) {
+      m_gamePreview->isOpen = true;
+      m_gamePreview->RequestFocus();
+    }
+  } else if (m_context.playState == ScenePlayState::Edit && m_runtimeScene) {
+    SetActiveScene(m_activeSceneBeforePlay);
+    m_runtimeScene.reset();
+  }
+  m_context.runtimeScene = m_runtimeScene.get();
+
   sf::Clock updateTimer;
   if (m_context.playState == ScenePlayState::Play) {
-    m_scene.physicsWorld.boundaryRotation += 0.0005f;
-    m_scene.Update(ts.GetSeconds());
+    m_runtimeScene->physicsWorld.boundaryRotation += 0.0005f;
+    m_runtimeScene->Update(ts.GetSeconds());
   } else if (m_context.playState == ScenePlayState::Step) {
-    m_scene.Update(1.0f / 60.0f);
+    m_runtimeScene->Update(1.0f / 60.0f);
     m_context.playState = ScenePlayState::Pause;
   }
 
@@ -159,7 +183,8 @@ void EditorLayer::OnUpdate(Timestep ts) {
   m_context.stats.updateTimeMs = updateMs;
   m_context.stats.physicsTimeMs = updateMs * 0.75f;
 
-  m_context.stats.entityCount = static_cast<uint32_t>(m_scene.objects.size());
+  const Scene &simulated = m_runtimeScene ? *m_runtimeScene : m_scene;
+  m_context.stats.entityCount = static_cast<uint32_t>(simulated.objects.size());
   m_context.stats.frameTimeMs = ts.GetMilliseconds();
   m_context.stats.fps =
       (ts.GetSeconds() > 0.0001f) ? (1.0f / ts.GetSeconds()) : 60.0f;
@@ -177,6 +202,13 @@ void EditorLayer::OnImGuiRender() {
   SetupDockSpace();
   RenderMenuBar(m_scene);
   ImGui::End();
+
+  // The Toolbar opens along with the Game Preview, whether at startup, from
+  // the View menu or when Play reopens it
+  const bool gamePreviewOpen = m_gamePreview && m_gamePreview->isOpen;
+  if (gamePreviewOpen && !m_gamePreviewWasOpen && m_toolbar)
+    m_toolbar->isOpen = true;
+  m_gamePreviewWasOpen = gamePreviewOpen;
 
   for (auto &panel : m_panels) {
     if (panel->isOpen) {
@@ -288,8 +320,21 @@ void EditorLayer::ResetLayout() {
   ImGuiID dock_top_left_id =
       ImGui::DockBuilderSplitNode(dock_left_id, ImGuiDir_Up, 0.50f, nullptr, &dock_left_id);
 
+  // Split Center Viewport: a strip on top just tall enough for the Toolbar's
+  // buttons and its vertical padding
+  const float toolbarHeight = ImGui::GetFrameHeight() + 2.0f * 6.0f;
+  const float centerHeight = ImGui::DockBuilderGetNode(dock_main_id)->Size.y;
+  ImGuiID dock_toolbar_id = ImGui::DockBuilderSplitNode(
+      dock_main_id, ImGuiDir_Up, toolbarHeight / std::max(centerHeight, toolbarHeight),
+      nullptr, &dock_main_id);
+  // No tab bar, and nothing else can be docked into it
+  ImGui::DockBuilderGetNode(dock_toolbar_id)->LocalFlags |=
+      ImGuiDockNodeFlags_NoTabBar | ImGuiDockNodeFlags_NoDockingOverMe;
+
   // Dock panels to respective IDs by exact window title strings
+  ImGui::DockBuilderDockWindow("##Toolbar", dock_toolbar_id);
   ImGui::DockBuilderDockWindow("Scene Viewport", dock_main_id);
+  ImGui::DockBuilderDockWindow("Game Preview", dock_main_id); // as a second tab
   ImGui::DockBuilderDockWindow("Scene Hierarchy", dock_top_left_id);
   ImGui::DockBuilderDockWindow("Content Browser", dock_left_id);
   ImGui::DockBuilderDockWindow("Console", dock_bottom_id);
@@ -298,10 +343,13 @@ void EditorLayer::ResetLayout() {
   ImGui::DockBuilderFinish(dockspace_id);
 
   // Configure panel visibility flags:
-  // Open: Viewport, Hierarchy, Content Browser, Console, Inspector
-  // Closed / Hidden: Stats & Profiler, Toolbar, and auxiliary panels
+  // Open: Toolbar, Viewport, Game Preview, Hierarchy, Content Browser,
+  // Console, Inspector
+  // Closed / Hidden: Stats & Profiler, and auxiliary panels
   for (auto &panel : m_panels) {
-    if (panel->name == "Scene Viewport" ||
+    if (panel->name == "Toolbar" ||
+        panel->name == "Scene Viewport" ||
+        panel->name == "Game Preview" ||
         panel->name == "Scene Hierarchy" ||
         panel->name == "Content Browser" ||
         panel->name == "Console" ||
@@ -311,6 +359,10 @@ void EditorLayer::ResetLayout() {
       panel->isOpen = false;
     }
   }
+
+  // The Scene Viewport and Game Preview share a node; show the Scene Viewport
+  if (m_sceneViewport)
+    m_sceneViewport->RequestFocus();
 
   ELYSIUM_CORE_INFO("Editor: Reset layout to default workspace configuration");
 }
@@ -677,6 +729,14 @@ void EditorLayer::Shutdown() {
 
   AssetManager::Get().Shutdown();
   m_panels.clear();
+  m_toolbar = nullptr;
+  m_sceneViewport = nullptr;
+  m_gamePreview = nullptr;
+  if (m_runtimeScene) {
+    SetActiveScene(m_activeSceneBeforePlay);
+    m_runtimeScene.reset();
+  }
+  m_context.runtimeScene = nullptr;
   ImGui::SFML::Shutdown();
   m_isInitialized = false;
   m_window = nullptr;

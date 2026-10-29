@@ -61,8 +61,11 @@ void StatsPanel::OnImGuiRender(EditorContext &context, Scene &scene,
       ImGui::Checkbox("Show AABB Bounds", &context.drawAABBs);
       ImGui::SliderFloat("Pixels Per Meter", &context.pixelsPerMeter, 10.0f,
                          150.0f, "%.1f");
+      const Scene &simulated =
+          context.runtimeScene ? *context.runtimeScene : scene;
       ImGui::Text("Boundary Rotation: %.2f deg",
-                  scene.physicsWorld.boundaryRotation * 180.0f / 3.14159265f);
+                  simulated.physicsWorld.boundaryRotation * 180.0f /
+                      3.14159265f);
     }
   }
   ImGui::End();

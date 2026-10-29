@@ -9,10 +9,21 @@ SceneViewportPanel::SceneViewportPanel() : EditorPanel("Scene Viewport") {}
 
 void SceneViewportPanel::OnImGuiRender(EditorContext &context, Scene &scene,
                                        SimpleRenderer &renderer) {
+  if (m_focusRequested)
+    ImGui::SetNextWindowFocus();
+
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-  if (ImGui::Begin("Scene Viewport", &isOpen,
-                   ImGuiWindowFlags_NoScrollbar |
-                       ImGuiWindowFlags_NoScrollWithMouse)) {
+  const bool visible = ImGui::Begin("Scene Viewport", &isOpen,
+                                    ImGuiWindowFlags_NoScrollbar |
+                                        ImGuiWindowFlags_NoScrollWithMouse);
+  // Known even while another tab hides this one
+  context.viewportDockId = ImGui::GetWindowDockID();
+  // Right after the layout is rebuilt, the dock node can still pick another
+  // tab to show, so keep asking until this tab is the one in front
+  if (m_focusRequested && !ImGui::IsWindowAppearing() &&
+      (visible || !ImGui::IsWindowDocked()))
+    m_focusRequested = false;
+  if (visible) {
     ImVec2 viewportAvail = ImGui::GetContentRegionAvail();
     context.viewportPos = sf::Vector2f(ImGui::GetCursorScreenPos().x,
                                        ImGui::GetCursorScreenPos().y);
@@ -26,10 +37,16 @@ void SceneViewportPanel::OnImGuiRender(EditorContext &context, Scene &scene,
     unsigned int height =
         static_cast<unsigned int>(std::max(1.0f, viewportAvail.y));
 
-    // Dynamic resize of the off-screen RenderTexture
-    if (m_currentTextureSize.x != width || m_currentTextureSize.y != height) {
+    // Dynamic resize of the off-screen RenderTexture. After a failed resize
+    // the old target can't be trusted, so skip drawing and retry next frame
+    bool targetReady = viewportAvail.x >= 1.0f && viewportAvail.y >= 1.0f;
+    if (targetReady &&
+        (m_currentTextureSize.x != width || m_currentTextureSize.y != height)) {
       if (m_viewportTexture.resize(sf::Vector2u(width, height))) {
         m_currentTextureSize = sf::Vector2u(width, height);
+      } else {
+        m_currentTextureSize = {0, 0};
+        targetReady = false;
       }
     }
 
@@ -47,11 +64,13 @@ void SceneViewportPanel::OnImGuiRender(EditorContext &context, Scene &scene,
     renderer.drawPhysicsColliders = context.drawPhysicsColliders;
     renderer.drawAABBs = context.drawAABBs;
     renderer.pixelsPerMeter = context.pixelsPerMeter;
-    renderer.Render(m_viewportTexture, scene, view);
-    m_viewportTexture.display();
+    if (targetReady) {
+      renderer.Render(m_viewportTexture, scene, view);
+      m_viewportTexture.display();
 
-    // Display texture in ImGui
-    ImGui::Image(m_viewportTexture);
+      // Display texture in ImGui
+      ImGui::Image(m_viewportTexture);
+    }
 
     // Independent Viewport Camera Controls
     if (context.isViewportHovered) {

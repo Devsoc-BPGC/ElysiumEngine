@@ -31,6 +31,7 @@ Custom behaviors derive from `Elysium::Script`:
 - `OnUpdate(float dt)`: Invoked once per simulation frame with delta time in seconds.
 - `OnDestroy()`: Invoked when the entity or script is detached/destroyed.
 - `entity`: Direct member pointer to the owning `Entity` handle.
+- `Clone()` (required): return a copy of the script, e.g. `return std::make_unique<MyScript>(*this);`. Play mode runs a copy of the scene; the copy's `entity` is re-pointed at the copied object automatically, and the active scene (`GetActiveScene()`) is the copy for the length of the play session.
 
 ### Spawning & World Abstraction
 World functions (`SpawnBox`, `SpawnCircle`, `SpawnStaticBox`, `SpawnStaticCircle`) automate multi-step setup:

@@ -37,6 +37,12 @@ public:
     void Update(float dt) override {
         OnUpdate(dt);
     }
+
+    /**
+     * @brief Points `entity` at the copied GameObject when Play mode copies
+     * the scene, so the copy's script drives the copy, not the original.
+     */
+    void OnCloned(const std::shared_ptr<GameObject> &owner) override;
 };
 
 } // namespace Elysium

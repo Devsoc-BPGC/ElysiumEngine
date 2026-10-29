@@ -25,6 +25,9 @@ public:
 
   void AddTexture(std::shared_ptr<const Texture> texture);
 
+  // Deep copy for Play mode: simulating the copy leaves this scene untouched
+  std::unique_ptr<Scene> Clone() const;
+
   void Update(float dt);
 };
 

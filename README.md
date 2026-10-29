@@ -595,6 +595,11 @@ public:
   void Update(float dt) override {
     // Regenerate or check health
   }
+
+  // Required: Play mode copies the scene, components included
+  std::unique_ptr<Component> Clone() const override {
+    return std::make_unique<HealthComponent>(*this);
+  }
 };
 
 // Attach to an entity:
