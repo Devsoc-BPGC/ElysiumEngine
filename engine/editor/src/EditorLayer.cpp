@@ -16,12 +16,27 @@
 #include "panels/StatsPanel.hpp"
 #include "panels/ToolbarPanel.hpp"
 #include <algorithm>
+#include <filesystem>
 #include <imgui-SFML.h>
 #include <imgui.h>
 #include <imgui_internal.h>
 #include "AudioSourceComponent.hpp"
 
 namespace Elysium {
+
+namespace {
+constexpr float EditorUiScale = 1.25f;
+constexpr float EditorFontSize = 20.0f;
+constexpr char EditorFontPath[] = "assets/fonts/Roboto-Medium.ttf";
+
+ImFont *LoadEditorFont(ImFontAtlas *fonts) {
+  std::error_code error;
+  if (!std::filesystem::exists(EditorFontPath, error))
+    return nullptr;
+
+  return fonts->AddFontFromFileTTF(EditorFontPath, EditorFontSize);
+}
+}
 
 EditorLayer::EditorLayer() : Layer("EditorLayer") {
   // Configure default scene
@@ -58,6 +73,13 @@ void EditorLayer::Init(sf::RenderWindow &window) {
   ImGuiIO &io = ImGui::GetIO();
   io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+  if (ImFont *font = LoadEditorFont(io.Fonts)) {
+    io.FontDefault = font;
+    if (!ImGui::SFML::UpdateFontTexture())
+      ELYSIUM_CORE_WARN("Failed to update the editor font texture");
+  } else {
+    ELYSIUM_CORE_WARN("Bundled editor font is unavailable; using the default ImGui font");
+  }
 
   // Configure ImGui layout persistence: tie to active project or disable to avoid cwd pollution
   if (auto project = Project::GetActive()) {
@@ -229,15 +251,7 @@ bool EditorLayer::OnKeyPressed(KeyPressedEvent &e) {
 
   // Delete: Delete selected entity
   if (e.GetKeyCode() == sf::Keyboard::Key::Delete && m_context.selectedEntity) {
-    if (m_context.selectedEntity->rigidBody) {
-      m_scene.physicsWorld.RemoveBody(
-          m_context.selectedEntity->rigidBody.get());
-    }
-    auto it = std::find(m_scene.objects.begin(), m_scene.objects.end(),
-                        m_context.selectedEntity);
-    if (it != m_scene.objects.end()) {
-      m_scene.objects.erase(it);
-    }
+    m_scene.DestroyEntityByUUID(m_context.selectedEntity->GetUUID());
     m_context.selectedEntity = nullptr;
     return true;
   }
@@ -428,7 +442,7 @@ void EditorLayer::RenderMenuBar(Scene &scene) {
       ImGui::Separator();
 
       if (ImGui::MenuItem("New Scene", "Ctrl+N")) {
-        scene.objects.clear();
+        scene.Clear();
         m_context.selectedEntity = nullptr;
         ELYSIUM_INFO("New Scene created");
       }
@@ -459,15 +473,7 @@ void EditorLayer::RenderMenuBar(Scene &scene) {
       if (ImGui::MenuItem("Delete Selected Entity", "Del", false,
                           hasSelection)) {
         if (m_context.selectedEntity) {
-          if (m_context.selectedEntity->rigidBody) {
-            scene.physicsWorld.RemoveBody(
-                m_context.selectedEntity->rigidBody.get());
-          }
-          auto it = std::find(scene.objects.begin(), scene.objects.end(),
-                              m_context.selectedEntity);
-          if (it != scene.objects.end()) {
-            scene.objects.erase(it);
-          }
+          scene.DestroyEntityByUUID(m_context.selectedEntity->GetUUID());
           m_context.selectedEntity = nullptr;
         }
       }
@@ -495,7 +501,7 @@ void EditorLayer::RenderMenuBar(Scene &scene) {
         m_context.camera.Reset();
       }
       if (ImGui::MenuItem("Clear All Objects")) {
-        scene.objects.clear();
+        scene.Clear();
         m_context.selectedEntity = nullptr;
       }
       ImGui::EndMenu();
@@ -549,10 +555,14 @@ void EditorLayer::RenderMenuBar(Scene &scene) {
           ApplyModernDarkTheme();
         }
         if (ImGui::MenuItem("ImGui Classic")) {
+          ImGui::GetStyle() = ImGuiStyle();
           ImGui::StyleColorsClassic();
+          ImGui::GetStyle().ScaleAllSizes(EditorUiScale);
         }
         if (ImGui::MenuItem("ImGui Light")) {
+          ImGui::GetStyle() = ImGuiStyle();
           ImGui::StyleColorsLight();
+          ImGui::GetStyle().ScaleAllSizes(EditorUiScale);
         }
         ImGui::EndMenu();
       }
@@ -713,6 +723,7 @@ void EditorLayer::Shutdown() {
 
 void EditorLayer::ApplyModernDarkTheme() {
   ImGuiStyle &style = ImGui::GetStyle();
+  style = ImGuiStyle();
   style.WindowRounding = 5.0f;
   style.ChildRounding = 4.0f;
   style.FrameRounding = 3.0f;
@@ -763,6 +774,7 @@ void EditorLayer::ApplyModernDarkTheme() {
   colors[ImGuiCol_TabUnfocusedActive] = ImVec4(0.16f, 0.18f, 0.24f, 1.00f);
   colors[ImGuiCol_DockingPreview] = ImVec4(0.35f, 0.65f, 1.00f, 0.70f);
   colors[ImGuiCol_DockingEmptyBg] = ImVec4(0.10f, 0.10f, 0.12f, 1.00f);
+  style.ScaleAllSizes(EditorUiScale);
 }
 
 } // namespace Elysium

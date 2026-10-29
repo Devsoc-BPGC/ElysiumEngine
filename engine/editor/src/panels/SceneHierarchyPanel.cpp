@@ -120,15 +120,8 @@ void SceneHierarchyPanel::OnImGuiRender(EditorContext &context, Scene &scene,
       if (context.selectedEntity == entityToDelete) {
         context.selectedEntity = nullptr;
       }
-      if (entityToDelete->rigidBody) {
-        scene.physicsWorld.RemoveBody(entityToDelete->rigidBody.get());
-      }
-      auto it =
-          std::find(scene.objects.begin(), scene.objects.end(), entityToDelete);
-      if (it != scene.objects.end()) {
-        ELYSIUM_INFO("Deleted Entity: {}", entityToDelete->name);
-        scene.objects.erase(it);
-      }
+      ELYSIUM_INFO("Deleted Entity: {}", entityToDelete->name);
+      scene.DestroyEntityByUUID(entityToDelete->GetUUID());
     }
 
     // Right-click on blank window space

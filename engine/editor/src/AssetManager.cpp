@@ -559,4 +559,20 @@ std::shared_ptr<Scene> AssetManager::Load<Scene>(AssetHandle handle) {
   return scene;
 }
 
+bool AssetManager::IsTextureFile(const std::filesystem::path &path) {
+  std::string ext = path.extension().string();
+  std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) {
+    return static_cast<char>(std::tolower(c));
+  });
+  return (ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".tga" || ext == ".bmp");
+}
+
+AssetHandle AssetManager::GetOrCreateAssetHandle(const std::filesystem::path &path) {
+  auto &am = AssetManager::Get();
+  if (am.HasAsset(path)) {
+    return am.GetHandleFromPath(path);
+  }
+  return am.RegisterAsset(path, AssetType::Texture);
+}
+
 } // namespace Elysium

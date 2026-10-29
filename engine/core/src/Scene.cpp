@@ -27,6 +27,13 @@ GameObject *Scene::GetEntityByUUID(Elysium::UUID uuid) {
   return nullptr;
 }
 
+void Scene::AddTexture(std::shared_ptr<const Texture> texture) {
+  if (!texture)
+    return;
+
+  textures.push_back(texture);
+}
+
 bool Scene::DestroyEntityByUUID(Elysium::UUID uuid) {
   auto it = m_EntityMap.find(uuid);
   if (it == m_EntityMap.end()) {
@@ -59,6 +66,7 @@ bool Scene::DestroyEntityByUUID(Elysium::UUID uuid) {
 
 std::unique_ptr<Scene> Scene::Clone() const {
   auto copy = std::make_unique<Scene>();
+  copy->textures = textures; // read-only, so both scenes can share them
   copy->physicsWorld = physicsWorld; // gravity, boundary, etc.
   copy->physicsWorld.rigidBodies.clear();
 
@@ -113,4 +121,17 @@ void Scene::Update(float dt) {
   for (auto &obj : objects) {
     obj->SyncPhysics();
   }
+}
+
+void Scene::Clear() {
+  for (auto &obj : objects) {
+    if (obj && obj->rigidBody) {
+      physicsWorld.RemoveBody(obj->rigidBody.get());
+    }
+  }
+
+  objects.clear();
+  m_EntityMap.clear();
+
+  ELYSIUM_CORE_INFO("Scene cleared");
 }
