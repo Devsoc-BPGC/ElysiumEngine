@@ -9,10 +9,8 @@ SceneViewportPanel::SceneViewportPanel() : EditorPanel("Scene Viewport") {}
 
 void SceneViewportPanel::OnImGuiRender(EditorContext &context, Scene &scene,
                                        SimpleRenderer &renderer) {
-  if (m_focusRequested) {
+  if (m_focusRequested)
     ImGui::SetNextWindowFocus();
-    m_focusRequested = false;
-  }
 
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
   const bool visible = ImGui::Begin("Scene Viewport", &isOpen,
@@ -20,6 +18,11 @@ void SceneViewportPanel::OnImGuiRender(EditorContext &context, Scene &scene,
                                         ImGuiWindowFlags_NoScrollWithMouse);
   // Known even while another tab hides this one
   context.viewportDockId = ImGui::GetWindowDockID();
+  // Right after the layout is rebuilt, the dock node can still pick another
+  // tab to show, so keep asking until this tab is the one in front
+  if (m_focusRequested && !ImGui::IsWindowAppearing() &&
+      (visible || !ImGui::IsWindowDocked()))
+    m_focusRequested = false;
   if (visible) {
     ImVec2 viewportAvail = ImGui::GetContentRegionAvail();
     context.viewportPos = sf::Vector2f(ImGui::GetCursorScreenPos().x,
