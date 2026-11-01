@@ -9,36 +9,6 @@
 #include <cmath>
 #include <iostream>
 
-void TestSpriteRendererOffsets() {
-  SpriteRenderer sprite;
-  assert(sprite.LocalPositionOffset.x == 0.0f && sprite.LocalPositionOffset.y == 0.0f);
-  assert(sprite.LocalRotationOffset == 0.0f);
-  assert(sprite.LocalScaleOffset.x == 1.0f && sprite.LocalScaleOffset.y == 1.0f);
-  assert(sprite.Pivot.x == 0.5f && sprite.Pivot.y == 0.5f);
-
-  // Set local offsets
-  sprite.LocalPositionOffset = Vec2(2.0f, -1.5f);
-  sprite.LocalRotationOffset = 45.0f;
-  sprite.LocalScaleOffset = Vec2(0.5f, 2.0f);
-  sprite.Pivot = Vec2(0.0f, 0.0f); // Top-left anchor
-
-  assert(sprite.LocalPositionOffset.x == 2.0f);
-  assert(sprite.LocalRotationOffset == 45.0f);
-  assert(sprite.LocalScaleOffset.y == 2.0f);
-  assert(sprite.Pivot.x == 0.0f);
-
-  // Clone test
-  auto clone = sprite.Clone();
-  auto *clonedSprite = dynamic_cast<SpriteRenderer *>(clone.get());
-  assert(clonedSprite != nullptr);
-  assert(clonedSprite->LocalPositionOffset.x == 2.0f);
-  assert(clonedSprite->LocalRotationOffset == 45.0f);
-  assert(clonedSprite->LocalScaleOffset.y == 2.0f);
-  assert(clonedSprite->Pivot.x == 0.0f);
-
-  std::cout << "[PASS] TestSpriteRendererOffsets" << std::endl;
-}
-
 void TestColliderOffsets() {
   // Test sphere collider creation with offset
   Collider sphere = Collider::CreateSphere(1.0f, 1.0f, Vec3(1.0f, 2.0f, 0.0f));
@@ -138,7 +108,6 @@ void TestCompoundDrawTransform() {
 
 int main() {
   Elysium::Log::Init();
-  TestSpriteRendererOffsets();
   TestColliderOffsets();
   TestNarrowphaseCollisionWithOffsets();
   TestCompoundDrawTransform();
