@@ -189,6 +189,7 @@ if(BUILD_TESTING)
     elysium_add_test(AssetManagerTest          test/AssetManagerTest.cpp)
     elysium_add_test(ProjectTest               test/ProjectTest.cpp)
     elysium_add_test(SceneCloneTest            test/SceneCloneTest.cpp)
+    elysium_add_test(ComponentOffsetsTest      test/ComponentOffsetsTest.cpp)
 endif()
 
 # ============================================================

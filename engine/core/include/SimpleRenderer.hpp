@@ -94,40 +94,65 @@ public:
       // Render SpriteRenderer component if attached
       auto *sprite = obj->GetComponent<SpriteRenderer>();
       if (sprite) {
+        // Calculate compound transform
+        Quat q = obj->rotation;
+        float objAngleDeg = 2.0f * std::atan2(q.z, q.w) * 180.0f / PI;
+        float totalAngleDeg = objAngleDeg + sprite->LocalRotationOffset;
+
+        // Position: parent position + rotated & scaled local offset
+        Vec3 scaledOffset(sprite->LocalPositionOffset.x * obj->scale.x,
+                          sprite->LocalPositionOffset.y * obj->scale.y, 0.0f);
+        Vec3 worldPos = obj->position + obj->rotation.RotateVector(scaledOffset);
+        sf::Vector2f screenPos(worldPos.x * ptm, worldPos.y * ptm);
+
+        // Compound scale
+        sf::Vector2f compoundScale(obj->scale.x * sprite->LocalScaleOffset.x,
+                                  obj->scale.y * sprite->LocalScaleOffset.y);
+
         if (sprite->isTextured) {
           sf::Sprite spriteRenderer(sprite->texture->GetTexture());
-          spriteRenderer.setOrigin(
-              {sprite->size.x * 0.5f * ptm, sprite->size.y * 0.5f * ptm});
-          spriteRenderer.setPosition({obj->position.x * ptm, obj->position.y * ptm});
+          // Size in pixels based on texture size or custom size
+          auto texSize = sprite->texture->GetTexture().getSize();
+          float texW = static_cast<float>(texSize.x);
+          float texH = static_cast<float>(texSize.y);
+          spriteRenderer.setOrigin({texW * sprite->Pivot.x,
+                                   texH * sprite->Pivot.y});
+          // Texture scale must also account for sprite->size relative to texture dimensions
+          float sx = (sprite->size.x * ptm) / (texW > 0.0f ? texW : 1.0f);
+          float sy = (sprite->size.y * ptm) / (texH > 0.0f ? texH : 1.0f);
+          spriteRenderer.setScale({compoundScale.x * sx, compoundScale.y * sy});
+          spriteRenderer.setPosition(screenPos);
           spriteRenderer.setColor(sprite->color);
-          Quat q = obj->rotation;
-          float angle = 2.0f * std::atan2(q.z, q.w) * 180.0f / PI;
-          spriteRenderer.setRotation(sf::degrees(angle));
+          spriteRenderer.setRotation(sf::degrees(totalAngleDeg));
           target.draw(spriteRenderer);
           drawCalls++;
         } else {
-            if (sprite->isCircle) {
-              float screenRadius = sprite->radius * ptm;
-              sf::CircleShape shape(screenRadius);
-              shape.setFillColor(sprite->color);
-              shape.setOrigin({screenRadius, screenRadius});
-              shape.setPosition({obj->position.x * ptm, obj->position.y * ptm});
-              target.draw(shape);
-              drawCalls++;
-              primitivesCount++;
-            } else {
-              sf::RectangleShape shape;
-              shape.setSize({sprite->size.x * ptm, sprite->size.y * ptm});
-              shape.setOrigin(
-                  {sprite->size.x * 0.5f * ptm, sprite->size.y * 0.5f * ptm});
-              shape.setPosition({obj->position.x * ptm, obj->position.y * ptm});
-              shape.setFillColor(sprite->color);
-              Quat q = obj->rotation;
-              float angle = 2.0f * std::atan2(q.z, q.w) * 180.0f / PI;
-              shape.setRotation(sf::degrees(angle));
-              target.draw(shape);
-              drawCalls++;
-              primitivesCount++;
+          if (sprite->isCircle) {
+            float screenRadius = sprite->radius * ptm;
+            sf::CircleShape shape(screenRadius);
+            shape.setFillColor(sprite->color);
+            // Pivot on circle: bounding box width and height is 2 * screenRadius
+            shape.setOrigin({2.0f * screenRadius * sprite->Pivot.x,
+                             2.0f * screenRadius * sprite->Pivot.y});
+            shape.setScale(compoundScale);
+            shape.setPosition(screenPos);
+            shape.setRotation(sf::degrees(totalAngleDeg));
+            target.draw(shape);
+            drawCalls++;
+            primitivesCount++;
+          } else {
+            sf::RectangleShape shape;
+            float w = sprite->size.x * ptm;
+            float h = sprite->size.y * ptm;
+            shape.setSize({w, h});
+            shape.setOrigin({w * sprite->Pivot.x, h * sprite->Pivot.y});
+            shape.setScale(compoundScale);
+            shape.setPosition(screenPos);
+            shape.setFillColor(sprite->color);
+            shape.setRotation(sf::degrees(totalAngleDeg));
+            target.draw(shape);
+            drawCalls++;
+            primitivesCount++;
           }
         }
       }

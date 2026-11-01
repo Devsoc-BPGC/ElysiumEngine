@@ -260,11 +260,10 @@ void EntityInspectorPanel::DrawCollidersComponent(EditorContext &context,
         }
       }
 
-      // Local Centroid Offset (x, y)
-      float offset[2] = {col.localCentroid.x, col.localCentroid.y};
+      // Local Offset (x, y)
+      float offset[2] = {col.offset.x, col.offset.y};
       if (ImGui::DragFloat2("Offset (m)", offset, 0.02f)) {
-        col.localCentroid.x = offset[0];
-        col.localCentroid.y = offset[1];
+        col.SetOffset(Vec2(offset[0], offset[1]));
         propertiesChanged = true;
       }
 
@@ -291,6 +290,29 @@ void EntityInspectorPanel::DrawSpriteRendererComponent(EditorContext &context,
 
   if (ImGui::CollapsingHeader("Sprite Renderer",
                               ImGuiTreeNodeFlags_DefaultOpen)) {
+    // Transform Offsets
+    if (ImGui::TreeNodeEx("Transform Offsets", ImGuiTreeNodeFlags_DefaultOpen)) {
+      float posOffset[2] = {sprite->LocalPositionOffset.x, sprite->LocalPositionOffset.y};
+      if (ImGui::DragFloat2("Position Offset", posOffset, 0.02f)) {
+        sprite->LocalPositionOffset = Vec2(posOffset[0], posOffset[1]);
+      }
+
+      ImGui::DragFloat("Rotation Offset", &sprite->LocalRotationOffset, 1.0f, -360.0f, 360.0f, "%.1f deg");
+
+      float scaleOffset[2] = {sprite->LocalScaleOffset.x, sprite->LocalScaleOffset.y};
+      if (ImGui::DragFloat2("Scale Offset", scaleOffset, 0.02f, 0.01f, 100.0f)) {
+        sprite->LocalScaleOffset = Vec2(scaleOffset[0], scaleOffset[1]);
+      }
+
+      float pivotAnchor[2] = {sprite->Pivot.x, sprite->Pivot.y};
+      if (ImGui::DragFloat2("Pivot Anchor", pivotAnchor, 0.01f, 0.0f, 1.0f, "%.2f")) {
+        sprite->Pivot = Vec2(pivotAnchor[0], pivotAnchor[1]);
+      }
+
+      ImGui::TreePop();
+      ImGui::Separator();
+    }
+
     // Shape toggle
     const char *shapes[] = {"Box / Rectangle", "Circle / Sphere"};
     int currentShape = sprite->isCircle ? 1 : 0;
