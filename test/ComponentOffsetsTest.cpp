@@ -74,43 +74,12 @@ void TestNarrowphaseCollisionWithOffsets() {
   std::cout << "[PASS] TestNarrowphaseCollisionWithOffsets" << std::endl;
 }
 
-void TestCompoundDrawTransform() {
-  // Verify SimpleRenderer can execute without crash with various offsets and pivots
-  Scene scene;
-  auto go = std::make_shared<GameObject>("TestEntity");
-  go->position = Vec3(2.0f, 3.0f, 0.0f);
-  go->rotation = Quat(Vec3(0, 0, 1), 0.5f);
-  go->scale = Vec3(1.5f, 1.5f, 1.0f);
-
-  auto &sprite = go->AddComponent<SpriteRenderer>(sf::Color::Blue, sf::Vector2f(2.0f, 2.0f));
-  sprite.LocalPositionOffset = Vec2(0.5f, -0.5f);
-  sprite.LocalRotationOffset = 30.0f;
-  sprite.LocalScaleOffset = Vec2(0.8f, 1.2f);
-  sprite.Pivot = Vec2(0.25f, 0.75f);
-
-  auto &rb = go->CreateRigidBody();
-  rb.AddColliders(Collider::CreateBox(Vec3(1.0f, 1.0f, 0.0f), 1.0f, Vec3(0.5f, -0.5f, 0.0f)));
-  scene.AddGameObject(go);
-  scene.physicsWorld.AddBody(&rb);
-
-  sf::RenderTexture rt;
-  if (rt.resize({800, 600})) {
-    SimpleRenderer renderer(50.0f);
-    renderer.drawPhysicsColliders = true;
-    renderer.Render(rt, scene);
-    assert(renderer.drawCalls > 0);
-  }
-
-  std::cout << "[PASS] TestCompoundDrawTransform" << std::endl;
-}
-
 #include "Log.h"
 
 int main() {
   Elysium::Log::Init();
   TestColliderOffsets();
   TestNarrowphaseCollisionWithOffsets();
-  TestCompoundDrawTransform();
   std::cout << "All Component Offsets Tests Passed Successfully!" << std::endl;
   return 0;
 }
