@@ -2,6 +2,7 @@
 #define SPRITERENDERER_HPP
 
 #include "Component.hpp"
+#include "CoreMath.hpp"
 #include "Texture.hpp"
 #include <SFML/Graphics/Color.hpp>
 #include <SFML/System/Vector2.hpp>
@@ -15,6 +16,12 @@ public:
   bool isCircle = false;
   bool isTextured = false;
   uint64_t textureHandle = 0;
+
+  // Local spatial offsets
+  Vec2 LocalPositionOffset = {0.0f, 0.0f};
+  float LocalRotationOffset = 0.0f; // in degrees
+  Vec2 LocalScaleOffset = {1.0f, 1.0f};
+  Vec2 Pivot = {0.5f, 0.5f}; // Normalized origin: 0.5 = center, 0.0 = top-left
 
   SpriteRenderer() = default;
   SpriteRenderer(sf::Color col, sf::Vector2f sz)
@@ -40,5 +47,12 @@ public:
     return std::make_unique<SpriteRenderer>(*this);
   }
 };
+
+using SpriteRendererComponent = SpriteRenderer;
+
+namespace Elysium {
+using SpriteRenderer = ::SpriteRenderer;
+using SpriteRendererComponent = ::SpriteRenderer;
+}
 
 #endif // SPRITERENDERER_HPP
