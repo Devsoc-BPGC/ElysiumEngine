@@ -28,6 +28,7 @@ public:
   // Deep copy for Play mode: simulating the copy leaves this scene untouched
   std::unique_ptr<Scene> Clone() const;
 
+  void UpdateTransforms();
   void Update(float dt);
 };
 
