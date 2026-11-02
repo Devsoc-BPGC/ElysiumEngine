@@ -190,6 +190,7 @@ if(BUILD_TESTING)
     elysium_add_test(ProjectTest               test/ProjectTest.cpp)
     elysium_add_test(SceneCloneTest            test/SceneCloneTest.cpp)
     elysium_add_test(ComponentOffsetsTest      test/ComponentOffsetsTest.cpp)
+    elysium_add_test(SceneGraphTest            test/SceneGraphTest.cpp)
 endif()
 
 # ============================================================

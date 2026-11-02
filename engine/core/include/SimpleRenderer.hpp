@@ -94,20 +94,23 @@ public:
       // Render SpriteRenderer component if attached
       auto *sprite = obj->GetComponent<SpriteRenderer>();
       if (sprite) {
-        // Calculate compound transform
-        Quat q = obj->rotation;
+        // Calculate compound transform using world transform
+        Vec3 objWorldPos = obj->GetWorldPosition();
+        Quat q = obj->GetWorldRotation();
+        Vec3 objWorldScale = obj->GetWorldScale();
+
         float objAngleDeg = 2.0f * std::atan2(q.z, q.w) * 180.0f / PI;
         float totalAngleDeg = objAngleDeg + sprite->LocalRotationOffset;
 
-        // Position: parent position + rotated & scaled local offset
-        Vec3 scaledOffset(sprite->LocalPositionOffset.x * obj->scale.x,
-                          sprite->LocalPositionOffset.y * obj->scale.y, 0.0f);
-        Vec3 worldPos = obj->position + obj->rotation.RotateVector(scaledOffset);
+        // Position: world position + rotated & scaled local offset
+        Vec3 scaledOffset(sprite->LocalPositionOffset.x * objWorldScale.x,
+                          sprite->LocalPositionOffset.y * objWorldScale.y, 0.0f);
+        Vec3 worldPos = objWorldPos + q.RotateVector(scaledOffset);
         sf::Vector2f screenPos(worldPos.x * ptm, worldPos.y * ptm);
 
         // Compound scale
-        sf::Vector2f compoundScale(obj->scale.x * sprite->LocalScaleOffset.x,
-                                  obj->scale.y * sprite->LocalScaleOffset.y);
+        sf::Vector2f compoundScale(objWorldScale.x * sprite->LocalScaleOffset.x,
+                                  objWorldScale.y * sprite->LocalScaleOffset.y);
 
         if (sprite->isTextured) {
           sf::Sprite spriteRenderer(sprite->texture->GetTexture());
