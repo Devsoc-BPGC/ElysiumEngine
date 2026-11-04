@@ -61,9 +61,32 @@ public:
    * @param verticesB Vertices of Polygon B in world space (ordered CW or CCW).
    * @return SATResult with collision flag, penetration depth, and normal from A to B.
    */
-  static SATResult TestPolygonPolygon(const std::vector<Vec3> &verticesA,
-                                      const std::vector<Vec3> &verticesB);
+  static SATResult TestPolygonPolygon(const std::vector<Vec3> &verticesA, const std::vector<Vec3> &verticesB);
+
+   
+   
+  /**
+   * @brief Projects a 2D circle onto a unit axis.
+   */
+  static Projection ProjectCircle(const Vec3 &center, float radius, const Vec3 &axis);
+
+  /**
+   * @brief Tests for intersection between a convex polygon and a circle using SAT.
+   * @param polygonVertices World-space vertices of the polygon.
+   * @param circleCenter World-space center of the circle.
+   * @param circleRadius Radius of the circle.
+   * @return SATResult with collision flag, penetration depth, and normal pointing from Polygon to Circle.
+   */
+  static SATResult TestPolygonCircle(const std::vector<Vec3> &polygonVertices, const Vec3 &circleCenter, float circleRadius);
+
+  /**
+   * @brief Convenience overload: Circle as Shape A, Polygon as Shape B.
+   * Normal points from Circle to Polygon.
+   */
+  static SATResult TestCirclePolygon(const Vec3 &circleCenter, float circleRadius, const std::vector<Vec3> &polygonVertices);
 };
+
+
 
 } // namespace Elysium
 
