@@ -82,3 +82,53 @@ int main() {
   std::cout << "\nAll SAT Tests passed successfully!" << std::endl;
   return 0;
 }
+
+void TestNonCollidingPolygonCircle() {
+  std::vector<Vec3> box = {
+    Vec3(0, 0, 0), Vec3(2, 0, 0), Vec3(2, 2, 0), Vec3(0, 2, 0)
+  };
+  Vec3 circleCenter(5.0f, 1.0f, 0.0f);
+  float radius = 1.0f;
+
+  SATResult result = SAT::TestPolygonCircle(box, circleCenter, radius);
+  assert(!result.collided);
+  std::cout << "[PASS] TestNonCollidingPolygonCircle" << std::endl;
+}
+
+void TestOverlappingPolygonCircleWithMTV() {
+  // Box: [0, 2] x [0, 2], right edge at x = 2
+  std::vector<Vec3> box = {
+    Vec3(0, 0, 0), Vec3(2, 0, 0), Vec3(2, 2, 0), Vec3(0, 2, 0)
+  };
+  // Circle center at (2.5, 1.0) with radius 1.0 -> overlaps right edge by 0.5
+  Vec3 circleCenter(2.5f, 1.0f, 0.0f);
+  float radius = 1.0f;
+
+  SATResult result = SAT::TestPolygonCircle(box, circleCenter, radius);
+  assert(result.collided);
+  assert(std::abs(result.depth - 0.5f) < 1e-4f);
+  // Normal points from Polygon towards Circle (+X direction)
+  assert(result.normal.x > 0.99f);
+  std::cout << "[PASS] TestOverlappingPolygonCircleWithMTV (depth: " << result.depth << ")" << std::endl;
+}
+
+void TestCircleNearPolygonCorner() {
+  // Box: [0, 2] x [0, 2], corner at (2, 2)
+  std::vector<Vec3> box = {
+    Vec3(0, 0, 0), Vec3(2, 0, 0), Vec3(2, 2, 0), Vec3(0, 2, 0)
+  };
+
+  // Case A: Circle diagonally separated near the corner
+  // Distance from corner (2,2) to (3.0, 3.0) is sqrt(2) ≈ 1.414 > 1.0
+  Vec3 separatedCircle(3.0f, 3.0f, 0.0f);
+  SATResult resA = SAT::TestPolygonCircle(box, separatedCircle, 1.0f);
+  assert(!resA.collided);
+
+  // Case B: Circle overlapping the diagonal corner
+  // Distance from (2,2) to (2.5, 2.5) is sqrt(0.5) ≈ 0.707 < 1.0 -> Colliding!
+  Vec3 overlappingCircle(2.5f, 2.5f, 0.0f);
+  SATResult resB = SAT::TestPolygonCircle(box, overlappingCircle, 1.0f);
+  assert(resB.collided);
+
+  std::cout << "[PASS] TestCircleNearPolygonCorner" << std::endl;
+}
