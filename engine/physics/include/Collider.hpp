@@ -22,9 +22,12 @@ public:
   // Shape-specific data
   float radius;     // For Sphere/Circle
   Vec3 halfExtents; // For Box
+   std::vector<Vec3> localVertices;  // For Polygon (Local coordinates)
 
   // 2D Spatial offset
   Vec2 offset = {0.0f, 0.0f};
+
+  
 
   void SetOffset(const Vec2 &off) {
     offset = off;
@@ -36,7 +39,7 @@ public:
     offset.x = localCentroid.x;
     offset.y = localCentroid.y;
   }
-  std::vector<Vec3> localVertices;  // For Polygon (Local coordinates)
+
   /**
    * @brief Constructor for a Circle (Sphere in 3D math terms).
    * @param r Radius of the circle.
