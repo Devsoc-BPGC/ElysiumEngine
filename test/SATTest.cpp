@@ -79,6 +79,9 @@ int main() {
   TestOverlappingBoxesWithMTV();
   TestRotatedPolygonTriangleVsBox();
   TestTouchingBoundaryEdgeContact();
+  TestNonCollidingPolygonCircle();
+  TestOverlappingPolygonCircleWithMTV();
+  TestCircleNearPolygonCorner();
   std::cout << "\nAll SAT Tests passed successfully!" << std::endl;
   return 0;
 }
