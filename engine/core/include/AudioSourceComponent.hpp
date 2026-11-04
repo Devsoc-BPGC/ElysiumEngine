@@ -37,6 +37,10 @@ public:
   void Start() override;
   void Update(float dt) override;
 
+  // Copies the settings only; the copy creates its own sound when it first
+  // updates or plays, so stopping one never silences the other
+  std::unique_ptr<Component> Clone() const override;
+
   void Play();
   void Stop();
   void Pause();

@@ -3,6 +3,7 @@
 #include "Input.hpp"
 #include "SpriteRenderer.hpp"
 #include <Elysium.hpp>
+#include <EntryPoint.hpp>
 #include <cstdlib>
 #include <memory>
 #include <ScriptingAPI.hpp>
@@ -11,6 +12,10 @@ class LifeSpan : public Component {
 public:
   float remaining;
   LifeSpan(float duration) : remaining(duration) {}
+
+  std::unique_ptr<Component> Clone() const override {
+    return std::make_unique<LifeSpan>(*this);
+  }
 
   void Update(float dt) override {
     remaining -= dt;
@@ -23,6 +28,10 @@ public:
 class BoxController : public Elysium::Script {
 public:
   float speed = 10.0f;
+
+  std::unique_ptr<Component> Clone() const override {
+    return std::make_unique<BoxController>(*this);
+  }
 
   void OnCreate() override {
     // Tint cyan on start to visually confirm script wrapper control

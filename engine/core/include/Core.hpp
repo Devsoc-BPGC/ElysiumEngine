@@ -9,20 +9,24 @@
 #define ELYSIUM_API
 
 // Platform detection (now defined by CMake, but fallback here)
-#ifndef ELYSIUM_PLATFORM_WINDOWS
-#ifdef _WIN32
+#if defined(ELYSIUM_PLATFORM_WINDOWS) || defined(_WIN32)
+#undef ELYSIUM_PLATFORM_WINDOWS
+#undef ELYSIUM_PLATFORM_LINUX
+#undef ELYSIUM_PLATFORM_MAC
+#undef ELYSIUM_PLATFORM_MACOS
 #define ELYSIUM_PLATFORM_WINDOWS 1
-#endif
-#endif
-
-#ifndef ELYSIUM_PLATFORM_LINUX
-#ifdef __linux__
+#elif defined(ELYSIUM_PLATFORM_MAC) || defined(ELYSIUM_PLATFORM_MACOS) || defined(__APPLE__)
+#undef ELYSIUM_PLATFORM_WINDOWS
+#undef ELYSIUM_PLATFORM_LINUX
+#undef ELYSIUM_PLATFORM_MAC
+#undef ELYSIUM_PLATFORM_MACOS
+#define ELYSIUM_PLATFORM_MAC 1
+#define ELYSIUM_PLATFORM_MACOS 1
+#elif defined(ELYSIUM_PLATFORM_LINUX) || defined(__linux__)
+#undef ELYSIUM_PLATFORM_WINDOWS
+#undef ELYSIUM_PLATFORM_LINUX
+#undef ELYSIUM_PLATFORM_MAC
+#undef ELYSIUM_PLATFORM_MACOS
 #define ELYSIUM_PLATFORM_LINUX 1
 #endif
-#endif
 
-#ifndef ELYSIUM_PLATFORM_MAC
-#ifdef __APPLE__
-#define ELYSIUM_PLATFORM_MAC 1
-#endif
-#endif

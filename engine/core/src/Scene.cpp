@@ -8,12 +8,26 @@ void Scene::AddGameObject(std::shared_ptr<GameObject> obj) {
   if (!obj)
     return;
 
+  obj->SetScene(this);
   objects.push_back(obj);
   m_EntityMap[obj->GetUUID()] = obj;
 
   if (obj->rigidBody) {
     physicsWorld.AddBody(obj->rigidBody.get());
   }
+
+  // Ensure world transform is initialized with hierarchy
+  if (obj->GetTransform().ParentHandle != 0) {
+    GameObject *parent = GetEntityByUUID(obj->GetTransform().ParentHandle);
+    if (parent) {
+      obj->GetTransform().UpdateWorldTransform(parent->GetWorldTransform());
+    } else {
+      obj->GetTransform().UpdateWorldTransform(Mat4::Identity());
+    }
+  } else {
+    obj->GetTransform().UpdateWorldTransform(Mat4::Identity());
+  }
+  obj->SyncTransform();
 
   ELYSIUM_CORE_TRACE("Entity registered to Scene: '{}' [UUID: {}]", obj->name,
                      static_cast<uint64_t>(obj->GetUUID()));
@@ -27,6 +41,13 @@ GameObject *Scene::GetEntityByUUID(Elysium::UUID uuid) {
   return nullptr;
 }
 
+void Scene::AddTexture(std::shared_ptr<const Texture> texture) {
+  if (!texture)
+    return;
+
+  textures.push_back(texture);
+}
+
 bool Scene::DestroyEntityByUUID(Elysium::UUID uuid) {
   auto it = m_EntityMap.find(uuid);
   if (it == m_EntityMap.end()) {
@@ -36,7 +57,25 @@ bool Scene::DestroyEntityByUUID(Elysium::UUID uuid) {
   }
 
   std::shared_ptr<GameObject> entity = it->second;
+
+  // 1. Recursively destroy all children first
   if (entity) {
+    // Copy children list to avoid modifying during iteration
+    auto children = entity->GetTransform().ChildrenHandles;
+    for (Elysium::UUID childUUID : children) {
+      DestroyEntityByUUID(childUUID);
+    }
+
+    // 2. Unparent from parent if parented
+    if (entity->GetTransform().ParentHandle != 0) {
+      GameObject *parent = GetEntityByUUID(entity->GetTransform().ParentHandle);
+      if (parent) {
+        auto &parentChildren = parent->GetTransform().ChildrenHandles;
+        parentChildren.erase(std::remove(parentChildren.begin(), parentChildren.end(), uuid),
+                             parentChildren.end());
+      }
+    }
+
     entity->active = false;
     if (entity->rigidBody) {
       physicsWorld.RemoveBody(entity->rigidBody.get());
@@ -57,14 +96,64 @@ bool Scene::DestroyEntityByUUID(Elysium::UUID uuid) {
   return true;
 }
 
+std::unique_ptr<Scene> Scene::Clone() const {
+  auto copy = std::make_unique<Scene>();
+  copy->textures = textures; // read-only, so both scenes can share them
+  copy->physicsWorld = physicsWorld; // gravity, boundary, etc.
+  copy->physicsWorld.rigidBodies.clear();
+
+  std::unordered_map<const RigidBody *, RigidBody *> bodyCopies;
+  for (const auto &obj : objects) {
+    if (!obj)
+      continue;
+    auto objCopy = obj->Clone();
+    objCopy->SetScene(copy.get());
+    if (obj->rigidBody) {
+      bodyCopies[obj->rigidBody.get()] = objCopy->rigidBody.get();
+    }
+    copy->m_EntityMap[objCopy->GetUUID()] = objCopy;
+    copy->objects.push_back(std::move(objCopy));
+  }
+
+  // Register bodies in the same order as this scene, so the copy simulates
+  // exactly as this scene would
+  for (const RigidBody *body : physicsWorld.rigidBodies) {
+    auto it = bodyCopies.find(body);
+    if (it != bodyCopies.end()) {
+      copy->physicsWorld.AddBody(it->second);
+    }
+  }
+
+  // Update world transforms for all entities in the cloned scene
+  copy->UpdateTransforms();
+
+  return copy;
+}
+
+void Scene::UpdateTransforms() {
+  for (auto &obj : objects) {
+    if (obj && obj->active && obj->GetTransform().ParentHandle == 0) {
+      obj->GetTransform().UpdateWorldTransform(Mat4::Identity());
+      if (obj->rigidBody) {
+        obj->rigidBody->position = obj->GetWorldPosition();
+        obj->rigidBody->orientation = obj->GetWorldRotation().ToMatrix();
+        obj->rigidBody->UpdateGlobalCentroidFromPosition();
+      }
+    }
+  }
+}
+
 void Scene::Update(float dt) {
-  // 1. Update components
+  // 1. Update transforms across scene graph
+  UpdateTransforms();
+
+  // 2. Update components
   for (auto &obj : objects) {
     if (obj->active)
       obj->Update(dt);
   }
 
-  // 2. Cleanup inactive objects
+  // 3. Cleanup inactive objects
   auto it = objects.begin();
   while (it != objects.end()) {
     if (!(*it)->active) {
@@ -78,11 +167,27 @@ void Scene::Update(float dt) {
     }
   }
 
-  // 3. Step physics
+  // 4. Step physics
   physicsWorld.Step(dt);
 
-  // 4. Sync game objects with physics results
+  // 5. Sync game objects with physics results
   for (auto &obj : objects) {
     obj->SyncPhysics();
   }
+
+  // 6. Keep world matrices synchronized after physics integration
+  UpdateTransforms();
+}
+
+void Scene::Clear() {
+  for (auto &obj : objects) {
+    if (obj && obj->rigidBody) {
+      physicsWorld.RemoveBody(obj->rigidBody.get());
+    }
+  }
+
+  objects.clear();
+  m_EntityMap.clear();
+
+  ELYSIUM_CORE_INFO("Scene cleared");
 }

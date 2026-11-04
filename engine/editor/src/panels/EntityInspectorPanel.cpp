@@ -1,10 +1,14 @@
 #include "panels/EntityInspectorPanel.hpp"
+#include "AssetManager.hpp"
 #include "AudioSourceComponent.hpp"
 #include "Collider.hpp"
+#include "FileDialog.hpp"
 #include "Log.h"
+#include "Project.hpp"
 #include "SpriteRenderer.hpp"
 #include <cmath>
 #include <cstring>
+#include <imgui-SFML.h>
 #include <imgui.h>
 
 namespace Elysium {
@@ -256,11 +260,10 @@ void EntityInspectorPanel::DrawCollidersComponent(EditorContext &context,
         }
       }
 
-      // Local Centroid Offset (x, y)
-      float offset[2] = {col.localCentroid.x, col.localCentroid.y};
+      // Local Offset (x, y)
+      float offset[2] = {col.offset.x, col.offset.y};
       if (ImGui::DragFloat2("Offset (m)", offset, 0.02f)) {
-        col.localCentroid.x = offset[0];
-        col.localCentroid.y = offset[1];
+        col.SetOffset(Vec2(offset[0], offset[1]));
         propertiesChanged = true;
       }
 
@@ -287,6 +290,29 @@ void EntityInspectorPanel::DrawSpriteRendererComponent(EditorContext &context,
 
   if (ImGui::CollapsingHeader("Sprite Renderer",
                               ImGuiTreeNodeFlags_DefaultOpen)) {
+    // Transform Offsets
+    if (ImGui::TreeNodeEx("Transform Offsets", ImGuiTreeNodeFlags_DefaultOpen)) {
+      float posOffset[2] = {sprite->LocalPositionOffset.x, sprite->LocalPositionOffset.y};
+      if (ImGui::DragFloat2("Position Offset", posOffset, 0.02f)) {
+        sprite->LocalPositionOffset = Vec2(posOffset[0], posOffset[1]);
+      }
+
+      ImGui::DragFloat("Rotation Offset", &sprite->LocalRotationOffset, 1.0f, -360.0f, 360.0f, "%.1f deg");
+
+      float scaleOffset[2] = {sprite->LocalScaleOffset.x, sprite->LocalScaleOffset.y};
+      if (ImGui::DragFloat2("Scale Offset", scaleOffset, 0.02f, 0.01f, 100.0f)) {
+        sprite->LocalScaleOffset = Vec2(scaleOffset[0], scaleOffset[1]);
+      }
+
+      float pivotAnchor[2] = {sprite->Pivot.x, sprite->Pivot.y};
+      if (ImGui::DragFloat2("Pivot Anchor", pivotAnchor, 0.01f, 0.0f, 1.0f, "%.2f")) {
+        sprite->Pivot = Vec2(pivotAnchor[0], pivotAnchor[1]);
+      }
+
+      ImGui::TreePop();
+      ImGui::Separator();
+    }
+
     // Shape toggle
     const char *shapes[] = {"Box / Rectangle", "Circle / Sphere"};
     int currentShape = sprite->isCircle ? 1 : 0;
@@ -317,6 +343,141 @@ void EntityInspectorPanel::DrawSpriteRendererComponent(EditorContext &context,
                                 static_cast<uint8_t>(color[2] * 255.0f),
                                 static_cast<uint8_t>(color[3] * 255.0f));
     }
+
+    // Helper lambda to assign and synchronize texture on sprite renderer
+    auto assignTexture = [&](AssetHandle handle, const std::filesystem::path &debugPath = "") {
+      sprite->SetTextureHandle(handle);
+      if (static_cast<uint64_t>(handle) != 0) {
+        auto loadedTex = AssetManager::Get().Load<sf::Texture>(handle);
+        if (loadedTex) {
+          sprite->texture = std::make_shared<const Texture>(*loadedTex);
+          sprite->isTextured = true;
+        }
+      } else {
+        sprite->SetTextureHandle(0);
+      }
+      if (!debugPath.empty()) {
+        ELYSIUM_INFO("Assigned texture '{0}' to entity", debugPath.string());
+      }
+    };
+
+    // Ensure texture is loaded if a handle exists but texture is not yet cached on the sprite
+    if (sprite->textureHandle != 0 && !sprite->texture) {
+      auto loadedTex = AssetManager::Get().Load<sf::Texture>(sprite->textureHandle);
+      if (loadedTex) {
+        sprite->texture = std::make_shared<const Texture>(*loadedTex);
+        sprite->isTextured = true;
+      }
+    }
+
+    // Texture slot with Thumbnail Preview and Native File Browser Picking
+    ImGui::Spacing();
+    ImGui::Text("Texture Slot:");
+
+    std::shared_ptr<sf::Texture> sfmlTexture = nullptr;
+    std::string textureLabel = "[ None (Texture2D) ]";
+    if (sprite->textureHandle != 0) {
+      const auto &meta = AssetManager::Get().GetMetadata(sprite->textureHandle);
+      if (static_cast<uint64_t>(meta.handle) != 0) {
+        textureLabel = meta.filePath.filename().string() + " (" +
+                       std::to_string(static_cast<uint64_t>(sprite->textureHandle)) + ")";
+      } else {
+        textureLabel = "Handle: " + std::to_string(static_cast<uint64_t>(sprite->textureHandle));
+      }
+      sfmlTexture = AssetManager::Get().Load<sf::Texture>(sprite->textureHandle);
+    }
+
+    bool openFilePicker = false;
+    float previewWidth = ImGui::GetContentRegionAvail().x - 60.0f;
+    if (previewWidth < 60.0f) previewWidth = 60.0f;
+
+    if (sfmlTexture) {
+      ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.14f, 0.16f, 0.20f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.24f, 0.32f, 0.45f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.30f, 0.40f, 0.58f, 1.0f));
+      if (ImGui::ImageButton("##TextureThumb", *sfmlTexture, sf::Vector2f(32.0f, 32.0f))) {
+        openFilePicker = true;
+      }
+      ImGui::PopStyleColor(3);
+
+      ImGui::SameLine();
+      ImVec2 slotSize(previewWidth - 40.0f, 32.0f);
+      ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.14f, 0.16f, 0.20f, 1.0f));
+      if (ImGui::Button(textureLabel.c_str(), slotSize)) {
+        openFilePicker = true;
+      }
+      ImGui::PopStyleColor();
+    } else {
+      ImVec2 slotSize(previewWidth, 32.0f);
+      ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.14f, 0.16f, 0.20f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.24f, 0.32f, 0.45f, 1.0f));
+      if (ImGui::Button(textureLabel.c_str(), slotSize)) {
+        openFilePicker = true;
+      }
+      ImGui::PopStyleColor(2);
+    }
+
+    if (ImGui::IsItemHovered()) {
+      ImGui::SetTooltip("Click to browse texture from disk or drag-and-drop from Content Browser");
+    }
+
+    // Drag-and-Drop Target for Texture
+    if (ImGui::BeginDragDropTarget()) {
+      if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM")) {
+        // Can be wide-string path or raw 64-bit uint64_t handle
+        if (payload->DataSize > static_cast<int>(sizeof(uint64_t))) {
+          const wchar_t *path = reinterpret_cast<const wchar_t *>(payload->Data);
+          std::filesystem::path texturePath(path);
+          if (AssetManager::IsTextureFile(texturePath)) {
+            AssetHandle handle = AssetManager::GetOrCreateAssetHandle(texturePath);
+            assignTexture(handle, texturePath);
+          }
+        } else if (payload->DataSize == sizeof(uint64_t)) {
+          uint64_t droppedHandle = *reinterpret_cast<const uint64_t *>(payload->Data);
+          const auto &meta = AssetManager::Get().GetMetadata(droppedHandle);
+          assignTexture(droppedHandle, meta.filePath);
+        }
+      } else if (const ImGuiPayload *payload =
+                     ImGui::AcceptDragDropPayload(AssetPayloads::TEXTURE)) {
+        uint64_t droppedHandle = *reinterpret_cast<const uint64_t *>(payload->Data);
+        const auto &meta = AssetManager::Get().GetMetadata(droppedHandle);
+        assignTexture(droppedHandle, meta.filePath);
+      }
+      ImGui::EndDragDropTarget();
+    }
+
+    // Native File Browser Picking Trigger
+    if (openFilePicker) {
+      std::filesystem::path assetDir = Project::GetActiveAssetDirectory();
+      std::vector<FileDialogFilter> filters = {
+          {"Image Files (*.png *.jpg *.tga)", "*.png;*.jpg;*.jpeg;*.tga;*.bmp"},
+          {"All Files (*.*)", "*.*"}};
+      auto selectedFile = FileDialog::OpenFile("Select Texture", assetDir, filters);
+      if (selectedFile.has_value() && !selectedFile->empty()) {
+        std::filesystem::path absPath = *selectedFile;
+        std::error_code ec;
+        std::filesystem::path relPath = std::filesystem::relative(absPath, assetDir, ec);
+        if (ec || relPath.empty()) {
+          relPath = absPath;
+        }
+
+        if (AssetManager::IsTextureFile(absPath)) {
+          AssetHandle handle = AssetManager::GetOrCreateAssetHandle(relPath);
+          assignTexture(handle, relPath);
+        } else {
+          ELYSIUM_WARN("Selected file '{}' is not a recognized texture format", absPath.string());
+        }
+      }
+    }
+
+    ImGui::SameLine();
+    if (ImGui::Button("X##ClearTex", ImVec2(24.0f, 32.0f)) || ImGui::Button("Clear##Tex")) {
+      assignTexture(0);
+    }
+
+    if (ImGui::IsItemHovered()) {
+      ImGui::SetTooltip("Clear assigned texture");
+    }
   }
 }
 
@@ -328,12 +489,27 @@ void EntityInspectorPanel::DrawAudioSourceComponent(EditorContext &context,
     return;
 
   if (ImGui::CollapsingHeader("Audio Source", ImGuiTreeNodeFlags_DefaultOpen)) {
-    // Filepath buffer input
+    // Filepath buffer input with drag-and-drop target
     char pathBuffer[512];
     std::strncpy(pathBuffer, audio->filepath.c_str(), sizeof(pathBuffer) - 1);
     pathBuffer[sizeof(pathBuffer) - 1] = '\0';
     if (ImGui::InputText("Sound File", pathBuffer, sizeof(pathBuffer))) {
       audio->filepath = pathBuffer;
+    }
+
+    // Drag-and-drop target for audio files
+    if (ImGui::BeginDragDropTarget()) {
+      if (const ImGuiPayload *payload =
+              ImGui::AcceptDragDropPayload(AssetPayloads::AUDIO)) {
+        uint64_t droppedHandle = *reinterpret_cast<const uint64_t *>(payload->Data);
+        const auto &meta = AssetManager::Get().GetMetadata(droppedHandle);
+        if (static_cast<uint64_t>(meta.handle) != 0) {
+          audio->filepath = meta.filePath.generic_string();
+          ELYSIUM_INFO("EntityInspector: Dropped audio file '{}' onto entity '{}'",
+                       audio->filepath, entity.name);
+        }
+      }
+      ImGui::EndDragDropTarget();
     }
 
     // Playback preview controls

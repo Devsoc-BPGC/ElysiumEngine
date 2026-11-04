@@ -21,6 +21,20 @@ public:
   // Shape-specific data
   float radius;     // For Sphere/Circle
   Vec3 halfExtents; // For Box
+
+  // 2D Spatial offset
+  Vec2 offset = {0.0f, 0.0f};
+
+  void SetOffset(const Vec2 &off) {
+    offset = off;
+    localCentroid.x = off.x;
+    localCentroid.y = off.y;
+  }
+
+  void SyncOffsetFromCentroid() {
+    offset.x = localCentroid.x;
+    offset.y = localCentroid.y;
+  }
   std::vector<Vec3> localVertices;  // For Polygon (Local coordinates)
   /**
    * @brief Constructor for a Circle (Sphere in 3D math terms).
@@ -34,6 +48,7 @@ public:
     c.type = ColliderType::Sphere;
     c.radius = r;
     c.localCentroid = offset;
+    c.offset = Vec2(offset.x, offset.y);
 
     // 2D Circle Area-based mass: PI * r^2 * density
     c.mass = PI * (r * r) * density;
@@ -57,6 +72,7 @@ public:
     c.type = ColliderType::Box;
     c.halfExtents = extents;
     c.localCentroid = offset;
+    c.offset = Vec2(offset.x, offset.y);
 
     // 2D Box Area: (2*ex) * (2*ey)
     c.mass = (2.0f * extents.x) * (2.0f * extents.y) * density;
@@ -90,6 +106,8 @@ public:
    * @param density Mass density (default: 1.0f).
    */
   void RecalculateProperties(float density = 1.0f) {
+    localCentroid.x = offset.x;
+    localCentroid.y = offset.y;
     if (type == ColliderType::Sphere) {
       mass = PI * (radius * radius) * density;
       float i = 0.5f * mass * (radius * radius);
@@ -125,4 +143,42 @@ public:
 
   std::vector<Vec3> GetWorldVertices(const RigidBody& body) const;
 };
+/**
+ * @struct CircleCollider2D
+ * @brief High-level 2D circle collider specification.
+ */
+struct CircleCollider2D {
+  float radius = 0.5f;
+  float density = 1.0f;
+  Vec2 offset = {0.0f, 0.0f};
+
+  Collider ToCollider() const {
+    return Collider::CreateSphere(radius, density, Vec3(offset.x, offset.y, 0.0f));
+  }
+};
+
+/**
+ * @struct BoxCollider2D
+ * @brief High-level 2D box collider specification.
+ */
+struct BoxCollider2D {
+  Vec2 size = {1.0f, 1.0f}; // full width and height
+  float density = 1.0f;
+  Vec2 offset = {0.0f, 0.0f};
+
+  Collider ToCollider() const {
+    return Collider::CreateBox(Vec3(size.x * 0.5f, size.y * 0.5f, 0.0f), density,
+                               Vec3(offset.x, offset.y, 0.0f));
+  }
+};
+
+using Collider2D = Collider;
+
+namespace Elysium {
+using Collider = ::Collider;
+using Collider2D = ::Collider2D;
+using CircleCollider2D = ::CircleCollider2D;
+using BoxCollider2D = ::BoxCollider2D;
+}
+
 #endif

@@ -20,6 +20,18 @@ public:
   bool operator!=(const UUID &other) const noexcept {
     return m_UUID != other.m_UUID;
   }
+  bool operator==(uint64_t other) const noexcept {
+    return m_UUID == other;
+  }
+  bool operator!=(uint64_t other) const noexcept {
+    return m_UUID != other;
+  }
+  bool operator==(int other) const noexcept {
+    return m_UUID == static_cast<uint64_t>(other);
+  }
+  bool operator!=(int other) const noexcept {
+    return m_UUID != static_cast<uint64_t>(other);
+  }
   bool operator<(const UUID &other) const noexcept {
     return m_UUID < other.m_UUID;
   }
