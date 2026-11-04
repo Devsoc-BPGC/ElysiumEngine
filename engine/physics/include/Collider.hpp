@@ -3,6 +3,7 @@
 
 #include "CoreMath.hpp"
 #include <vector>
+#include <cmath>
 
 enum class ColliderType { Sphere, Box, Polygon };
 struct RigidBody;
