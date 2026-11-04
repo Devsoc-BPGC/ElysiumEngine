@@ -74,18 +74,6 @@ void TestTouchingBoundaryEdgeContact() {
   std::cout << "[PASS] TestTouchingBoundaryEdgeContact" << std::endl;
 }
 
-int main() {
-  TestNonCollidingSeparatedBoxes();
-  TestOverlappingBoxesWithMTV();
-  TestRotatedPolygonTriangleVsBox();
-  TestTouchingBoundaryEdgeContact();
-  TestNonCollidingPolygonCircle();
-  TestOverlappingPolygonCircleWithMTV();
-  TestCircleNearPolygonCorner();
-  std::cout << "\nAll SAT Tests passed successfully!" << std::endl;
-  return 0;
-}
-
 void TestNonCollidingPolygonCircle() {
   std::vector<Vec3> box = {
     Vec3(0, 0, 0), Vec3(2, 0, 0), Vec3(2, 2, 0), Vec3(0, 2, 0)
@@ -135,3 +123,16 @@ void TestCircleNearPolygonCorner() {
 
   std::cout << "[PASS] TestCircleNearPolygonCorner" << std::endl;
 }
+
+int main() {
+  TestNonCollidingSeparatedBoxes();
+  TestOverlappingBoxesWithMTV();
+  TestRotatedPolygonTriangleVsBox();
+  TestTouchingBoundaryEdgeContact();
+  TestNonCollidingPolygonCircle();
+  TestOverlappingPolygonCircleWithMTV();
+  TestCircleNearPolygonCorner();
+  std::cout << "\nAll SAT Tests passed successfully!" << std::endl;
+  return 0;
+}
+
