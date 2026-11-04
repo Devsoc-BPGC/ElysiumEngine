@@ -120,14 +120,59 @@ public:
     return true;
   }
 
+    /**
+   * @brief Computes the 2D geometric centroid (center of mass) of a polygon.
+   */
+  static Vec3 ComputePolygonCentroid(const std::vector<Vec3>& verts) {
+    if (verts.empty()) return Vec3(0, 0, 0);
+    if (verts.size() < 3) return verts[0];
+
+    float signedArea = 0.0f;
+    Vec3 centroid(0.0f, 0.0f, 0.0f);
+    size_t n = verts.size();
+
+    for (size_t i = 0; i < n; ++i) {
+      const Vec3& p0 = verts[i];
+      const Vec3& p1 = verts[(i + 1) % n];
+      float a = (p0.x * p1.y - p1.x * p0.y);
+      signedArea += a;
+      centroid.x += (p0.x + p1.x) * a;
+      centroid.y += (p0.y + p1.y) * a;
+    }
+
+    signedArea *= 0.5f;
+    if (std::abs(signedArea) > 1e-5f) {
+      centroid.x /= (6.0f * signedArea);
+      centroid.y /= (6.0f * signedArea);
+      return centroid;
+    }
+
+    // Fallback to arithmetic mean if area is near zero
+    Vec3 mean(0, 0, 0);
+    for (const auto& v : verts) mean += v;
+    return mean * (1.0f / static_cast<float>(n));
+  }
+
   static Collider CreatePolygon(const std::vector<Vec3>& verts, float density = 1.0f, Vec3 offset = Vec3(0, 0, 0)) {
     assert(verts.size() >= 3 && "Polygon collider must have at least 3 vertices.");
     assert(IsConvex(verts) && "Polygon collider must be convex for SAT collision detection.");
 
     Collider c;
     c.type = ColliderType::Polygon;
-    c.localVertices = verts;
-    c.localCentroid = offset;
+
+    // 1. Compute the geometric centroid of the input vertices
+    Vec3 polyCentroid = ComputePolygonCentroid(verts);
+
+    // 2. Recenter vertices so (0, 0) represents the center of mass
+    c.localVertices.reserve(verts.size());
+    for (const auto& v : verts) {
+      c.localVertices.push_back(v - polyCentroid);
+    }
+
+    // 3. Position the collider's centroid at offset + centroid
+    c.localCentroid = offset + polyCentroid;
+    c.offset = Vec2(c.localCentroid.x, c.localCentroid.y);
+
     c.RecalculateProperties(density);
     return c;
   }
@@ -158,6 +203,7 @@ public:
         if (distSq > maxDistSq) maxDistSq = distSq;
       }
       radius = std::sqrt(maxDistSq);
+
       // Shoelace formula for polygon area
       float area = 0.0f;
       for (size_t i = 0; i < localVertices.size(); ++i) {
