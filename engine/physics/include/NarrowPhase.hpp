@@ -20,18 +20,18 @@ public:
    * @param a The first rigid body.
    * @param b The second rigid body.
    */
-  static void ResolveCollision(RigidBody *a, RigidBody *b) {
+   static void ResolveCollision(RigidBody *a, RigidBody *b) {
     for (auto &colA : a->colliders) {
       for (auto &colB : b->colliders) {
         if (colA.type == ColliderType::Sphere &&
             colB.type == ColliderType::Sphere) {
           ResolveSphereSphere(a, colA, b, colB);
         } else if (colA.type == ColliderType::Sphere &&
-                   colB.type == ColliderType::Box) {
-          ResolveSphereBox(a, colA, b, colB);
-        } else if (colA.type == ColliderType::Box &&
+                   (colB.type == ColliderType::Box || colB.type == ColliderType::Polygon)) {
+          ResolveCirclePolygon(a, colA, b, colB);
+        } else if ((colA.type == ColliderType::Box || colA.type == ColliderType::Polygon) &&
                    colB.type == ColliderType::Sphere) {
-          ResolveSphereBox(b, colB, a, colA);
+          ResolveCirclePolygon(b, colB, a, colA);
         } else if ((colA.type == ColliderType::Box || colA.type == ColliderType::Polygon) &&
                    (colB.type == ColliderType::Box || colB.type == ColliderType::Polygon)) {
           ResolvePolygonPolygon(a, colA, b, colB);
@@ -40,7 +40,19 @@ public:
     }
   }
 
+
+
 private:
+
+  static void ResolveCirclePolygon(RigidBody *circleBody, const Collider &colCircle,
+                                   RigidBody *polyBody, const Collider &colPoly) {
+    Vec3 circleCenter = circleBody->LocalToGlobal(colCircle.localCentroid);
+    std::vector<Vec3> polyVerts = colPoly.GetWorldVertices(*polyBody);
+    SATResult sat = SAT::TestCirclePolygon(circleCenter, colCircle.radius, polyVerts);
+    if (sat.collided) {
+      ApplyImpulse(circleBody, polyBody, sat.normal, sat.depth);
+    }
+  }
 
   static void ResolvePolygonPolygon(RigidBody *a, const Collider &colA, RigidBody *b,
                                     const Collider &colB) {

@@ -122,4 +122,103 @@ SATResult SAT::TestPolygonPolygon(const std::vector<Vec3> &verticesA,
   return result;
 }
 
+
+Projection SAT::ProjectCircle(const Vec3 &center, float radius, const Vec3 &axis) {
+  float centerProj = axis.Dot(center);
+  return {centerProj - radius, centerProj + radius};
+}
+
+SATResult SAT::TestPolygonCircle(const std::vector<Vec3> &polygonVertices, const Vec3 &circleCenter, float circleRadius) {
+  SATResult result;
+  if (polygonVertices.size() < 3) {
+    result.collided = false;
+    return result;
+  }
+
+  float minOverlap = FLT_MAX;
+  Vec3 smallestAxis(0.0f, 0.0f, 0.0f);
+
+  // -------------------------------------------------------------
+  // 1. Test all edge normals of the polygon
+  // -------------------------------------------------------------
+  std::vector<Vec3> axes = GetAxes(polygonVertices);
+
+  // -------------------------------------------------------------
+  // 2. Add the axis between the circle center and the closest vertex
+  // -------------------------------------------------------------
+  float minDistanceSq = FLT_MAX;
+  Vec3 closestVertex = polygonVertices[0];
+
+  for (const auto &v : polygonVertices) {
+    Vec3 diff = v - circleCenter;
+    float distSq = diff.MagnitudeSquared();
+    if (distSq < minDistanceSq) {
+      minDistanceSq = distSq;
+      closestVertex = v;
+    }
+  }
+
+  Vec3 vertexAxis = closestVertex - circleCenter;
+  float vertexAxisDist = vertexAxis.Magnitude();
+  if (vertexAxisDist > EPSILON) {
+    axes.push_back(vertexAxis / vertexAxisDist);
+  }
+
+  // -------------------------------------------------------------
+  // 3. Test overlap on all candidate axes
+  // -------------------------------------------------------------
+  for (const auto &axis : axes) {
+    Projection pPoly = Project(polygonVertices, axis);
+    Projection pCircle = ProjectCircle(circleCenter, circleRadius, axis);
+
+    // Separating axis found -> No collision
+    if (!pPoly.Overlaps(pCircle)) {
+      result.collided = false;
+      return result;
+    }
+
+    // Check for containment
+    float overlap = pPoly.GetOverlap(pCircle);
+    if (pPoly.Contains(pCircle) || pCircle.Contains(pPoly)) {
+      float mins = std::abs(pPoly.min - pCircle.min);
+      float maxs = std::abs(pPoly.max - pCircle.max);
+      overlap += std::min(mins, maxs);
+    }
+
+    if (overlap < minOverlap) {
+      minOverlap = overlap;
+      smallestAxis = axis;
+    }
+  }
+
+  // -------------------------------------------------------------
+  // 4. Overlap on all axes -> Collision confirmed
+  // -------------------------------------------------------------
+  result.collided = true;
+  result.depth = minOverlap;
+
+  // Compute arithmetic mean (centroid) of the polygon
+  Vec3 polyCenter(0.0f, 0.0f, 0.0f);
+  for (const auto &v : polygonVertices) polyCenter += v;
+  polyCenter = polyCenter * (1.0f / static_cast<float>(polygonVertices.size()));
+
+  // Ensure normal points from Polygon (Shape A) towards Circle (Shape B)
+  Vec3 direction = circleCenter - polyCenter;
+  if (direction.Dot(smallestAxis) < 0.0f) {
+    smallestAxis = -smallestAxis;
+  }
+
+  result.normal = smallestAxis;
+  return result;
+}
+
+SATResult SAT::TestCirclePolygon(const Vec3 &circleCenter, float circleRadius,
+                                 const std::vector<Vec3> &polygonVertices) {
+  SATResult res = TestPolygonCircle(polygonVertices, circleCenter, circleRadius);
+  // Invert normal so it points from Circle (Shape A) to Polygon (Shape B)
+  res.normal = -res.normal;
+  return res;
+}
+
+
 } // namespace Elysium
