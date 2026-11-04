@@ -4,6 +4,7 @@
 #include "CoreMath.hpp"
 #include <vector>
 #include <cmath>
+#include <cassert>
 
 enum class ColliderType { Sphere, Box, Polygon };
 struct RigidBody;
@@ -95,7 +96,34 @@ public:
     return c;
   }
 
+    /**
+   * @brief Checks if a 2D polygon is strictly convex and non-self-intersecting.
+   */
+  static bool IsConvex(const std::vector<Vec3>& verts) {
+    if (verts.size() < 3) return false;
+    bool hasPositive = false;
+    bool hasNegative = false;
+    size_t n = verts.size();
+
+    for (size_t i = 0; i < n; ++i) {
+      const Vec3& a = verts[i];
+      const Vec3& b = verts[(i + 1) % n];
+      const Vec3& c = verts[(i + 2) % n];
+
+      float cross = (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x);
+      if (cross > 1e-5f) hasPositive = true;
+      if (cross < -1e-5f) hasNegative = true;
+
+      // If turns change direction, the polygon is concave
+      if (hasPositive && hasNegative) return false;
+    }
+    return true;
+  }
+
   static Collider CreatePolygon(const std::vector<Vec3>& verts, float density = 1.0f, Vec3 offset = Vec3(0, 0, 0)) {
+    assert(verts.size() >= 3 && "Polygon collider must have at least 3 vertices.");
+    assert(IsConvex(verts) && "Polygon collider must be convex for SAT collision detection.");
+
     Collider c;
     c.type = ColliderType::Polygon;
     c.localVertices = verts;
