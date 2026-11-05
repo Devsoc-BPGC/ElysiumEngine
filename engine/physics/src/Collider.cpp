@@ -1,8 +1,11 @@
 #include "Collider.hpp"
 #include "RigidBody.hpp"
+
 std::vector<Vec3> Collider::GetWorldVertices(const RigidBody& body) const {
   std::vector<Vec3> worldVerts;
+
   if (type == ColliderType::Box) {
+    worldVerts.reserve(4);
     float hx = halfExtents.x;
     float hy = halfExtents.y;
     Vec3 corners[4] = {
@@ -15,9 +18,11 @@ std::vector<Vec3> Collider::GetWorldVertices(const RigidBody& body) const {
       worldVerts.push_back(body.LocalToGlobal(corners[i]));
     }
   } else if (type == ColliderType::Polygon) {
+    worldVerts.reserve(localVertices.size());
     for (const auto& v : localVertices) {
       worldVerts.push_back(body.LocalToGlobal(localCentroid + v));
     }
   }
+
   return worldVerts;
 }
