@@ -19,20 +19,23 @@ public:
    * @param a The first rigid body.
    * @param b The second rigid body.
    */
-   static void ResolveCollision(RigidBody *a, RigidBody *b) {
+  static bool IsConvexShape(ColliderType type) {
+    return type == ColliderType::Box || type == ColliderType::Polygon;
+  }
+
+  static void ResolveCollision(RigidBody *a, RigidBody *b) {
     for (auto &colA : a->colliders) {
       for (auto &colB : b->colliders) {
-        if (colA.type == ColliderType::Sphere &&
-            colB.type == ColliderType::Sphere) {
+        bool isPolyA = IsConvexShape(colA.type);
+        bool isPolyB = IsConvexShape(colB.type);
+
+        if (colA.type == ColliderType::Sphere && colB.type == ColliderType::Sphere) {
           ResolveSphereSphere(a, colA, b, colB);
-        } else if (colA.type == ColliderType::Sphere &&
-                   (colB.type == ColliderType::Box || colB.type == ColliderType::Polygon)) {
+        } else if (colA.type == ColliderType::Sphere && isPolyB) {
           ResolveCirclePolygon(a, colA, b, colB);
-        } else if ((colA.type == ColliderType::Box || colA.type == ColliderType::Polygon) &&
-                   colB.type == ColliderType::Sphere) {
+        } else if (isPolyA && colB.type == ColliderType::Sphere) {
           ResolveCirclePolygon(b, colB, a, colA);
-        } else if ((colA.type == ColliderType::Box || colA.type == ColliderType::Polygon) &&
-                   (colB.type == ColliderType::Box || colB.type == ColliderType::Polygon)) {
+        } else if (isPolyA && isPolyB) {
           ResolvePolygonPolygon(a, colA, b, colB);
         }
       }
@@ -82,48 +85,7 @@ private:
     ApplyImpulse(a, b, normal, radiusSum - distance);
   }
 
-  static void ResolveSphereBox(RigidBody *sphereBody, const Collider &sphereCol,
-                               RigidBody *boxBody, const Collider &boxCol) {
-    // 1. Get sphere position in box's local space
-    Vec3 sphereWorldPos = sphereBody->LocalToGlobal(sphereCol.localCentroid);
-    Vec3 sphereLocalPos = boxBody->GlobalToLocal(sphereWorldPos);
-
-    // 2. Find the closest point on the box to the sphere center
-    Vec3 closestPointLocal = sphereLocalPos;
-    Vec3 halfExtents = boxCol.halfExtents;
-
-    if (closestPointLocal.x > halfExtents.x)
-      closestPointLocal.x = halfExtents.x;
-    else if (closestPointLocal.x < -halfExtents.x)
-      closestPointLocal.x = -halfExtents.x;
-
-    if (closestPointLocal.y > halfExtents.y)
-      closestPointLocal.y = halfExtents.y;
-    else if (closestPointLocal.y < -halfExtents.y)
-      closestPointLocal.y = -halfExtents.y;
-
-    if (closestPointLocal.z > halfExtents.z)
-      closestPointLocal.z = halfExtents.z;
-    else if (closestPointLocal.z < -halfExtents.z)
-      closestPointLocal.z = -halfExtents.z;
-
-    // 3. Check if the closest point is within radius distance
-    Vec3 vecFromClosestToSphereLocal = sphereLocalPos - closestPointLocal;
-    float distSq = vecFromClosestToSphereLocal.MagnitudeSquared();
-
-    if (distSq >= sphereCol.radius * sphereCol.radius || distSq == 0)
-      return;
-
-    float distance = std::sqrt(distSq);
-
-    // normalFromAtoB where A=Sphere, B=Box
-    // normalLocal = closestPointLocal - sphereLocalPos
-    Vec3 normalLocal = closestPointLocal - sphereLocalPos;
-    Vec3 normalWorld = boxBody->LocalToGlobalVec(normalLocal / distance);
-
-    ApplyImpulse(sphereBody, boxBody, normalWorld, sphereCol.radius - distance);
-  }
-
+  
   static void ApplyImpulse(RigidBody *a, RigidBody *b,
                            const Vec3 &normalFromAtoB, float overlap) {
     // 1. Position Correction (to resolve overlap)
