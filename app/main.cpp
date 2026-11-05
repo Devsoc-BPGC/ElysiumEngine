@@ -67,6 +67,9 @@ public:
     auto &scene = editorLayer->GetScene();
     Elysium::SetActiveScene(&scene);
 
+    // Register script classes for ScriptComponent & Editor
+    Elysium::ScriptRegistry::Register<BoxController>("BoxController");
+
     // Populate Initial Demo Scene Entities
 
     // 1. Dynamic Balls
@@ -87,10 +90,10 @@ public:
       scene.AddGameObject(ball);
     }
 
-    // 2. Dynamic Box with Script Wrapper (WASD Controls)
+    // 2. Dynamic Box with Script Component (WASD Controls)
     {
       auto playerBox = Elysium::SpawnBox("Scripted Box (WASD)", 8.0f, 4.0f, 1.0f, 1.0f);
-      playerBox.AttachScript<BoxController>();
+      playerBox.GetInternalObject()->AddComponent<Elysium::ScriptComponent>("BoxController");
     }
 
     PushOverlay(editorLayer);

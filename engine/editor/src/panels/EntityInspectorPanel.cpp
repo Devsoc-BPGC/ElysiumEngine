@@ -3,6 +3,8 @@
 #include "Collider.hpp"
 #include "Log.h"
 #include "SpriteRenderer.hpp"
+#include "ScriptComponent.hpp"
+#include "ScriptRegistry.hpp"
 #include <cmath>
 #include <cstring>
 #include <imgui.h>
@@ -60,7 +62,10 @@ void EntityInspectorPanel::OnImGuiRender(EditorContext &context, Scene &scene,
     // 5. AudioSource Component
     DrawAudioSourceComponent(context, entity);
 
-    // 6. Custom Components
+    // 6. Script Component
+    DrawScriptComponent(context, entity);
+
+    // 7. Custom Components
     DrawCustomComponents(context, entity);
 
     ImGui::Spacing();
@@ -101,6 +106,12 @@ void EntityInspectorPanel::OnImGuiRender(EditorContext &context, Scene &scene,
           ImGui::MenuItem("Audio Source")) {
         entity.AddComponent<AudioSourceComponent>();
         ELYSIUM_INFO("Added AudioSourceComponent to entity: {}", entity.name);
+      }
+
+      if (!entity.GetComponent<ScriptComponent>() &&
+          ImGui::MenuItem("Script Component")) {
+        entity.AddComponent<ScriptComponent>();
+        ELYSIUM_INFO("Added ScriptComponent to entity: {}", entity.name);
       }
 
       ImGui::EndPopup();
@@ -388,9 +399,63 @@ void EntityInspectorPanel::DrawCustomComponents(EditorContext &context,
   if (ImGui::CollapsingHeader("Attached Components",
                               ImGuiTreeNodeFlags_DefaultOpen)) {
     for (size_t i = 0; i < entity.components.size(); ++i) {
+      if (dynamic_cast<ScriptComponent*>(entity.components[i].get())) continue;
       ImGui::PushID(static_cast<int>(i));
       ImGui::BulletText("Custom Component #%zu", i + 1);
       ImGui::PopID();
+    }
+  }
+}
+
+
+void EntityInspectorPanel::DrawScriptComponent(EditorContext &context,
+                                               GameObject &entity) {
+  (void)context;
+  auto *scriptComp = entity.GetComponent<ScriptComponent>();
+  if (!scriptComp)
+    return;
+
+  if (ImGui::CollapsingHeader("Script Component",
+                              ImGuiTreeNodeFlags_DefaultOpen)) {
+    std::vector<std::string> available = ScriptRegistry::GetAvailableScripts();
+    std::string currentScript = scriptComp->GetScriptName();
+
+    const char *preview =
+        currentScript.empty() ? "-- None --" : currentScript.c_str();
+    if (ImGui::BeginCombo("Script", preview)) {
+      for (const auto &scriptName : available) {
+        bool isSelected = (currentScript == scriptName);
+        if (ImGui::Selectable(scriptName.c_str(), isSelected)) {
+          scriptComp->BindScript(scriptName);
+        }
+        if (isSelected) {
+          ImGui::SetItemDefaultFocus();
+        }
+      }
+      ImGui::EndCombo();
+    }
+
+    if (scriptComp->IsBound()) {
+      ImGui::TextColored(ImVec4(0.3f, 0.9f, 0.3f, 1.0f),
+                         "Status: Active & Bound");
+      ImGui::SameLine();
+      if (ImGui::Button("Reload")) {
+        scriptComp->ReloadScript();
+      }
+    } else {
+      ImGui::TextColored(ImVec4(0.9f, 0.4f, 0.3f, 1.0f),
+                         "Status: Unbound / None");
+    }
+
+    ImGui::Spacing();
+    if (ImGui::Button("Remove Script Component")) {
+      for (auto it = entity.components.begin(); it != entity.components.end();
+           ++it) {
+        if (it->get() == scriptComp) {
+          entity.components.erase(it);
+          break;
+        }
+      }
     }
   }
 }
