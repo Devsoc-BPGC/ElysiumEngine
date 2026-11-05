@@ -197,34 +197,55 @@ public:
       localInertiaTensor = Mat3::Diagonal(i, i, i);
       radius = halfExtents.Magnitude();
     } else if (type == ColliderType::Polygon) {
+      size_t n = localVertices.size();
+      if (n < 3) {
+        mass = 0.0f;
+        radius = 0.0f;
+        localInertiaTensor.Zero();
+        return;
+      }
+
       float maxDistSq = 0.0f;
-      for (const auto& v : localVertices) {
-        float distSq = v.MagnitudeSquared();
+      float A = 0.0f;
+      float I0 = 0.0f;
+      Vec3 c(0.0f, 0.0f, 0.0f);
+
+      // Single-pass computation of bounding radius, area, centroid, and origin inertia
+      for (size_t k = 0; k < n; ++k) {
+        const Vec3& p = localVertices[k];
+        const Vec3& q = localVertices[(k + 1) % n];
+
+        float distSq = p.MagnitudeSquared();
         if (distSq > maxDistSq) maxDistSq = distSq;
+
+        float cr = p.x * q.y - q.x * p.y;
+        A += cr;
+        c = c + (p + q) * cr;
+        I0 += cr * (p.Dot(p) + p.Dot(q) + q.Dot(q));
       }
       radius = std::sqrt(maxDistSq);
 
-            // Shoelace formula for polygon area
-      float area = 0.0f;
-      for (size_t i = 0; i < localVertices.size(); ++i) {
-        const Vec3& p1 = localVertices[i];
-        const Vec3& p2 = localVertices[(i + 1) % localVertices.size()];
-        area += (p1.x * p2.y - p2.x * p1.y);
-      }
-      area = std::abs(area) * 0.5f;
+      A *= 0.5f;
+      float absArea = std::abs(A);
 
-      assert(area > 1e-5f && "Polygon collider must have a positive, non-zero area (vertices cannot be collinear or degenerate).");
+      assert(absArea > 1e-5f && "Polygon collider must have a positive, non-zero area (vertices cannot be collinear or degenerate).");
 
-      if (area <= 1e-5f) {
+      if (absArea <= 1e-5f) {
         mass = 0.0f;
         localInertiaTensor.Zero();
         return;
       }
 
-      mass = area * density;
-      float i = (1.0f / 6.0f) * mass * (radius * radius);
-      localInertiaTensor = Mat3::Diagonal(i, i, i);
-    }
+      c = c * (1.0f / (6.0f * A));
+      mass = absArea * density;
+
+      // Parallel Axis Theorem: I_cm = I_origin - mass * |centroid|^2
+      float Icm = std::abs(density * I0 / 12.0f) - mass * c.MagnitudeSquared();
+      if (Icm <= 0.0f) {
+        Icm = (1.0f / 6.0f) * mass * (radius * radius);
+      }
+      localInertiaTensor = Mat3::Diagonal(Icm, Icm, Icm);
+    } 
   }
 
   std::vector<Vec3> GetWorldVertices(const RigidBody& body) const;
