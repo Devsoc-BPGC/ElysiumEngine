@@ -35,18 +35,31 @@ std::vector<Vec3> SAT::GetAxes(const std::vector<Vec3> &vertices) {
     const Vec3 &p1 = vertices[i];
     const Vec3 &p2 = vertices[(i + 1) % vertices.size()];
 
-        // Edge vector: e = p2 - p1
+    // Edge vector: e = p2 - p1
     Vec3 edge = p2 - p1;
     float lenSq = edge.MagnitudeSquared();
     if (lenSq <= EPSILON * EPSILON) {
-      continue; // Skip degenerate zero-length edges safely before normalizing
+      continue; // Skip degenerate zero-length edges
     }
 
-    // 2D Perpendicular (normal) to edge: (-edge.y, edge.x, 0)
+    // 2D Perpendicular to edge
     Vec3 normal(-edge.y, edge.x, 0.0f);
     normal.Normalize();
-    axes.push_back(normal);
+
+    // Check if a parallel or anti-parallel axis is already present
+    bool isDuplicate = false;
+    for (const auto &existing : axes) {
+      if (std::abs(existing.Dot(normal)) > 1.0f - 1e-4f) {
+        isDuplicate = true;
+        break;
+      }
+    }
+
+    if (!isDuplicate) {
+      axes.push_back(normal);
+    }
   }
+
   return axes;
 }
 
@@ -66,41 +79,34 @@ SATResult SAT::TestPolygonPolygon(const std::vector<Vec3> &verticesA,
   // 2. Candidate axes from Polygon B
   std::vector<Vec3> axesB = GetAxes(verticesB);
 
-  std::vector<Vec3> allAxes;
-  allAxes.reserve(axesA.size() + axesB.size());
-  allAxes.insert(allAxes.end(), axesA.begin(), axesA.end());
-  allAxes.insert(allAxes.end(), axesB.begin(), axesB.end());
-
-  if (allAxes.empty()) return result; 
-
-  for (const auto &axis : allAxes) {
-    // Project both shapes onto axis
-    Projection pA = Project(verticesA, axis);
-    Projection pB = Project(verticesB, axis);
-
-    // If any separating axis is found, shapes do NOT collide
-    if (!pA.Overlaps(pB)) {
-      result.collided = false;
-      return result;
-    }
-
-    // Check for containment (dyn4j MTV handling)
-    float overlap = pA.GetOverlap(pB);
-    if (pA.Contains(pB) || pB.Contains(pA)) {
-      float mins = std::abs(pA.min - pB.min);
-      float maxs = std::abs(pA.max - pB.max);
-      if (mins < maxs) {
-        overlap += mins;
-      } else {
-        overlap += maxs;
+  if (axesA.empty() && axesB.empty()) {
+    result.collided = false;
+    return result;
+  }
+  // Iterate both axis vectors directly without allocating an allAxes vector
+  for (const auto *axesPtr : {&axesA, &axesB}) {
+    for (const auto &axis : *axesPtr) {
+      // Project both shapes onto axis
+      Projection pA = Project(verticesA, axis);
+      Projection pB = Project(verticesB, axis);
+      // If any separating axis is found, shapes do NOT collide
+      if (!pA.Overlaps(pB)) {
+        result.collided = false;
+        return result;
       }
-    }
-
-        if (overlap < minOverlap) {
-      minOverlap = overlap;
-      float midA = 0.5f * (pA.min + pA.max);
-      float midB = 0.5f * (pB.min + pB.max);
-      smallestAxis = (midA <= midB) ? axis : -axis; // Always points A -> B
+      // Check for containment (dyn4j MTV handling)
+      float overlap = pA.GetOverlap(pB);
+      if (pA.Contains(pB) || pB.Contains(pA)) {
+        float mins = std::abs(pA.min - pB.min);
+        float maxs = std::abs(pA.max - pB.max);
+        overlap += std::min(mins, maxs);
+      }
+      if (overlap < minOverlap) {
+        minOverlap = overlap;
+        float midA = 0.5f * (pA.min + pA.max);
+        float midB = 0.5f * (pB.min + pB.max);
+        smallestAxis = (midA <= midB) ? axis : -axis; // Always points A -> B
+      }
     }
   }
 
