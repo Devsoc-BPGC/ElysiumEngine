@@ -35,18 +35,18 @@ std::vector<Vec3> SAT::GetAxes(const std::vector<Vec3> &vertices) {
     const Vec3 &p1 = vertices[i];
     const Vec3 &p2 = vertices[(i + 1) % vertices.size()];
 
-    // Edge vector: e = p2 - p1
+        // Edge vector: e = p2 - p1
     Vec3 edge = p2 - p1;
+    float lenSq = edge.MagnitudeSquared();
+    if (lenSq <= EPSILON * EPSILON) {
+      continue; // Skip degenerate zero-length edges safely before normalizing
+    }
 
     // 2D Perpendicular (normal) to edge: (-edge.y, edge.x, 0)
     Vec3 normal(-edge.y, edge.x, 0.0f);
     normal.Normalize();
-
-    if (normal.MagnitudeSquared() > EPSILON) {
-      axes.push_back(normal);
-    }
+    axes.push_back(normal);
   }
-
   return axes;
 }
 
