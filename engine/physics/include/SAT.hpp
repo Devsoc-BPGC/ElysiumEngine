@@ -52,7 +52,9 @@ public:
   static Projection Project(const std::vector<Vec3> &vertices, const Vec3 &axis);
 
   /**
-   * @brief Extracts outward unit normal axes from consecutive polygon edges.
+   * @brief Extracts candidate perpendicular axes from consecutive polygon edges.
+   * @note In SAT, axes represent 1D projection lines (sign is bidirectional).
+   * The final MTV collision normal is explicitly oriented from Shape A to Shape B.
    */
   static std::vector<Vec3> GetAxes(const std::vector<Vec3> &vertices);
 
