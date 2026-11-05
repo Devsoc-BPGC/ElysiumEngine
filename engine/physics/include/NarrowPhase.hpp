@@ -5,7 +5,6 @@
 #include "SAT.hpp"
 #include <cmath>
 
-using namespace Elysium;
 
 /**
  * @class NarrowPhase
@@ -44,11 +43,10 @@ public:
 
 private:
 
-  static void ResolveCirclePolygon(RigidBody *circleBody, const Collider &colCircle,
-                                   RigidBody *polyBody, const Collider &colPoly) {
+  static void ResolveCirclePolygon(RigidBody *circleBody, const Collider &colCircle, RigidBody *polyBody, const Collider &colPoly) {
     Vec3 circleCenter = circleBody->LocalToGlobal(colCircle.localCentroid);
     std::vector<Vec3> polyVerts = colPoly.GetWorldVertices(*polyBody);
-    SATResult sat = SAT::TestCirclePolygon(circleCenter, colCircle.radius, polyVerts);
+    Elysium::SATResult sat = Elysium::SAT::TestCirclePolygon(circleCenter, colCircle.radius, polyVerts);
     if (sat.collided) {
       ApplyImpulse(circleBody, polyBody, sat.normal, sat.depth);
     }
@@ -58,7 +56,7 @@ private:
                                     const Collider &colB) {
     std::vector<Vec3> vertsA = colA.GetWorldVertices(*a);
     std::vector<Vec3> vertsB = colB.GetWorldVertices(*b);
-    SATResult sat = SAT::TestPolygonPolygon(vertsA, vertsB);
+    Elysium::SATResult sat = Elysium::SAT::TestPolygonPolygon(vertsA, vertsB);
     if (sat.collided) {
       ApplyImpulse(a, b, sat.normal, sat.depth);
     }
