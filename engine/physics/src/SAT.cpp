@@ -71,6 +71,8 @@ SATResult SAT::TestPolygonPolygon(const std::vector<Vec3> &verticesA,
   allAxes.insert(allAxes.end(), axesA.begin(), axesA.end());
   allAxes.insert(allAxes.end(), axesB.begin(), axesB.end());
 
+  if (allAxes.empty()) return result; 
+
   for (const auto &axis : allAxes) {
     // Project both shapes onto axis
     Projection pA = Project(verticesA, axis);
@@ -154,6 +156,9 @@ SATResult SAT::TestPolygonCircle(const std::vector<Vec3> &polygonVertices, const
   // -------------------------------------------------------------
   // 3. Test overlap on all candidate axes
   // -------------------------------------------------------------
+
+  if (axes.empty()) return result;
+
   for (const auto &axis : axes) {
     Projection pPoly = Project(polygonVertices, axis);
     Projection pCircle = ProjectCircle(circleCenter, circleRadius, axis);
