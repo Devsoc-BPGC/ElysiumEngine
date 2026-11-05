@@ -3,6 +3,7 @@ set(ENGINE_SOURCES
     physics/src/Collider.cpp
     physics/src/PhysicsWorld.cpp
     physics/src/RigidBody.cpp
+    physics/src/SAT.cpp
 )
 
 # Core src seems empty for now, but we'll add it if there are any files

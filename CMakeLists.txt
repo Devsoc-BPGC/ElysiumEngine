@@ -191,6 +191,7 @@ if(BUILD_TESTING)
     elysium_add_test(SceneCloneTest            test/SceneCloneTest.cpp)
     elysium_add_test(ComponentOffsetsTest      test/ComponentOffsetsTest.cpp)
     elysium_add_test(SceneGraphTest            test/SceneGraphTest.cpp)
+    elysium_add_test(SATTest                   test/SATTest.cpp)
 endif()
 
 # ============================================================
