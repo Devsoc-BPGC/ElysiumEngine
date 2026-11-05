@@ -9,6 +9,7 @@
 
 #include "CoreMath.hpp"
 #include <vector>
+#include <algorithm>
 
 namespace Elysium {
 
