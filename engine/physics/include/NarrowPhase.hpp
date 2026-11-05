@@ -48,6 +48,13 @@ private:
 
   static void ResolveCirclePolygon(RigidBody *circleBody, const Collider &colCircle, RigidBody *polyBody, const Collider &colPoly) {
     Vec3 circleCenter = circleBody->LocalToGlobal(colCircle.localCentroid);
+    Vec3 polyCenter = polyBody->LocalToGlobal(colPoly.localCentroid);
+    // Cheap bounding-radius early-out: avoids allocating world vertices when shapes are far apart
+    float radiusSum = colCircle.radius + colPoly.radius;
+    float distSq = (circleCenter - polyCenter).MagnitudeSquared();
+    if (distSq >= radiusSum * radiusSum || distSq == 0.0f) {
+      return;
+    }
     std::vector<Vec3> polyVerts = colPoly.GetWorldVertices(*polyBody);
     Elysium::SATResult sat = Elysium::SAT::TestCirclePolygon(circleCenter, colCircle.radius, polyVerts);
     if (sat.collided) {
@@ -55,8 +62,15 @@ private:
     }
   }
 
-  static void ResolvePolygonPolygon(RigidBody *a, const Collider &colA, RigidBody *b,
-                                    const Collider &colB) {
+  static void ResolvePolygonPolygon(RigidBody *a, const Collider &colA, RigidBody *b, const Collider &colB) {
+    Vec3 centerA = a->LocalToGlobal(colA.localCentroid);
+    Vec3 centerB = b->LocalToGlobal(colB.localCentroid);
+    // Cheap bounding-radius early-out: avoids allocating world vertices when shapes are far apart
+    float radiusSum = colA.radius + colB.radius;
+    float distSq = (centerA - centerB).MagnitudeSquared();
+    if (distSq >= radiusSum * radiusSum || distSq == 0.0f) {
+      return;
+    }
     std::vector<Vec3> vertsA = colA.GetWorldVertices(*a);
     std::vector<Vec3> vertsB = colB.GetWorldVertices(*b);
     Elysium::SATResult sat = Elysium::SAT::TestPolygonPolygon(vertsA, vertsB);
