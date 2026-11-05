@@ -94,30 +94,17 @@ SATResult SAT::TestPolygonPolygon(const std::vector<Vec3> &verticesA,
       }
     }
 
-    if (overlap < minOverlap) {
+        if (overlap < minOverlap) {
       minOverlap = overlap;
-      smallestAxis = axis;
+      float midA = 0.5f * (pA.min + pA.max);
+      float midB = 0.5f * (pB.min + pB.max);
+      smallestAxis = (midA <= midB) ? axis : -axis; // Always points A -> B
     }
   }
 
   // All axes overlap -> collision confirmed
   result.collided = true;
   result.depth = minOverlap;
-
-  // Compute centers to orient normal from A to B
-  Vec3 centerA(0, 0, 0);
-  for (const auto &v : verticesA) centerA += v;
-  centerA = centerA * (1.0f / static_cast<float>(verticesA.size()));
-
-  Vec3 centerB(0, 0, 0);
-  for (const auto &v : verticesB) centerB += v;
-  centerB = centerB * (1.0f / static_cast<float>(verticesB.size()));
-
-  Vec3 dir = centerB - centerA;
-  if (dir.Dot(smallestAxis) < 0.0f) {
-    smallestAxis = -smallestAxis;
-  }
-
   result.normal = smallestAxis;
   return result;
 }
@@ -185,29 +172,17 @@ SATResult SAT::TestPolygonCircle(const std::vector<Vec3> &polygonVertices, const
       overlap += std::min(mins, maxs);
     }
 
-    if (overlap < minOverlap) {
+        if (overlap < minOverlap) {
       minOverlap = overlap;
-      smallestAxis = axis;
+      float midPoly = 0.5f * (pPoly.min + pPoly.max);
+      float midCircle = 0.5f * (pCircle.min + pCircle.max);
+      smallestAxis = (midPoly <= midCircle) ? axis : -axis; // Always points Polygon -> Circle
     }
   }
 
-  // -------------------------------------------------------------
-  // 4. Overlap on all axes -> Collision confirmed
-  // -------------------------------------------------------------
+  // All axes overlap -> collision confirmed
   result.collided = true;
   result.depth = minOverlap;
-
-  // Compute arithmetic mean (centroid) of the polygon
-  Vec3 polyCenter(0.0f, 0.0f, 0.0f);
-  for (const auto &v : polygonVertices) polyCenter += v;
-  polyCenter = polyCenter * (1.0f / static_cast<float>(polygonVertices.size()));
-
-  // Ensure normal points from Polygon (Shape A) towards Circle (Shape B)
-  Vec3 direction = circleCenter - polyCenter;
-  if (direction.Dot(smallestAxis) < 0.0f) {
-    smallestAxis = -smallestAxis;
-  }
-
   result.normal = smallestAxis;
   return result;
 }
