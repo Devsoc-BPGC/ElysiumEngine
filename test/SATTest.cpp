@@ -41,14 +41,14 @@ void TestOverlappingBoxesWithMTV() {
   std::cout << "[PASS] TestOverlappingBoxesWithMTV (depth: " << result.depth << ")" << std::endl;
 }
 
-void TestRotatedPolygonTriangleVsBox() {
-  // Triangle pointing right
+void TestTriangleVsBoxOverlap() {
+  // Triangle pointing right with tip at x = 2.0
   std::vector<Vec3> triangle = {
     Vec3(0.0f, 1.0f, 0.0f),
     Vec3(2.0f, 0.0f, 0.0f),
     Vec3(0.0f, -1.0f, 0.0f)
   };
-  // Box positioned overlapping the tip of the triangle
+  // Box with left edge at x = 1.5, overlapping the triangle tip by 0.5 units
   std::vector<Vec3> box = {
     Vec3(1.5f, -1.0f, 0.0f), Vec3(3.5f, -1.0f, 0.0f),
     Vec3(3.5f,  1.0f, 0.0f), Vec3(1.5f,  1.0f, 0.0f)
@@ -56,8 +56,10 @@ void TestRotatedPolygonTriangleVsBox() {
 
   SATResult result = SAT::TestPolygonPolygon(triangle, box);
   assert(result.collided);
-  assert(result.depth > 0.0f);
-  std::cout << "[PASS] TestRotatedPolygonTriangleVsBox" << std::endl;
+  assert(std::abs(result.depth - 0.5f) < 1e-4f);
+  // Normal must point from triangle towards box (+X direction)
+  assert(result.normal.x > 0.99f);
+  std::cout << "[PASS] TestTriangleVsBoxOverlap (depth: " << result.depth << ")" << std::endl;
 }
 
 void TestTouchingBoundaryEdgeContact() {
@@ -127,7 +129,7 @@ void TestCircleNearPolygonCorner() {
 int main() {
   TestNonCollidingSeparatedBoxes();
   TestOverlappingBoxesWithMTV();
-  TestRotatedPolygonTriangleVsBox();
+  TestTriangleVsBoxOverlap();
   TestTouchingBoundaryEdgeContact();
   TestNonCollidingPolygonCircle();
   TestOverlappingPolygonCircleWithMTV();
