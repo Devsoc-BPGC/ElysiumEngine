@@ -94,12 +94,14 @@ SATResult SAT::TestPolygonPolygon(const std::vector<Vec3> &verticesA,
         result.collided = false;
         return result;
       }
-      // Check for containment (dyn4j MTV handling)
-      float overlap = pA.GetOverlap(pB);
-      if (pA.Contains(pB) || pB.Contains(pA)) {
-        float mins = std::abs(pA.min - pB.min);
-        float maxs = std::abs(pA.max - pB.max);
-        overlap += std::min(mins, maxs);
+      
+      float overlap = ComputeOverlap(pA, pB);
+
+      if (overlap < minOverlap) {
+        minOverlap = overlap;
+        float midA = 0.5f * (pA.min + pA.max);
+        float midB = 0.5f * (pB.min + pB.max);
+        smallestAxis = (midA <= midB) ? axis : -axis; // Always points A -> B
       }
       if (overlap < minOverlap) {
         minOverlap = overlap;
@@ -175,15 +177,16 @@ SATResult SAT::TestPolygonCircle(const std::vector<Vec3> &polygonVertices, const
       return result;
     }
 
-    // Check for containment
-    float overlap = pPoly.GetOverlap(pCircle);
-    if (pPoly.Contains(pCircle) || pCircle.Contains(pPoly)) {
-      float mins = std::abs(pPoly.min - pCircle.min);
-      float maxs = std::abs(pPoly.max - pCircle.max);
-      overlap += std::min(mins, maxs);
-    }
+      float overlap = ComputeOverlap(pPoly, pCircle);
 
-        if (overlap < minOverlap) {
+      if (overlap < minOverlap) {
+        minOverlap = overlap;
+        float midPoly = 0.5f * (pPoly.min + pPoly.max);
+        float midCircle = 0.5f * (pCircle.min + pCircle.max);
+        smallestAxis = (midPoly <= midCircle) ? axis : -axis; // Always points Polygon -> Circle
+      }
+
+      if (overlap < minOverlap) {
       minOverlap = overlap;
       float midPoly = 0.5f * (pPoly.min + pPoly.max);
       float midCircle = 0.5f * (pCircle.min + pCircle.max);
@@ -204,6 +207,16 @@ SATResult SAT::TestCirclePolygon(const Vec3 &circleCenter, float circleRadius,
   // Invert normal so it points from Circle (Shape A) to Polygon (Shape B)
   res.normal = -res.normal;
   return res;
+}
+
+float SAT::ComputeOverlap(const Projection &a, const Projection &b) {
+  float overlap = a.GetOverlap(b);
+  if (a.Contains(b) || b.Contains(a)) {
+    float mins = std::abs(a.min - b.min);
+    float maxs = std::abs(a.max - b.max);
+    overlap += std::min(mins, maxs);
+  }
+  return overlap;
 }
 
 

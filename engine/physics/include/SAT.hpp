@@ -52,6 +52,11 @@ public:
   static Projection Project(const std::vector<Vec3> &vertices, const Vec3 &axis);
 
   /**
+   * @brief Computes 1D overlap between two projections, accounting for full containment (dyn4j MTV handling).
+   */
+  static float ComputeOverlap(const Projection &a, const Projection &b);
+
+  /**
    * @brief Extracts candidate perpendicular axes from consecutive polygon edges.
    * @note In SAT, axes represent 1D projection lines (sign is bidirectional).
    * The final MTV collision normal is explicitly oriented from Shape A to Shape B.
