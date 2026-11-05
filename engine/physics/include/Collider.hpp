@@ -204,7 +204,7 @@ public:
       }
       radius = std::sqrt(maxDistSq);
 
-      // Shoelace formula for polygon area
+            // Shoelace formula for polygon area
       float area = 0.0f;
       for (size_t i = 0; i < localVertices.size(); ++i) {
         const Vec3& p1 = localVertices[i];
@@ -212,7 +212,15 @@ public:
         area += (p1.x * p2.y - p2.x * p1.y);
       }
       area = std::abs(area) * 0.5f;
-      if (area <= 0.0f) area = 1.0f;
+
+      assert(area > 1e-5f && "Polygon collider must have a positive, non-zero area (vertices cannot be collinear or degenerate).");
+
+      if (area <= 1e-5f) {
+        mass = 0.0f;
+        localInertiaTensor.Zero();
+        return;
+      }
+
       mass = area * density;
       float i = (1.0f / 6.0f) * mass * (radius * radius);
       localInertiaTensor = Mat3::Diagonal(i, i, i);
