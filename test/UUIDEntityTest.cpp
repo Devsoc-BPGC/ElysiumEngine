@@ -144,6 +144,46 @@ void TestEntityHandleResolution() {
   std::cout << "[PASS] TestEntityHandleResolution" << std::endl;
 }
 
+void TestSceneClear() {
+  Scene scene;
+
+  auto plain = std::make_shared<GameObject>("Plain");
+  auto body = std::make_shared<GameObject>("Body");
+  body->CreateRigidBody();
+  Elysium::UUID bodyId = body->GetUUID();
+
+  scene.AddGameObject(plain);
+  scene.AddGameObject(body);
+  assert(scene.objects.size() == 2);
+  assert(scene.m_EntityMap.size() == 2);
+  assert(scene.physicsWorld.rigidBodies.size() == 1);
+
+  scene.Clear();
+
+  assert(scene.objects.empty());
+  assert(scene.m_EntityMap.empty());
+  assert(scene.physicsWorld.rigidBodies.empty());
+  assert(scene.GetEntityByUUID(bodyId) == nullptr);
+
+  // Scene no longer holds references, so entities are released
+  std::weak_ptr<GameObject> weakBody = body;
+  body.reset();
+  assert(weakBody.expired());
+
+  // Stepping an empty scene after Clear must not touch freed bodies
+  scene.Update(1.0f / 60.0f);
+
+  // Scene remains usable after Clear
+  auto fresh = std::make_shared<GameObject>("Fresh");
+  fresh->CreateRigidBody();
+  scene.AddGameObject(fresh);
+  assert(scene.objects.size() == 1);
+  assert(scene.physicsWorld.rigidBodies.size() == 1);
+  scene.Update(1.0f / 60.0f);
+
+  std::cout << "[PASS] TestSceneClear" << std::endl;
+}
+
 int main(int argc, char **argv) {
   (void)argc;
   (void)argv;
@@ -154,6 +194,7 @@ int main(int argc, char **argv) {
   TestGameObjectUUIDIntegration();
   TestSceneEntityLookupAndDeletion();
   TestEntityHandleResolution();
+  TestSceneClear();
   std::cout << "\nAll UUID and EntityHandle tests PASSED successfully!\n";
   return 0;
 }

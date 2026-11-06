@@ -3,6 +3,7 @@ set(ENGINE_SOURCES
     physics/src/Collider.cpp
     physics/src/PhysicsWorld.cpp
     physics/src/RigidBody.cpp
+    physics/src/SAT.cpp
 )
 
 # Core src seems empty for now, but we'll add it if there are any files
@@ -29,13 +30,14 @@ target_include_directories(ElysiumEngine PUBLIC
     events
 )
 
-# Remove ELYSIUM_BUILD_DLL since we're building static
-# Let CMake handle platform detection instead of hardcoding
-target_compile_definitions(ElysiumEngine PUBLIC
-    $<$<BOOL:${WIN32}>:ELYSIUM_PLATFORM_WINDOWS>
-    $<$<BOOL:${APPLE}>:ELYSIUM_PLATFORM_MAC>
-    $<$<BOOL:${UNIX} AND NOT ${APPLE}>:ELYSIUM_PLATFORM_LINUX>
-)
+if(WIN32)
+    target_compile_definitions(ElysiumEngine PUBLIC ELYSIUM_PLATFORM_WINDOWS)
+elseif(APPLE)
+    target_compile_definitions(ElysiumEngine PUBLIC ELYSIUM_PLATFORM_MAC)
+elseif(UNIX)
+    target_compile_definitions(ElysiumEngine PUBLIC ELYSIUM_PLATFORM_LINUX)
+endif()
+
 
 target_link_libraries(ElysiumEngine PUBLIC
     SFML::Graphics 

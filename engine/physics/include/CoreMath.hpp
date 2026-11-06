@@ -18,6 +18,7 @@ static const float PI = 3.14159265359f;
 struct Vec2;
 struct Vec3;
 struct Mat3;
+struct Mat4;
 struct Quat;
 
 /**
@@ -430,6 +431,19 @@ struct Quat {
                 w * q.z + x * q.y - y * q.x + z * q.w);
   }
 
+  /** @brief Returns conjugate quaternion (negates vector part). */
+  Quat Conjugate() const { return Quat(w, -x, -y, -z); }
+
+  /** @brief Returns inverse quaternion. */
+  Quat Inverted() const {
+    float lenSq = w * w + x * x + y * y + z * z;
+    if (lenSq > EPSILON) {
+      float inv = 1.0f / lenSq;
+      return Quat(w * inv, -x * inv, -y * inv, -z * inv);
+    }
+    return Quat(1.0f, 0.0f, 0.0f, 0.0f);
+  }
+
   Quat operator*(float s) const { return Quat(w * s, x * s, y * s, z * s); }
   void operator+=(const Quat &q) {
     w += q.w;
@@ -511,5 +525,168 @@ inline Quat Mat3::ToQuat() const {
 inline Mat3 Vec3::outerProduct(const Vec3 &v) const {
   return Mat3::OuterProduct(*this, v);
 }
+
+/**
+ * @struct Mat4
+ * @brief 4x4 Transformation matrix for 3D/2D affine transforms.
+ * Stored row-by-row m[row][col] consistent with Mat3.
+ */
+struct Mat4 {
+  float m[4][4];
+
+  Mat4() { Zero(); }
+
+  Mat4(float m00, float m01, float m02, float m03,
+       float m10, float m11, float m12, float m13,
+       float m20, float m21, float m22, float m23,
+       float m30, float m31, float m32, float m33) {
+    m[0][0] = m00; m[0][1] = m01; m[0][2] = m02; m[0][3] = m03;
+    m[1][0] = m10; m[1][1] = m11; m[1][2] = m12; m[1][3] = m13;
+    m[2][0] = m20; m[2][1] = m21; m[2][2] = m22; m[2][3] = m23;
+    m[3][0] = m30; m[3][1] = m31; m[3][2] = m32; m[3][3] = m33;
+  }
+
+  void Zero() {
+    for (int r = 0; r < 4; ++r) {
+      for (int c = 0; c < 4; ++c) {
+        m[r][c] = 0.0f;
+      }
+    }
+  }
+
+  static Mat4 Identity() {
+    Mat4 res;
+    res.m[0][0] = 1.0f;
+    res.m[1][1] = 1.0f;
+    res.m[2][2] = 1.0f;
+    res.m[3][3] = 1.0f;
+    return res;
+  }
+
+  static Mat4 Translate(const Vec3 &t) {
+    Mat4 res = Identity();
+    res.m[0][3] = t.x;
+    res.m[1][3] = t.y;
+    res.m[2][3] = t.z;
+    return res;
+  }
+
+  static Mat4 Scale(const Vec3 &s) {
+    Mat4 res = Identity();
+    res.m[0][0] = s.x;
+    res.m[1][1] = s.y;
+    res.m[2][2] = s.z;
+    return res;
+  }
+
+  static Mat4 Rotate(const Quat &q) {
+    Mat3 r = q.ToMatrix();
+    Mat4 res = Identity();
+    for (int row = 0; row < 3; ++row) {
+      for (int col = 0; col < 3; ++col) {
+        res.m[row][col] = r.m[row][col];
+      }
+    }
+    return res;
+  }
+
+  /**
+   * @brief Creates a composite Transform matrix: T * R * S
+   */
+  static Mat4 TRS(const Vec3 &translation, const Quat &rotation, const Vec3 &scale) {
+    Mat3 rot = rotation.ToMatrix();
+    Mat4 res;
+    // Column 0 = rot * (scale.x, 0, 0)
+    res.m[0][0] = rot.m[0][0] * scale.x;
+    res.m[1][0] = rot.m[1][0] * scale.x;
+    res.m[2][0] = rot.m[2][0] * scale.x;
+    res.m[3][0] = 0.0f;
+
+    // Column 1 = rot * (0, scale.y, 0)
+    res.m[0][1] = rot.m[0][1] * scale.y;
+    res.m[1][1] = rot.m[1][1] * scale.y;
+    res.m[2][1] = rot.m[2][1] * scale.y;
+    res.m[3][1] = 0.0f;
+
+    // Column 2 = rot * (0, 0, scale.z)
+    res.m[0][2] = rot.m[0][2] * scale.z;
+    res.m[1][2] = rot.m[1][2] * scale.z;
+    res.m[2][2] = rot.m[2][2] * scale.z;
+    res.m[3][2] = 0.0f;
+
+    // Column 3 = translation
+    res.m[0][3] = translation.x;
+    res.m[1][3] = translation.y;
+    res.m[2][3] = translation.z;
+    res.m[3][3] = 1.0f;
+
+    return res;
+  }
+
+  Mat4 operator*(const Mat4 &o) const {
+    Mat4 result;
+    for (int r = 0; r < 4; ++r) {
+      for (int c = 0; c < 4; ++c) {
+        result.m[r][c] = m[r][0] * o.m[0][c] +
+                         m[r][1] * o.m[1][c] +
+                         m[r][2] * o.m[2][c] +
+                         m[r][3] * o.m[3][c];
+      }
+    }
+    return result;
+  }
+
+  /**
+   * @brief Transforms a point (w = 1.0f).
+   */
+  Vec3 TransformPoint(const Vec3 &p) const {
+    float w = m[3][0] * p.x + m[3][1] * p.y + m[3][2] * p.z + m[3][3];
+    float invW = (std::abs(w) > EPSILON) ? (1.0f / w) : 1.0f;
+    return Vec3((m[0][0] * p.x + m[0][1] * p.y + m[0][2] * p.z + m[0][3]) * invW,
+                (m[1][0] * p.x + m[1][1] * p.y + m[1][2] * p.z + m[1][3]) * invW,
+                (m[2][0] * p.x + m[2][1] * p.y + m[2][2] * p.z + m[2][3]) * invW);
+  }
+
+  /**
+   * @brief Transforms a direction vector (w = 0.0f, ignores translation).
+   */
+  Vec3 TransformVector(const Vec3 &v) const {
+    return Vec3(m[0][0] * v.x + m[0][1] * v.y + m[0][2] * v.z,
+                m[1][0] * v.x + m[1][1] * v.y + m[1][2] * v.z,
+                m[2][0] * v.x + m[2][1] * v.y + m[2][2] * v.z);
+  }
+
+  Vec3 GetTranslation() const {
+    return Vec3(m[0][3], m[1][3], m[2][3]);
+  }
+
+  Vec3 GetScale() const {
+    Vec3 col0(m[0][0], m[1][0], m[2][0]);
+    Vec3 col1(m[0][1], m[1][1], m[2][1]);
+    Vec3 col2(m[0][2], m[1][2], m[2][2]);
+    return Vec3(col0.Magnitude(), col1.Magnitude(), col2.Magnitude());
+  }
+
+  Quat GetRotation() const {
+    Vec3 scale = GetScale();
+    Mat3 rotMat;
+    if (scale.x > EPSILON) {
+      rotMat.m[0][0] = m[0][0] / scale.x;
+      rotMat.m[1][0] = m[1][0] / scale.x;
+      rotMat.m[2][0] = m[2][0] / scale.x;
+    }
+    if (scale.y > EPSILON) {
+      rotMat.m[0][1] = m[0][1] / scale.y;
+      rotMat.m[1][1] = m[1][1] / scale.y;
+      rotMat.m[2][1] = m[2][1] / scale.y;
+    }
+    if (scale.z > EPSILON) {
+      rotMat.m[0][2] = m[0][2] / scale.z;
+      rotMat.m[1][2] = m[1][2] / scale.z;
+      rotMat.m[2][2] = m[2][2] / scale.z;
+    }
+    return rotMat.ToQuat();
+  }
+};
 
 #endif

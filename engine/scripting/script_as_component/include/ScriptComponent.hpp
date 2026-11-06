@@ -32,6 +32,24 @@ public:
     ~ScriptComponent() override;
 
     /**
+     * @brief Returns a copy of this component for Play mode scene cloning.
+     */
+    std::unique_ptr<Component> Clone() const override {
+        auto clone = std::make_unique<ScriptComponent>(m_ScriptName);
+        return clone;
+    }
+
+    /**
+     * @brief Re-binds the script when the scene is cloned for Play mode.
+     */
+    void OnCloned(const std::shared_ptr<GameObject> &owner) override {
+        (void)owner;
+        if (!m_ScriptName.empty()) {
+            BindScript(m_ScriptName);
+        }
+    }
+
+    /**
      * @brief Called by the engine when the scene starts or component is created.
      */
     void Start() override;

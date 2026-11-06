@@ -15,6 +15,10 @@ public:
                      SimpleRenderer &renderer) override;
 
 private:
+  void DrawEntityNode(EditorContext &context, Scene &scene,
+                      const std::shared_ptr<GameObject> &obj,
+                      std::shared_ptr<GameObject> &entityToDelete);
+
   ImGuiTextFilter m_filter;
 };
 

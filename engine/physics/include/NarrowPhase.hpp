@@ -2,7 +2,9 @@
 #define NARROW_PHASE_HPP
 
 #include "RigidBody.hpp"
+#include "SAT.hpp"
 #include <cmath>
+
 
 /**
  * @class NarrowPhase
@@ -17,76 +19,66 @@ public:
    * @param a The first rigid body.
    * @param b The second rigid body.
    */
+  static bool IsConvexShape(ColliderType type) {
+    return type == ColliderType::Box || type == ColliderType::Polygon;
+  }
+
   static void ResolveCollision(RigidBody *a, RigidBody *b) {
     for (auto &colA : a->colliders) {
       for (auto &colB : b->colliders) {
-        if (colA.type == ColliderType::Sphere &&
-            colB.type == ColliderType::Sphere) {
+        bool isPolyA = IsConvexShape(colA.type);
+        bool isPolyB = IsConvexShape(colB.type);
+
+        if (colA.type == ColliderType::Sphere && colB.type == ColliderType::Sphere) {
           ResolveSphereSphere(a, colA, b, colB);
-        } else if (colA.type == ColliderType::Sphere &&
-                   colB.type == ColliderType::Box) {
-          ResolveSphereBox(a, colA, b, colB);
-        } else if (colA.type == ColliderType::Box &&
-                   colB.type == ColliderType::Sphere) {
-          ResolveSphereBox(b, colB, a, colA);
-        } else if (colA.type == ColliderType::Box &&
-                   colB.type == ColliderType::Box) {
-          ResolveBoxBox(a, colA, b, colB);
+        } else if (colA.type == ColliderType::Sphere && isPolyB) {
+          ResolveCirclePolygon(a, colA, b, colB);
+        } else if (isPolyA && colB.type == ColliderType::Sphere) {
+          ResolveCirclePolygon(b, colB, a, colA);
+        } else if (isPolyA && isPolyB) {
+          ResolvePolygonPolygon(a, colA, b, colB);
         }
       }
     }
   }
 
+
+
 private:
-  static void ResolveBoxBox(RigidBody *a, const Collider &colA, RigidBody *b,
-                            const Collider &colB) {
-    // 1. Get world positions of centroids
-    Vec3 posA = a->LocalToGlobal(colA.localCentroid);
-    Vec3 posB = b->LocalToGlobal(colB.localCentroid);
-    Vec3 deltaPos = posB - posA;
 
-    // 2. Axes to test: Box A's X/Y, Box B's X/Y
-    // In 2D, columns 0 and 1 of the orientation matrix are X and Y world axes.
-    Vec3 axes[4] = {a->orientation.GetColumn(0).Normalized(),
-                    a->orientation.GetColumn(1).Normalized(),
-                    b->orientation.GetColumn(0).Normalized(),
-                    b->orientation.GetColumn(1).Normalized()};
-
-    float minOverlap = 1e10f;
-    Vec3 mtvNormal;
-
-    for (int i = 0; i < 4; ++i) {
-      Vec3 axis = axes[i];
-
-      // Project Box A
-      float projectionA = std::abs(axes[0].Dot(axis)) * colA.halfExtents.x +
-                          std::abs(axes[1].Dot(axis)) * colA.halfExtents.y;
-
-      // Project Box B
-      float projectionB = std::abs(axes[2].Dot(axis)) * colB.halfExtents.x +
-                          std::abs(axes[3].Dot(axis)) * colB.halfExtents.y;
-
-      // Project distance between centers
-      float distance = std::abs(deltaPos.Dot(axis));
-
-      float overlap = projectionA + projectionB - distance;
-
-      if (overlap <= 0)
-        return; // Separating axis found
-
-      if (overlap < minOverlap) {
-        minOverlap = overlap;
-        mtvNormal = axis;
-      }
+  static void ResolveCirclePolygon(RigidBody *circleBody, const Collider &colCircle, RigidBody *polyBody, const Collider &colPoly) {
+    Vec3 circleCenter = circleBody->LocalToGlobal(colCircle.localCentroid);
+    Vec3 polyCenter = polyBody->LocalToGlobal(colPoly.localCentroid);
+    // Cheap bounding-radius early-out: avoids allocating world vertices when shapes are far apart
+    float radiusSum = colCircle.radius + colPoly.radius;
+    float distSq = (circleCenter - polyCenter).MagnitudeSquared();
+    if (distSq >= radiusSum * radiusSum || distSq == 0.0f) {
+      return;
     }
-
-    // Ensure normal points from A to B
-    if (deltaPos.Dot(mtvNormal) < 0) {
-      mtvNormal = mtvNormal * -1.0f;
+    std::vector<Vec3> polyVerts = colPoly.GetWorldVertices(*polyBody);
+    Elysium::SATResult sat = Elysium::SAT::TestCirclePolygon(circleCenter, colCircle.radius, polyVerts);
+    if (sat.collided) {
+      ApplyImpulse(circleBody, polyBody, sat.normal, sat.depth);
     }
-
-    ApplyImpulse(a, b, mtvNormal, minOverlap);
   }
+
+  static void ResolvePolygonPolygon(RigidBody *a, const Collider &colA, RigidBody *b, const Collider &colB) {
+    Vec3 centerA = a->LocalToGlobal(colA.localCentroid);
+    Vec3 centerB = b->LocalToGlobal(colB.localCentroid);
+    // Cheap bounding-radius early-out: avoids allocating world vertices when shapes are far apart
+    float radiusSum = colA.radius + colB.radius;
+    float distSq = (centerA - centerB).MagnitudeSquared();
+    if (distSq >= radiusSum * radiusSum || distSq == 0.0f) {
+      return;
+    }
+    std::vector<Vec3> vertsA = colA.GetWorldVertices(*a);
+    std::vector<Vec3> vertsB = colB.GetWorldVertices(*b);
+    Elysium::SATResult sat = Elysium::SAT::TestPolygonPolygon(vertsA, vertsB);
+    if (sat.collided) {
+      ApplyImpulse(a, b, sat.normal, sat.depth);
+    }
+  }
+
   static void ResolveSphereSphere(RigidBody *a, const Collider &colA,
                                   RigidBody *b, const Collider &colB) {
     Vec3 posA = a->LocalToGlobal(colA.localCentroid);
@@ -107,48 +99,7 @@ private:
     ApplyImpulse(a, b, normal, radiusSum - distance);
   }
 
-  static void ResolveSphereBox(RigidBody *sphereBody, const Collider &sphereCol,
-                               RigidBody *boxBody, const Collider &boxCol) {
-    // 1. Get sphere position in box's local space
-    Vec3 sphereWorldPos = sphereBody->LocalToGlobal(sphereCol.localCentroid);
-    Vec3 sphereLocalPos = boxBody->GlobalToLocal(sphereWorldPos);
-
-    // 2. Find the closest point on the box to the sphere center
-    Vec3 closestPointLocal = sphereLocalPos;
-    Vec3 halfExtents = boxCol.halfExtents;
-
-    if (closestPointLocal.x > halfExtents.x)
-      closestPointLocal.x = halfExtents.x;
-    else if (closestPointLocal.x < -halfExtents.x)
-      closestPointLocal.x = -halfExtents.x;
-
-    if (closestPointLocal.y > halfExtents.y)
-      closestPointLocal.y = halfExtents.y;
-    else if (closestPointLocal.y < -halfExtents.y)
-      closestPointLocal.y = -halfExtents.y;
-
-    if (closestPointLocal.z > halfExtents.z)
-      closestPointLocal.z = halfExtents.z;
-    else if (closestPointLocal.z < -halfExtents.z)
-      closestPointLocal.z = -halfExtents.z;
-
-    // 3. Check if the closest point is within radius distance
-    Vec3 vecFromClosestToSphereLocal = sphereLocalPos - closestPointLocal;
-    float distSq = vecFromClosestToSphereLocal.MagnitudeSquared();
-
-    if (distSq >= sphereCol.radius * sphereCol.radius || distSq == 0)
-      return;
-
-    float distance = std::sqrt(distSq);
-
-    // normalFromAtoB where A=Sphere, B=Box
-    // normalLocal = closestPointLocal - sphereLocalPos
-    Vec3 normalLocal = closestPointLocal - sphereLocalPos;
-    Vec3 normalWorld = boxBody->LocalToGlobalVec(normalLocal / distance);
-
-    ApplyImpulse(sphereBody, boxBody, normalWorld, sphereCol.radius - distance);
-  }
-
+  
   static void ApplyImpulse(RigidBody *a, RigidBody *b,
                            const Vec3 &normalFromAtoB, float overlap) {
     // 1. Position Correction (to resolve overlap)
