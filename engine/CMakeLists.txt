@@ -15,7 +15,7 @@ file(GLOB_RECURSE EDITOR_SOURCES editor/src/*.cpp)
 list(APPEND ENGINE_SOURCES ${EDITOR_SOURCES})
 
 # Scripting sources
-file(GLOB_RECURSE SCRIPTING_SOURCES scripting/src/*.cpp)
+file(GLOB_RECURSE SCRIPTING_SOURCES "scripting/*.cpp")
 list(APPEND ENGINE_SOURCES ${SCRIPTING_SOURCES})
 
 # Changed from SHARED to STATIC to avoid DLL export issues on Windows
@@ -25,7 +25,8 @@ target_include_directories(ElysiumEngine PUBLIC
     core/include
     physics/include
     editor/include
-    scripting/include
+    "scripting/wrapper cmds/include"
+    scripting/script_as_component/include
     events
 )
 
