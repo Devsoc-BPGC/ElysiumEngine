@@ -12,6 +12,14 @@
 #include <algorithm>
 #include <vector>
 
+struct PhysicsStepStats {
+  size_t broadPhaseCandidatePairs = 0;
+  size_t narrowPhasePairsTested = 0;
+  size_t boundingRadiusPruned = 0;
+  size_t satChecksPerformed = 0;
+  size_t actualCollisions = 0;
+};
+
 /**
  * @class PhysicsWorld
  * @brief Manages the collection of rigid bodies and orchestrates the simulation
@@ -76,8 +84,9 @@ public:
   /**
    * @brief Advances the simulation by a fixed time step.
    * @param dt The time delta (change in time) in seconds.
+   * @param stats Optional pointer to collect step metrics.
    */
-  void Step(float dt);
+  void Step(float dt, PhysicsStepStats *stats = nullptr);
 
   /**
    * @brief Resets the force and torque accumulators for all bodies in the

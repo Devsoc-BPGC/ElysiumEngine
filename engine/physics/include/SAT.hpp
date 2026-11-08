@@ -21,7 +21,7 @@ struct Projection {
   float max = 0.0f;
 
   bool Overlaps(const Projection &other) const {
-    return max > other.min && other.max > min;
+    return max >= other.min && other.max >= min;
   }
 
   float GetOverlap(const Projection &other) const {

@@ -21,7 +21,7 @@
  * constraints).
  * * @param dt The time delta for the current frame.
  */
-void PhysicsWorld::Step(float dt) {
+void PhysicsWorld::Step(float dt, PhysicsStepStats *stats) {
   // 1. Apply Gravity
   // Computes F = m * g and applies it at the center of mass.
   for (auto *body : rigidBodies) {
@@ -42,25 +42,27 @@ void PhysicsWorld::Step(float dt) {
   std::vector<CollisionPair> candidates =
       BroadPhase::GeneratePairs(rigidBodies);
 
+  if (stats) {
+    stats->broadPhaseCandidatePairs = candidates.size();
+  }
+
   // 4. Narrow Phase (Body vs Body)
   // Detailed geometric intersection tests and impulse resolution.
+  NarrowPhaseStats npStats;
   for (auto &pair : candidates) {
-    NarrowPhase::ResolveCollision(pair.A, pair.B);
+    NarrowPhase::ResolveCollision(pair.A, pair.B, stats ? &npStats : nullptr);
+  }
+
+  if (stats) {
+    stats->narrowPhasePairsTested = npStats.candidatePairsTested;
+    stats->boundingRadiusPruned = npStats.boundingRadiusPruned;
+    stats->satChecksPerformed = npStats.satChecksPerformed;
+    stats->actualCollisions = npStats.actualCollisions;
   }
 
   // 5. Boundary Resolution
-  // Final check to ensure balls stay within the simulation box after
-  // collisions.
+  // Final check to ensure bodies stay within the simulation box after collisions.
   ResolveBoundaries();
-
-  // Secondary Broad Phase check (often used for debug visualization or logging)
-  std::vector<CollisionPair> pairs = BroadPhase::GeneratePairs(rigidBodies);
-
-  // Temporary Debug Hook
-  if (!pairs.empty()) {
-    // std::cout << "Broad Phase found " << pairs.size() << " potential
-    // collisions!" << std::endl;
-  }
 }
 
 /**

@@ -24,6 +24,7 @@ endif()
 
 # --- Test toggle (must be declared before enable_testing / add_test) ---
 option(BUILD_TESTING "Build tests" OFF)
+option(BUILD_BENCHMARKS "Build benchmark suite" OFF)
 
 # --- Distribution build toggle (strips all logging) ---
 option(ELYSIUM_DIST "Build in distribution mode (no logging)" OFF)
@@ -164,34 +165,48 @@ if(WIN32)
 endif()
 
 # ============================================================
-#  Tests (opt-in via -DBUILD_TESTING=ON)
+#  Tests & Benchmarks (opt-in via -DBUILD_TESTING=ON or -DBUILD_BENCHMARKS=ON)
 # ============================================================
-if(BUILD_TESTING)
-    enable_testing()
+if(BUILD_TESTING OR BUILD_BENCHMARKS)
+    if(BUILD_TESTING)
+        enable_testing()
 
-    function(elysium_add_test test_name source_file)
-        add_executable(${test_name} ${source_file})
-        target_link_libraries(${test_name} PRIVATE
-            ElysiumEngine
-            SFML::System
-            spdlog::spdlog_header_only
-        )
-        configure_elysium_target(${test_name})
-        add_test(NAME ${test_name} COMMAND ${test_name})
-    endfunction()
+        function(elysium_add_test test_name source_file)
+            add_executable(${test_name} ${source_file})
+            target_link_libraries(${test_name} PRIVATE
+                ElysiumEngine
+                SFML::System
+                spdlog::spdlog_header_only
+            )
+            configure_elysium_target(${test_name})
+            add_test(NAME ${test_name} COMMAND ${test_name})
+        endfunction()
 
-    elysium_add_test(PhysicsPerformanceTest   test/PhysicsPerformanceTest.cpp)
-    elysium_add_test(BroadPhasePerformanceTest test/BroadPhasePerformanceTest.cpp)
-    elysium_add_test(BoundaryTest              test/BoundaryTest.cpp)
-    elysium_add_test(FrictionTest              test/FrictionTest.cpp)
-    elysium_add_test(RigidBodyDecouplingTest   test/RigidBodyDecouplingTest.cpp)
-    elysium_add_test(UUIDEntityTest            test/UUIDEntityTest.cpp)
-    elysium_add_test(AssetManagerTest          test/AssetManagerTest.cpp)
-    elysium_add_test(ProjectTest               test/ProjectTest.cpp)
-    elysium_add_test(SceneCloneTest            test/SceneCloneTest.cpp)
-    elysium_add_test(ComponentOffsetsTest      test/ComponentOffsetsTest.cpp)
-    elysium_add_test(SceneGraphTest            test/SceneGraphTest.cpp)
-    elysium_add_test(SATTest                   test/SATTest.cpp)
+        elysium_add_test(PhysicsPerformanceTest   test/PhysicsPerformanceTest.cpp)
+        elysium_add_test(BroadPhasePerformanceTest test/BroadPhasePerformanceTest.cpp)
+        elysium_add_test(BoundaryTest              test/BoundaryTest.cpp)
+        elysium_add_test(FrictionTest              test/FrictionTest.cpp)
+        elysium_add_test(RigidBodyDecouplingTest   test/RigidBodyDecouplingTest.cpp)
+        elysium_add_test(UUIDEntityTest            test/UUIDEntityTest.cpp)
+        elysium_add_test(AssetManagerTest          test/AssetManagerTest.cpp)
+        elysium_add_test(ProjectTest               test/ProjectTest.cpp)
+        elysium_add_test(SceneCloneTest            test/SceneCloneTest.cpp)
+        elysium_add_test(ComponentOffsetsTest      test/ComponentOffsetsTest.cpp)
+        elysium_add_test(SceneGraphTest            test/SceneGraphTest.cpp)
+        elysium_add_test(SATTest                   test/SATTest.cpp)
+    endif()
+
+    add_executable(PhysicsBenchmark test/PhysicsBenchmark.cpp)
+    target_link_libraries(PhysicsBenchmark PRIVATE
+        ElysiumEngine
+        SFML::System
+        spdlog::spdlog_header_only
+    )
+    configure_elysium_target(PhysicsBenchmark)
+
+    if(BUILD_TESTING)
+        add_test(NAME PhysicsBenchmarkQuick COMMAND PhysicsBenchmark --sizes=100 --iterations=5 --warmup=2 --verify)
+    endif()
 endif()
 
 # ============================================================

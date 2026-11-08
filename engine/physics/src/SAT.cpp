@@ -79,7 +79,7 @@ SATResult SAT::TestPolygonPolygon(const std::vector<Vec3> &verticesA,
   // 2. Candidate axes from Polygon B
   std::vector<Vec3> axesB = GetAxes(verticesB);
 
-  if (axesA.empty() && axesB.empty()) {
+  if (axesA.empty() || axesB.empty()) {
     result.collided = false;
     return result;
   }
