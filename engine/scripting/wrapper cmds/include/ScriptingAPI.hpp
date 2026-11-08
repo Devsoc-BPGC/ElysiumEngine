@@ -6,3 +6,5 @@
 #include "ScriptingWorld.hpp"
 #include "ScriptingInput.hpp"
 #include "ScriptEngine.hpp"
+#include "ScriptComponent.hpp"
+#include "ScriptRegistry.hpp"
