@@ -381,6 +381,7 @@ The physics engine (`engine/physics/`) provides robust 2D dynamics:
 - **BroadPhase**: Uniform spatial grid for rapid collision pair candidate pruning.
 - **NarrowPhase**: Separating Axis Theorem (SAT) for box-box, sphere-sphere, and box-sphere contact manifold generation.
 - **Simulation Control**: Toggle between Edit Mode (physics paused, live manual transform positioning) and Play Mode (active physics stepping).
+- **Benchmarking Suite (`PhysicsBenchmark`)**: Built-in benchmark harness (`test/PhysicsBenchmark.cpp`) with parametric scaling sweeps ($N = 100 \dots 5000$), density distributions (sparse, dense, grid), ground-truth verification, and JSON/CSV historical tracking. See [`docs/PHYSICS_BENCHMARK.md`](docs/PHYSICS_BENCHMARK.md).
 
 ---
 

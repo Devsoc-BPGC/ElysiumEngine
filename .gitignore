@@ -28,9 +28,9 @@
 *.out
 *.app
 
-docs
-
 build
+
+build_bench
 
 *.log
 

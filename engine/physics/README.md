@@ -34,3 +34,32 @@ The `engine/physics` module provides continuous 2D rigid body dynamics, broadpha
    - `PhysicsWorld` evaluates optional rotating bounding box constraints (`boundaryHalfExtents`, `boundaryRotation`).
 5. **Transform Sync**:
    - After stepping, `GameObject::SyncPhysics()` updates entity positions and rotations to match the physics simulation.
+
+---
+
+## Benchmarking Suite (`PhysicsBenchmark`)
+
+Elysium Engine includes a comprehensive, reproducible C++ benchmarking suite to establish baseline performance metrics and track optimizations across broadphase and narrowphase systems.
+
+### Building the Benchmark Target
+```bash
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_BENCHMARKS=ON
+cmake --build build --target PhysicsBenchmark -j$(nproc)
+```
+
+### Running Benchmarks
+- **Quick Smoke Test with Verification**:
+  ```bash
+  ./build/bin/PhysicsBenchmark --sizes=100,500 --verify
+  ```
+- **Parametric Scaling Sweep with JSON & CSV Export**:
+  ```bash
+  ./build/bin/PhysicsBenchmark --sizes=100,500,1000,2500,5000 --format=all --out=physics_baseline.json --verify
+  ```
+- **Target Selection**:
+  - `--benchmark=<all|broadphase|narrowphase|world>`
+  - `--distribution=<all|sparse|dense|grid>`
+  - `--shapes=<all|sphere|box|box-sphere|mixed>`
+
+See [`docs/PHYSICS_BENCHMARK.md`](../../docs/PHYSICS_BENCHMARK.md) for full CLI flags, JSON schema, and CI/CD optimization comparison workflows.
+
