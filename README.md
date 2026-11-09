@@ -83,9 +83,10 @@ Elysium follows a modular, decoupled engine design:
   - ImGui docking branch with workspace persistence and custom modern dark theme.
   - Comprehensive Main Menu Bar (`File`, `Edit`, `Scene`, `Entities`, `View`, `Options`).
   - Play, Pause, and Single-Frame Step toolbar controls to toggle between Edit Mode and Simulation Mode.
-- **Off-Screen Viewport**:
+- **Off-Screen Viewport & Mouse Picking**:
   - Scene is rendered into an `sf::RenderTexture` and displayed via `ImGui::Image`.
   - Independent 2D Editor Camera with smooth panning (Right-Click / Middle-Click drag) and zooming (Mouse Wheel), completely decoupled from the editor UI.
+  - Interactive direct viewport mouse picking: left-click to select entities in 2D space with screen-to-world unprojection, oriented sprite bounds (accounting for rotation, scale, and custom pivots), collider geometry, top-most Z-ordering, and golden-yellow highlight rendering.
 - **Scene Hierarchy & Entity Inspector**:
   - Filterable live entity list with selection highlight.
   - Interactive component reflection for `Transform` (Position, Rotation, Scale), `RigidBody2D` (Mass, Linear/Angular Velocity, Static/Dynamic toggle, Friction, Restitution), `Collider2D` (Sphere radius, Box extents), and `SpriteRenderer`.
@@ -177,6 +178,7 @@ ElysiumEngine/
 │   │       ├── Project.cpp              # Project initialization, loading, and directories
 │   │       ├── ProjectSerializer.cpp    # .elyproj serialization and deserialization
 │   │       ├── Scene.cpp                # Scene entity registry and physics integration
+│   │       ├── SimpleRenderer.cpp       # 2D scene renderer & geometric viewport picking
 │   │       ├── UUID.cpp                 # 64-bit Mersenne Twister & entropy generator
 │   │       ├── Window.cpp               # SFML 3 event pump and translation
 │   │       ├── Layer.cpp                # Layer base implementation
@@ -215,6 +217,7 @@ ElysiumEngine/
 │       │   ├── PhysicsWorld.hpp    # Simulation manager and solver loop
 │       │   ├── BroadPhase.hpp      # Spatial hash grid
 │       │   ├── NarrowPhase.hpp     # SAT collision detection and resolution
+│       │   ├── SAT.hpp             # Separating Axis Theorem convex polygon/circle solver
 │       │   ├── AABB.hpp            # Axis-aligned bounding boxes
 │       │   ├── CollisionPair.hpp   # Potential contact pair representation
 │       │   └── CoreMath.hpp        # Vec2, Vec3, Mat3, Quat math primitives
@@ -222,7 +225,8 @@ ElysiumEngine/
 │           ├── AABB.cpp
 │           ├── Collider.cpp
 │           ├── PhysicsWorld.cpp
-│           └── RigidBody.cpp
+│           ├── RigidBody.cpp
+│           └── SAT.cpp
 ├── external/                   # Git submodules
 │   ├── SFML/                   # SFML 3.2.0 source
 │   └── spdlog/                 # spdlog header-only logging
@@ -230,11 +234,17 @@ ElysiumEngine/
     ├── AssetManagerTest.cpp
     ├── BoundaryTest.cpp
     ├── BroadPhasePerformanceTest.cpp
+    ├── ComponentOffsetsTest.cpp
     ├── FrictionTest.cpp
+    ├── PhysicsBenchmark.cpp
     ├── PhysicsPerformanceTest.cpp
     ├── ProjectTest.cpp
     ├── RigidBodyDecouplingTest.cpp
-    └── UUIDEntityTest.cpp
+    ├── SATTest.cpp
+    ├── SceneCloneTest.cpp
+    ├── SceneGraphTest.cpp
+    ├── UUIDEntityTest.cpp
+    └── ViewportPickingTest.cpp
 ```
 
 ---
@@ -329,6 +339,23 @@ The **Scene Viewport Panel** (`SceneViewportPanel`) achieves full decoupling bet
    - **Pan**: Hold **Right Mouse Button** or **Middle Mouse Button** and drag inside the viewport.
    - **Zoom**: Scroll the **Mouse Wheel** to zoom between 5% and 2000%.
    - **HUD Overlay**: On-screen coordinates and quick "Reset View" button.
+
+#### Viewport Mouse Picking & Entity Selection
+The editor supports direct left-click selection of entities within the 2D viewport:
+- **Screen-to-World Raycasting / Unprojection**: Viewport pixel offsets relative to center $[- \text{width}/2, \text{width}/2] \times [-\text{height}/2, \text{height}/2]$ are unprojected into world space via [`EditorCamera::ViewportToWorld`](file:///home/mrgreenapple24/projects/ElysiumEngine/engine/editor/include/EditorContext.hpp):
+  $$\mathbf{P}_{\text{world}} = \mathbf{P}_{\text{camera}} + \frac{\mathbf{P}_{\text{viewport\_pixel}}}{\text{pixelsPerMeter} \times \text{zoom}}$$
+- **Geometric Hit Testing ([`SimpleRenderer::PickEntity`](file:///home/mrgreenapple24/projects/ElysiumEngine/engine/core/include/SimpleRenderer.hpp))**:
+  - **Rotated Sprite Bounding Boxes**: Evaluates oriented bounding boxes (OBBs) taking into account entity position, scale, rotation quaternion, and custom sprite pivots.
+  - **Sprite Circles**: Evaluates radial Euclidean distance against scaled circle radius.
+  - **Physics Colliders**: Tests points against attached `Box`, `Sphere`, or `Polygon` collider geometries.
+  - **Centroid Fallback**: Bounding radius test centered on entity position.
+- **Z-Depth & Draw-Order Precedence**: When entities overlap at the clicked location, the entity with the highest Z-depth (`position.z`) is selected; ties are broken in favor of later draw order (rendered on top).
+- **Interaction Guard Rails**:
+  - Left clicks are only sampled if the cursor is hovering the viewport texture canvas without active dragging (`!ImGui::IsMouseDragging(0)`).
+  - Clicks landing within HUD overlays (e.g. coordinates display, "Reset View" button) or active ImGui widgets are suppressed.
+  - Clicking empty viewport space clears the current selection (`context.ClearSelection()`).
+- **Selection Highlighting**: Selected entities display an eye-catching golden-yellow (`#FFD700`) outline rendered directly into the off-screen scene texture matching the entity's exact bounding box or circle geometry.
+- **Two-Way Synchronization**: Picking in the viewport immediately updates `EditorContext::selectedEntity`, synchronizing the **Scene Hierarchy** tree and populating the **Entity Inspector** panel in real time.
 
 ---
 
@@ -621,6 +648,7 @@ Upcoming milestones as detailed in [`PLAN.md`](file:///home/mrgreenapple24/proje
 - [x] **Asset Registry & Cache**: 64-bit UUID asset handles, thread-safe memory caching, and manifest serialization (`assets.meta`).
 - [x] **Content Browser Panel**: Directory tree navigation, thumbnail grid, file watcher, and drag-and-drop integration.
 - [x] **Project Management & Native Dialogs**: Standalone `.elyproj` project files, directory auto-initialization, and OS file/folder pickers.
+- [x] **Viewport Mouse Picking**: 2D unprojection, geometric entity hit testing (OBB/colliders), and synchronized editor selection highlight.
 
 ---
 

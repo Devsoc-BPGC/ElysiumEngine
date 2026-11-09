@@ -194,6 +194,7 @@ if(BUILD_TESTING OR BUILD_BENCHMARKS)
         elysium_add_test(ComponentOffsetsTest      test/ComponentOffsetsTest.cpp)
         elysium_add_test(SceneGraphTest            test/SceneGraphTest.cpp)
         elysium_add_test(SATTest                   test/SATTest.cpp)
+        elysium_add_test(ViewportPickingTest       test/ViewportPickingTest.cpp)
     endif()
 
     add_executable(PhysicsBenchmark test/PhysicsBenchmark.cpp)
