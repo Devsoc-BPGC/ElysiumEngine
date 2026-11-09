@@ -64,6 +64,7 @@ void SceneViewportPanel::OnImGuiRender(EditorContext &context, Scene &scene,
     renderer.drawPhysicsColliders = context.drawPhysicsColliders;
     renderer.drawAABBs = context.drawAABBs;
     renderer.pixelsPerMeter = context.pixelsPerMeter;
+    renderer.selectedEntity = context.selectedEntity;
     if (targetReady) {
       renderer.Render(m_viewportTexture, scene, view);
       m_viewportTexture.display();
@@ -72,8 +73,54 @@ void SceneViewportPanel::OnImGuiRender(EditorContext &context, Scene &scene,
       ImGui::Image(m_viewportTexture);
     }
 
+    ImVec2 imageMin = ImGui::GetItemRectMin();
+    ImVec2 imageSize = ImGui::GetItemRectSize();
+    bool isImageHovered = ImGui::IsItemHovered();
+
+    // Viewport HUD Overlay (Camera info & quick controls)
+    ImVec2 overlayPos =
+        ImVec2(context.viewportPos.x + 10.0f, context.viewportPos.y + 10.0f);
+    ImGui::SetNextWindowPos(overlayPos);
+    ImGui::SetNextWindowBgAlpha(0.6f);
+    if (ImGui::BeginChild("ViewportHUD", ImVec2(240.0f, 65.0f), true,
+                          ImGuiWindowFlags_NoDecoration |
+                              ImGuiWindowFlags_NoDocking |
+                              ImGuiWindowFlags_NoSavedSettings)) {
+      ImGui::Text("Cam: (%.2f, %.2f) m", context.camera.center.x,
+                  context.camera.center.y);
+      ImGui::Text("Zoom: %.0f%%", context.camera.zoom * 100.0f);
+      ImGui::SameLine();
+      if (ImGui::SmallButton("Reset View")) {
+        context.camera.Reset();
+      }
+    }
+    ImGui::EndChild();
+
+    // Viewport Mouse Picking / Entity Selection
+    // Guard rails: Only trigger on Left-Click when hovered over the viewport image,
+    // not dragging, not over the HUD overlay, and not interacting with other ImGui items.
+    ImVec2 mousePos = ImGui::GetMousePos();
+    ImVec2 hudMin = overlayPos;
+    ImVec2 hudMax = ImVec2(overlayPos.x + 240.0f, overlayPos.y + 65.0f);
+    bool overHud = (mousePos.x >= hudMin.x && mousePos.x <= hudMax.x &&
+                    mousePos.y >= hudMin.y && mousePos.y <= hudMax.y);
+
+    bool leftClicked = ImGui::IsMouseClicked(ImGuiMouseButton_Left);
+    bool isDragging = ImGui::IsMouseDragging(ImGuiMouseButton_Left) ||
+                      ImGui::IsMouseDragging(ImGuiMouseButton_Right) ||
+                      ImGui::IsMouseDragging(ImGuiMouseButton_Middle);
+
+    if (isImageHovered && leftClicked && !isDragging && !overHud && !ImGui::IsAnyItemActive()) {
+      sf::Vector2f mouseInViewport(mousePos.x - imageMin.x, mousePos.y - imageMin.y);
+      sf::Vector2f worldPos = context.camera.ViewportToWorld(
+          mouseInViewport, sf::Vector2f(imageSize.x, imageSize.y), ptm);
+
+      auto picked = renderer.PickEntity(scene, Vec2(worldPos.x, worldPos.y));
+      context.selectedEntity = picked;
+    }
+
     // Independent Viewport Camera Controls
-    if (context.isViewportHovered) {
+    if (context.isViewportHovered && !overHud) {
       // Zooming via mouse wheel
       float wheel = ImGui::GetIO().MouseWheel;
       if (wheel != 0.0f) {
@@ -94,25 +141,6 @@ void SceneViewportPanel::OnImGuiRender(EditorContext &context, Scene &scene,
         ImGui::ResetMouseDragDelta(ImGuiMouseButton_Middle);
       }
     }
-
-    // Viewport HUD Overlay (Camera info & quick controls)
-    ImVec2 overlayPos =
-        ImVec2(context.viewportPos.x + 10.0f, context.viewportPos.y + 10.0f);
-    ImGui::SetNextWindowPos(overlayPos);
-    ImGui::SetNextWindowBgAlpha(0.6f);
-    if (ImGui::BeginChild("ViewportHUD", ImVec2(240.0f, 65.0f), true,
-                          ImGuiWindowFlags_NoDecoration |
-                              ImGuiWindowFlags_NoDocking |
-                              ImGuiWindowFlags_NoSavedSettings)) {
-      ImGui::Text("Cam: (%.2f, %.2f) m", context.camera.center.x,
-                  context.camera.center.y);
-      ImGui::Text("Zoom: %.0f%%", context.camera.zoom * 100.0f);
-      ImGui::SameLine();
-      if (ImGui::SmallButton("Reset View")) {
-        context.camera.Reset();
-      }
-    }
-    ImGui::EndChild();
   }
   ImGui::End();
   ImGui::PopStyleVar();

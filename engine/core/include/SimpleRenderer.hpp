@@ -16,6 +16,17 @@ public:
   bool drawAABBs = false;
   uint32_t drawCalls = 0;
   uint32_t primitivesCount = 0;
+  std::shared_ptr<GameObject> selectedEntity = nullptr;
+
+  /**
+   * @brief Performs a 2D point-in-bounds hit-test across all active entities in the scene.
+   * Evaluates SpriteRenderer geometries, physics colliders, and fallback transform bounds.
+   * Selects the top-most overlapping entity (highest Z-index / layer order).
+   * @param scene The active scene containing entities.
+   * @param worldPoint Coordinates in 2D world space (meters).
+   * @return Pointer to top-most hit GameObject or nullptr if clicked on empty space.
+   */
+  std::shared_ptr<GameObject> PickEntity(Scene &scene, const Vec2 &worldPoint) const;
 
   explicit SimpleRenderer(float ppm = 50.0f)
       : pixelsPerMeter(ppm), m_window(nullptr) {}
@@ -235,9 +246,98 @@ public:
         }
       }
     }
+
+    // Draw selection highlight for the active selected entity
+    if (selectedEntity && selectedEntity->active) {
+      DrawSelectionHighlight(target, *selectedEntity, ptm);
+    }
   }
 
 private:
+  void DrawSelectionHighlight(sf::RenderTarget &target, const GameObject &obj, float ptm) {
+    auto *sprite = const_cast<GameObject&>(obj).GetComponent<SpriteRenderer>();
+    Vec3 objWorldPos = obj.GetWorldPosition();
+    Quat q = obj.GetWorldRotation();
+    Vec3 objWorldScale = obj.GetWorldScale();
+    float objAngleDeg = 2.0f * std::atan2(q.z, q.w) * 180.0f / PI;
+
+    sf::Color selectOutlineColor(255, 215, 0, 240); // Golden yellow
+
+    if (sprite) {
+      float totalAngleDeg = objAngleDeg + sprite->LocalRotationOffset;
+      Vec3 scaledOffset(sprite->LocalPositionOffset.x * objWorldScale.x,
+                        sprite->LocalPositionOffset.y * objWorldScale.y, 0.0f);
+      Vec3 worldPos = objWorldPos + q.RotateVector(scaledOffset);
+      sf::Vector2f screenPos(worldPos.x * ptm, worldPos.y * ptm);
+      sf::Vector2f compoundScale(objWorldScale.x * sprite->LocalScaleOffset.x,
+                                objWorldScale.y * sprite->LocalScaleOffset.y);
+
+      if (sprite->isCircle) {
+        float r = sprite->radius * std::abs(compoundScale.x) * ptm + 3.0f;
+        sf::CircleShape highlight(r);
+        highlight.setFillColor(sf::Color::Transparent);
+        highlight.setOutlineColor(selectOutlineColor);
+        highlight.setOutlineThickness(2.0f);
+        highlight.setOrigin({r, r});
+        highlight.setPosition(screenPos);
+        target.draw(highlight);
+      } else {
+        float w = sprite->size.x * std::abs(compoundScale.x) * ptm + 6.0f;
+        float h = sprite->size.y * std::abs(compoundScale.y) * ptm + 6.0f;
+        sf::RectangleShape highlight({w, h});
+        highlight.setOrigin({w * sprite->Pivot.x, h * sprite->Pivot.y});
+        highlight.setPosition(screenPos);
+        highlight.setFillColor(sf::Color::Transparent);
+        highlight.setOutlineColor(selectOutlineColor);
+        highlight.setOutlineThickness(2.0f);
+        highlight.setRotation(sf::degrees(totalAngleDeg));
+        target.draw(highlight);
+      }
+      drawCalls++;
+    } else if (obj.rigidBody && !obj.rigidBody->colliders.empty()) {
+      auto &body = obj.rigidBody;
+      for (const auto &col : body->colliders) {
+        Vec3 globalPos = body->LocalToGlobal(col.localCentroid);
+        if (col.type == ColliderType::Sphere) {
+          float r = col.radius * ptm + 3.0f;
+          sf::CircleShape highlight(r);
+          highlight.setFillColor(sf::Color::Transparent);
+          highlight.setOutlineColor(selectOutlineColor);
+          highlight.setOutlineThickness(2.0f);
+          highlight.setOrigin({r, r});
+          highlight.setPosition({globalPos.x * ptm, globalPos.y * ptm});
+          target.draw(highlight);
+        } else if (col.type == ColliderType::Box) {
+          float w = col.halfExtents.x * 2.0f * ptm + 6.0f;
+          float h = col.halfExtents.y * 2.0f * ptm + 6.0f;
+          sf::RectangleShape highlight({w, h});
+          highlight.setOrigin({w * 0.5f, h * 0.5f});
+          highlight.setPosition({globalPos.x * ptm, globalPos.y * ptm});
+          highlight.setFillColor(sf::Color::Transparent);
+          highlight.setOutlineColor(selectOutlineColor);
+          highlight.setOutlineThickness(2.0f);
+          Quat bq = body->orientation.ToQuat();
+          float angle = 2.0f * std::atan2(bq.z, bq.w) * 180.0f / PI;
+          highlight.setRotation(sf::degrees(angle));
+          target.draw(highlight);
+        }
+        drawCalls++;
+      }
+    } else {
+      // Fallback for transform-only entities
+      float size = 0.6f * ptm;
+      sf::RectangleShape highlight({size, size});
+      highlight.setOrigin({size * 0.5f, size * 0.5f});
+      highlight.setPosition({objWorldPos.x * ptm, objWorldPos.y * ptm});
+      highlight.setFillColor(sf::Color::Transparent);
+      highlight.setOutlineColor(selectOutlineColor);
+      highlight.setOutlineThickness(2.0f);
+      highlight.setRotation(sf::degrees(objAngleDeg));
+      target.draw(highlight);
+      drawCalls++;
+    }
+  }
+
   sf::RenderWindow *m_window = nullptr;
 };
 

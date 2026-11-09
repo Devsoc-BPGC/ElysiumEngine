@@ -20,8 +20,8 @@ struct ColorRGBA {
     uint8_t a = 255;
 
     ColorRGBA() = default;
-    ColorRGBA(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255)
-        : r(r), green(g), b(b), a(a) {}
+    ColorRGBA(uint8_t inR, uint8_t inG, uint8_t inB, uint8_t inA = 255)
+        : r(inR), green(inG), b(inB), a(inA) {}
 
     static ColorRGBA Red()     { return {240, 80, 80}; }
     static ColorRGBA Green()   { return {80, 200, 120}; }

@@ -22,6 +22,36 @@ struct EditorCamera {
     center = {8.0f, 6.0f};
     zoom = 1.0f;
   }
+
+  /**
+   * @brief Converts pixel offset from the viewport center to world coordinates in meters.
+   * @param viewportPixelOffset Pixel offset relative to center of the viewport (x: -w/2..w/2, y: -h/2..h/2).
+   * @param pixelsPerMeter Conversion factor from meters to pixels.
+   */
+  sf::Vector2f ScreenToWorld(const sf::Vector2f &viewportPixelOffset, float pixelsPerMeter) const {
+    float effectivePtm = pixelsPerMeter * zoom;
+    if (effectivePtm <= 0.0f) effectivePtm = 1.0f;
+    return {
+      center.x + viewportPixelOffset.x / effectivePtm,
+      center.y + viewportPixelOffset.y / effectivePtm
+    };
+  }
+
+  /**
+   * @brief Converts mouse position within the viewport image to world coordinates in meters.
+   * @param mousePosInViewport Coordinates relative to the top-left of the viewport image [0..w, 0..h].
+   * @param viewportSize Dimensions of the viewport image in pixels.
+   * @param pixelsPerMeter Conversion factor from meters to pixels.
+   */
+  sf::Vector2f ViewportToWorld(const sf::Vector2f &mousePosInViewport,
+                               const sf::Vector2f &viewportSize,
+                               float pixelsPerMeter) const {
+    sf::Vector2f pixelFromCenter = {
+      mousePosInViewport.x - viewportSize.x * 0.5f,
+      mousePosInViewport.y - viewportSize.y * 0.5f
+    };
+    return ScreenToWorld(pixelFromCenter, pixelsPerMeter);
+  }
 };
 
 // Drives the Game Preview. Kept separate from EditorCamera so navigating one
@@ -54,6 +84,9 @@ struct EditorContext {
   EditorCamera camera;
   GameCamera gameCamera;
   EditorStats stats;
+
+  void SelectEntity(const std::shared_ptr<GameObject> &entity) { selectedEntity = entity; }
+  void ClearSelection() { selectedEntity = nullptr; }
 
   // Copy of the scene being simulated while not in Edit mode (null in Edit
   // mode). Play never touches the edit scene shown in the scene viewport.
