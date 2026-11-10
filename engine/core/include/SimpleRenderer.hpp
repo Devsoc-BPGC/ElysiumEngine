@@ -2,6 +2,7 @@
 #define SIMPLERENDERER_HPP
 
 #include "BroadPhase.hpp"
+#include "CameraComponent.hpp"
 #include "Scene.hpp"
 #include "SpriteRenderer.hpp"
 #include <SFML/Graphics.hpp>
@@ -14,6 +15,8 @@ public:
   bool drawDebugGrid = false;
   bool drawPhysicsColliders = true;
   bool drawAABBs = false;
+  bool drawCameraFrustum = true;
+  sf::Color clearColor = sf::Color(119, 221, 119);
   uint32_t drawCalls = 0;
   uint32_t primitivesCount = 0;
   std::shared_ptr<GameObject> selectedEntity = nullptr;
@@ -52,7 +55,7 @@ public:
       target.setView(target.getDefaultView());
     }
 
-    target.clear(sf::Color(119, 221, 119));
+    target.clear(clearColor);
 
     float ptm = pixelsPerMeter;
 
@@ -247,10 +250,64 @@ public:
       }
     }
 
+    // Draw Camera Frustum Gizmos in Edit mode / debug mode
+    if (drawCameraFrustum) {
+      for (const auto &obj : scene.objects) {
+        if (!obj || !obj->active)
+          continue;
+        const auto *cam = const_cast<GameObject *>(obj.get())->GetComponent<Elysium::CameraComponent>();
+        if (cam) {
+          DrawCameraFrustum(target, *obj, *cam, ptm);
+        }
+      }
+    }
+
     // Draw selection highlight for the active selected entity
     if (selectedEntity && selectedEntity->active) {
       DrawSelectionHighlight(target, *selectedEntity, ptm);
     }
+  }
+
+  void DrawCameraFrustum(sf::RenderTarget &target, const GameObject &cameraEntity,
+                         const Elysium::CameraComponent &cameraComp, float ptm) {
+    Vec3 camPos = cameraEntity.GetWorldPosition();
+    Quat q = cameraEntity.GetWorldRotation();
+    float angleDeg = 2.0f * std::atan2(q.z, q.w) * 180.0f / PI;
+
+    float h = cameraComp.Camera.GetOrthographicSize() * ptm;
+    float w = cameraComp.Camera.GetOrthographicSize() * cameraComp.Camera.GetAspectRatio() * ptm;
+
+    sf::RectangleShape frustumVisual({w, h});
+    frustumVisual.setOrigin({w * 0.5f, h * 0.5f});
+    frustumVisual.setPosition({camPos.x * ptm, camPos.y * ptm});
+    frustumVisual.setRotation(sf::degrees(angleDeg));
+    frustumVisual.setFillColor(sf::Color::Transparent);
+
+    bool isSelected = (selectedEntity.get() == &cameraEntity);
+    if (isSelected) {
+      frustumVisual.setOutlineColor(sf::Color(50, 200, 255, 230)); // Bright cyan
+      frustumVisual.setOutlineThickness(2.5f);
+    } else if (cameraComp.Primary) {
+      frustumVisual.setOutlineColor(sf::Color(50, 180, 240, 160)); // Cyan for primary
+      frustumVisual.setOutlineThickness(1.5f);
+    } else {
+      frustumVisual.setOutlineColor(sf::Color(150, 150, 150, 120)); // Dim grey for non-primary
+      frustumVisual.setOutlineThickness(1.0f);
+    }
+    target.draw(frustumVisual);
+
+    // Top lens/direction notch on frustum
+    float notchW = std::min(w * 0.25f, 24.0f);
+    sf::RectangleShape notch({notchW, 6.0f});
+    notch.setOrigin({notchW * 0.5f, h * 0.5f + 6.0f});
+    notch.setPosition({camPos.x * ptm, camPos.y * ptm});
+    notch.setRotation(sf::degrees(angleDeg));
+    notch.setFillColor(isSelected ? sf::Color(50, 200, 255, 230)
+                                  : sf::Color(50, 180, 240, 160));
+    target.draw(notch);
+
+    drawCalls += 2;
+    primitivesCount += 2;
   }
 
 private:

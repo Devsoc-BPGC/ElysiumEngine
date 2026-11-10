@@ -1,8 +1,9 @@
 #include "panels/SceneHierarchyPanel.hpp"
+#include "AudioSourceComponent.hpp"
+#include "CameraComponent.hpp"
 #include "Collider.hpp"
 #include "Log.h"
 #include <algorithm>
-#include "AudioSourceComponent.hpp"
 
 namespace Elysium {
 
@@ -244,6 +245,15 @@ void SceneHierarchyPanel::OnImGuiRender(EditorContext &context, Scene &scene,
         rb.AddColliders(Collider::CreateSphere(0.5f, 1.0f));
         scene.AddGameObject(entity);
         context.selectedEntity = entity;
+      }
+      if (ImGui::MenuItem("Create Camera")) {
+        auto entity = std::make_shared<GameObject>("Camera");
+        entity->position =
+            Vec3(context.camera.center.x, context.camera.center.y, 0.0f);
+        entity->AddComponent<CameraComponent>();
+        scene.AddGameObject(entity);
+        context.selectedEntity = entity;
+        ELYSIUM_INFO("Created Camera entity: {}", entity->name);
       }
       ImGui::EndPopup();
     }

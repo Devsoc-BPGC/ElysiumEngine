@@ -21,6 +21,7 @@
 #include <imgui.h>
 #include <imgui_internal.h>
 #include "AudioSourceComponent.hpp"
+#include "CameraComponent.hpp"
 
 namespace Elysium {
 
@@ -552,6 +553,15 @@ void EditorLayer::RenderMenuBar(Scene &scene) {
         scene.AddGameObject(entity);
         m_context.selectedEntity = entity;
         ELYSIUM_INFO("Added AudioSourceComponent to entity: {}", entity->GetComponent<AudioSourceComponent>() != nullptr);
+      }
+      if (ImGui::MenuItem("Create Camera")) {
+        auto entity = std::make_shared<GameObject>("Camera");
+        entity->position =
+            Vec3(m_context.camera.center.x, m_context.camera.center.y, 0.0f);
+        entity->AddComponent<CameraComponent>();
+        scene.AddGameObject(entity);
+        m_context.selectedEntity = entity;
+        ELYSIUM_INFO("Created Camera entity: {}", entity->name);
       }
       ImGui::EndMenu();
     }

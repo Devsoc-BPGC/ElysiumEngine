@@ -30,6 +30,12 @@ public:
 
   void UpdateTransforms();
   void Update(float dt);
+  void OnUpdate(float dt) { Update(dt); }
+
+  GameObject *GetPrimaryCameraEntity();
+  const GameObject *GetPrimaryCameraEntity() const;
+  void OnViewportResize(uint32_t width, uint32_t height);
+  Mat4 GetPrimaryCameraViewProjection() const;
 };
 
 namespace Elysium {
