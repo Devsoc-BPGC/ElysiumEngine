@@ -1,6 +1,7 @@
 #include "panels/EntityInspectorPanel.hpp"
 #include "AssetManager.hpp"
 #include "AudioSourceComponent.hpp"
+#include "CameraComponent.hpp"
 #include "Collider.hpp"
 #include "FileDialog.hpp"
 #include "Log.h"
@@ -64,7 +65,10 @@ void EntityInspectorPanel::OnImGuiRender(EditorContext &context, Scene &scene,
     // 5. AudioSource Component
     DrawAudioSourceComponent(context, entity);
 
-    // 6. Custom Components
+    // 6. Camera Component
+    DrawCameraComponent(context, scene, entity);
+
+    // 7. Custom Components
     DrawCustomComponents(context, entity);
 
     ImGui::Spacing();
@@ -105,6 +109,12 @@ void EntityInspectorPanel::OnImGuiRender(EditorContext &context, Scene &scene,
           ImGui::MenuItem("Audio Source")) {
         entity.AddComponent<AudioSourceComponent>();
         ELYSIUM_INFO("Added AudioSourceComponent to entity: {}", entity.name);
+      }
+
+      if (!entity.GetComponent<CameraComponent>() &&
+          ImGui::MenuItem("Camera")) {
+        entity.AddComponent<CameraComponent>();
+        ELYSIUM_INFO("Added CameraComponent to entity: {}", entity.name);
       }
 
       ImGui::EndPopup();
@@ -551,6 +561,81 @@ void EntityInspectorPanel::DrawAudioSourceComponent(EditorContext &context,
       ImGui::DragFloat("Attenuation", &audio->attenuation, 0.05f, 0.0f, 10.0f);
       ImGui::TextDisabled("Source Pos: (%.2f, %.2f, %.2f)", entity.position.x,
                           entity.position.y, entity.position.z);
+    }
+  }
+}
+
+void EntityInspectorPanel::DrawCameraComponent(EditorContext &context,
+                                               Scene &scene,
+                                               GameObject &entity) {
+  (void)context;
+  (void)scene;
+  auto *cam = entity.GetComponent<CameraComponent>();
+  if (!cam)
+    return;
+
+  bool open = ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen);
+  if (ImGui::BeginPopupContextItem("CameraComponentContext")) {
+    if (ImGui::MenuItem("Remove Component")) {
+      auto it = std::find_if(entity.components.begin(), entity.components.end(),
+                             [](const std::unique_ptr<Component> &c) {
+                               return dynamic_cast<CameraComponent *>(c.get()) != nullptr;
+                             });
+      if (it != entity.components.end()) {
+        entity.components.erase(it);
+        ELYSIUM_INFO("Removed CameraComponent from entity: {}", entity.name);
+      }
+      ImGui::EndPopup();
+      return;
+    }
+    ImGui::EndPopup();
+  }
+
+  if (open) {
+    // Orthographic Size
+    float size = cam->Camera.GetOrthographicSize();
+    if (ImGui::DragFloat("Size", &size, 0.1f, 0.1f, 1000.0f, "%.2f")) {
+      cam->Camera.SetOrthographicSize(size);
+    }
+
+    // Near and Far clipping planes
+    float nearClip = cam->Camera.GetNearClip();
+    if (ImGui::DragFloat("Near Clip", &nearClip, 0.1f, -1000.0f, 1000.0f, "%.2f")) {
+      cam->Camera.SetNearClip(nearClip);
+    }
+
+    float farClip = cam->Camera.GetFarClip();
+    if (ImGui::DragFloat("Far Clip", &farClip, 0.1f, -1000.0f, 1000.0f, "%.2f")) {
+      cam->Camera.SetFarClip(farClip);
+    }
+
+    // Primary Camera toggle
+    ImGui::Checkbox("Primary", &cam->Primary);
+
+    // Fixed Aspect Ratio toggle
+    ImGui::Checkbox("Fixed Aspect Ratio", &cam->FixedAspectRatio);
+
+    if (cam->FixedAspectRatio) {
+      float aspect = cam->Camera.GetAspectRatio();
+      if (ImGui::DragFloat("Aspect Ratio", &aspect, 0.01f, 0.1f, 10.0f, "%.3f")) {
+        cam->Camera.SetAspectRatio(aspect);
+      }
+    }
+
+    // Clear Color
+    float clearColor[4] = {
+      static_cast<float>(cam->ClearColor.r) / 255.0f,
+      static_cast<float>(cam->ClearColor.g) / 255.0f,
+      static_cast<float>(cam->ClearColor.b) / 255.0f,
+      static_cast<float>(cam->ClearColor.a) / 255.0f
+    };
+    if (ImGui::ColorEdit4("Clear Color", clearColor)) {
+      cam->ClearColor = sf::Color(
+        static_cast<uint8_t>(std::clamp(clearColor[0] * 255.0f, 0.0f, 255.0f)),
+        static_cast<uint8_t>(std::clamp(clearColor[1] * 255.0f, 0.0f, 255.0f)),
+        static_cast<uint8_t>(std::clamp(clearColor[2] * 255.0f, 0.0f, 255.0f)),
+        static_cast<uint8_t>(std::clamp(clearColor[3] * 255.0f, 0.0f, 255.0f))
+      );
     }
   }
 }

@@ -20,6 +20,7 @@ private:
   void DrawCollidersComponent(EditorContext &context, GameObject &entity);
   void DrawSpriteRendererComponent(EditorContext &context, GameObject &entity);
   void DrawAudioSourceComponent(EditorContext &context, GameObject &entity);
+  void DrawCameraComponent(EditorContext &context, Scene &scene, GameObject &entity);
   void DrawCustomComponents(EditorContext &context, GameObject &entity);
 };
 

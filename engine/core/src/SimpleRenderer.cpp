@@ -110,7 +110,18 @@ bool IsPointInEntity(const GameObject &obj, const Vec2 &point) {
     }
   }
 
-  // 3. Fallback hit bounds for empty / transform-only entities (0.6m x 0.6m)
+  // 3. Test CameraComponent bounds (1.0m x 1.0m around center)
+  auto *cam = const_cast<GameObject &>(obj).GetComponent<Elysium::CameraComponent>();
+  if (cam) {
+    Vec3 worldPos = obj.GetWorldPosition();
+    float halfSize = 0.5f;
+    if (std::abs(point.x - worldPos.x) <= halfSize &&
+        std::abs(point.y - worldPos.y) <= halfSize) {
+      return true;
+    }
+  }
+
+  // 4. Fallback hit bounds for empty / transform-only entities (0.6m x 0.6m)
   if (!sprite && (!obj.rigidBody || obj.rigidBody->colliders.empty())) {
     Vec3 worldPos = obj.GetWorldPosition();
     float halfSize = 0.3f;

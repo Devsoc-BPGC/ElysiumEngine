@@ -21,6 +21,7 @@ Elysium has evolved from a standalone 2D physics engine into a full-featured 2D 
   - [7. Audio Subsystem & Spatial Sound](#7-audio-subsystem--spatial-sound)
   - [8. Asset Management & Registry](#8-asset-management--registry)
   - [9. Project Architecture & Native File Dialogs](#9-project-architecture--native-file-dialogs)
+  - [10. Scene Camera & Runtime Resolution](#10-scene-camera--runtime-resolution)
 - [Prerequisites & Dependencies](#prerequisites--dependencies)
 - [Building & Running](#building--running)
 - [Developer & Contributor Guide](#developer--contributor-guide)
@@ -128,6 +129,12 @@ Elysium follows a modular, decoupled engine design:
   - Decoupled `AudioEngine` singleton/application subsystem managing streamed background music (`sf::Music`) and an asset-cached pool of sound effects (`sf::Sound` / `sf::SoundBuffer`).
   - `AudioSourceComponent` providing GameObject-attached 3D spatial audio synchronized with entity `Transform`s and SFML 3's `sf::Listener`.
   - Full editor reflection in the **Entity Inspector** with file path picker, volume/pitch sliders, loop/spatial toggles, and live playback preview controls.
+- **Scene Camera Entity System (`CameraComponent` & `SceneCamera`)**:
+  - Modular 2D orthographic camera projection pipeline (`Mat4::Ortho`) with configurable `OrthographicSize`, `NearClip`, `FarClip`, and dynamic/fixed aspect ratios.
+  - Runtime Primary Camera resolution in `Scene` routing the `SceneViewportPanel` in Play Mode to the active camera entity with custom clear color support.
+  - Dynamic viewport resize synchronization updating non-fixed cameras.
+  - Interactive cyan view frustum gizmo rendered in the viewport during Edit Mode with directional orientation indicators.
+  - Full editor reflection in the **Entity Inspector** with numeric size/clipping drags, primary/fixed-aspect checkboxes, and clear color pickers.
 
 ---
 
@@ -148,6 +155,8 @@ ElysiumEngine/
 │   │   │   ├── Application.hpp          # Application singleton and master loop
 │   │   │   ├── AudioEngine.hpp          # High-level Audio Subsystem & sound pool
 │   │   │   ├── AudioSourceComponent.hpp # GameObject spatial audio component
+│   │   │   ├── CameraComponent.hpp      # Scene camera entity component
+│   │   │   ├── SceneCamera.hpp          # 2D orthographic projection camera
 │   │   │   ├── Window.hpp               # sf::RenderWindow encapsulation and event pump
 │   │   │   ├── Layer.hpp                # Base class for engine layers
 │   │   │   ├── LayerStack.hpp           # Ordered layer and overlay stack
@@ -173,11 +182,13 @@ ElysiumEngine/
 │   │       ├── Application.cpp          # Engine game loop and event distribution
 │   │       ├── AudioEngine.cpp          # Audio subsystem, sound pool & buffer cache
 │   │       ├── AudioSourceComponent.cpp # AudioSourceComponent lifecycle & spatialization
+│   │       ├── CameraComponent.cpp      # CameraComponent clone implementation
 │   │       ├── FileDialog.cpp           # Native OS dialog implementation (Linux/Win/Mac)
 │   │       ├── GameObject.cpp           # GameObject lifecycle & logging
 │   │       ├── Project.cpp              # Project initialization, loading, and directories
 │   │       ├── ProjectSerializer.cpp    # .elyproj serialization and deserialization
 │   │       ├── Scene.cpp                # Scene entity registry and physics integration
+│   │       ├── SceneCamera.cpp          # Orthographic projection & SFML view calculations
 │   │       ├── SimpleRenderer.cpp       # 2D scene renderer & geometric viewport picking
 │   │       ├── UUID.cpp                 # 64-bit Mersenne Twister & entropy generator
 │   │       ├── Window.cpp               # SFML 3 event pump and translation
@@ -241,6 +252,7 @@ ElysiumEngine/
     ├── ProjectTest.cpp
     ├── RigidBodyDecouplingTest.cpp
     ├── SATTest.cpp
+    ├── SceneCameraTest.cpp
     ├── SceneCloneTest.cpp
     ├── SceneGraphTest.cpp
     ├── UUIDEntityTest.cpp
@@ -496,6 +508,48 @@ Elysium organizes games into standalone, portable projects decoupled from the en
 
 ---
 
+### 10. Scene Camera & Runtime Resolution
+
+Elysium features a dedicated 2D orthographic camera system for gameplay and simulation, decoupled from the editor's interactive navigation camera:
+
+- **SceneCamera Abstraction (`SceneCamera`)**:
+  - Manages 2D orthographic projection parameters: `OrthographicSize` (vertical view height in world meters), `NearClip`, `FarClip`, and `AspectRatio`.
+  - Calculates the 4x4 orthographic projection matrix via `Mat4::Ortho(left, right, bottom, top, near, far)`.
+  - Automatically updates aspect ratios and recalculates projection via `SetViewportSize(width, height)`.
+  - Computes exact SFML render views via `CalculateView(worldPos, worldRot, ptm)`.
+
+- **CameraComponent**:
+  - Inherits from [`Component`](file:///home/mrgreenapple24/projects/ElysiumEngine/engine/core/include/Component.hpp):
+    ```cpp
+    auto cameraEntity = std::make_shared<GameObject>("MainCamera");
+    auto &cam = cameraEntity->AddComponent<Elysium::CameraComponent>();
+    cam.Primary = true;
+    cam.Camera.SetOrthographicSize(12.0f);
+    cam.ClearColor = sf::Color(30, 30, 30);
+    scene.AddGameObject(cameraEntity);
+    ```
+  - `Primary`: Specifies the active camera rendered during Play mode.
+  - `FixedAspectRatio`: Locks the camera's aspect ratio regardless of viewport window dimensions (ideal for pixel-perfect or retro viewports).
+  - `ClearColor`: Custom viewport background clearing color.
+  - Full deep-copy support (`Clone()`) when duplicating entities or transitioning into simulation mode.
+
+- **Runtime Camera Resolution (`Scene`)**:
+  - `Scene::GetPrimaryCameraEntity()`: Queries the active camera entity designated as primary.
+  - `Scene::GetPrimaryCameraViewProjection()`: Generates the combined View-Projection matrix ($VP = P \times V$) combining the entity's position, rotation quaternion, and projection matrix.
+  - `Scene::OnViewportResize(width, height)`: Propagates viewport resize events to all non-fixed scene cameras in real time.
+
+- **Play Mode vs Edit Mode Routing**:
+  - **Game Preview (`GamePreviewPanel`)**:
+    - During Play mode and live preview, automatically resolves the active scene's primary camera (`shown.GetPrimaryCameraEntity()`), renders through its position, rotation, and orthographic size (`CalculateView`), clears with `ClearColor`, and respects `FixedAspectRatio` letterboxing.
+    - If no primary camera entity exists in the scene, smoothly falls back to the default `GameCamera` with an on-screen warning banner (`NO PRIMARY CAMERA (Default View)`).
+    - In right-click settings, displays active camera name and locked aspect ratio status.
+  - **Scene Viewport (`SceneViewportPanel`)**:
+    - **Play Mode**: Switches to the Primary Camera Entity, clearing the framebuffer with `cam.ClearColor`, disabling editor gizmos, and unprojecting mouse clicks through the active camera.
+    - **Edit Mode**: Continues rendering through `EditorCamera` (pan/zoom), displaying a cyan (`#32C8FF`) wireframe frustum gizmo with top-edge direction notch matching the camera's visible world bounds.
+  - Full reflection in `EntityInspectorPanel` with numeric drags, toggles, and color pickers.
+
+---
+
 ## Prerequisites & Dependencies
 
 ### System Requirements
@@ -649,6 +703,7 @@ Upcoming milestones as detailed in [`PLAN.md`](file:///home/mrgreenapple24/proje
 - [x] **Content Browser Panel**: Directory tree navigation, thumbnail grid, file watcher, and drag-and-drop integration.
 - [x] **Project Management & Native Dialogs**: Standalone `.elyproj` project files, directory auto-initialization, and OS file/folder pickers.
 - [x] **Viewport Mouse Picking**: 2D unprojection, geometric entity hit testing (OBB/colliders), and synchronized editor selection highlight.
+- [x] **Scene Camera Entity System**: 2D orthographic projection, `CameraComponent`, primary camera resolution, viewport resize sync, and Play mode viewport routing.
 
 ---
 

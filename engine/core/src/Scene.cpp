@@ -1,4 +1,5 @@
 #include "Scene.hpp"
+#include "CameraComponent.hpp"
 #include "Log.h"
 #include <algorithm>
 
@@ -133,12 +134,7 @@ std::unique_ptr<Scene> Scene::Clone() const {
 void Scene::UpdateTransforms() {
   for (auto &obj : objects) {
     if (obj && obj->active && obj->GetTransform().ParentHandle == 0) {
-      obj->GetTransform().UpdateWorldTransform(Mat4::Identity());
-      if (obj->rigidBody) {
-        obj->rigidBody->position = obj->GetWorldPosition();
-        obj->rigidBody->orientation = obj->GetWorldRotation().ToMatrix();
-        obj->rigidBody->UpdateGlobalCentroidFromPosition();
-      }
+      obj->SyncTransform();
     }
   }
 }
@@ -191,3 +187,60 @@ void Scene::Clear() {
 
   ELYSIUM_CORE_INFO("Scene cleared");
 }
+
+GameObject *Scene::GetPrimaryCameraEntity() {
+  for (auto &obj : objects) {
+    if (obj && obj->active) {
+      if (auto *cam = obj->GetComponent<Elysium::CameraComponent>()) {
+        if (cam->Primary) {
+          return obj.get();
+        }
+      }
+    }
+  }
+  return nullptr;
+}
+
+const GameObject *Scene::GetPrimaryCameraEntity() const {
+  for (const auto &obj : objects) {
+    if (obj && obj->active) {
+      if (const auto *cam = const_cast<GameObject *>(obj.get())->GetComponent<Elysium::CameraComponent>()) {
+        if (cam->Primary) {
+          return obj.get();
+        }
+      }
+    }
+  }
+  return nullptr;
+}
+
+void Scene::OnViewportResize(uint32_t width, uint32_t height) {
+  for (auto &obj : objects) {
+    if (obj && obj->active) {
+      if (auto *cam = obj->GetComponent<Elysium::CameraComponent>()) {
+        if (!cam->FixedAspectRatio) {
+          cam->Camera.SetViewportSize(width, height);
+        }
+      }
+    }
+  }
+}
+
+Mat4 Scene::GetPrimaryCameraViewProjection() const {
+  const GameObject *camEntity = GetPrimaryCameraEntity();
+  if (!camEntity) {
+    return Mat4::Identity();
+  }
+
+  const auto *cam = const_cast<GameObject *>(camEntity)->GetComponent<Elysium::CameraComponent>();
+  if (!cam) {
+    return Mat4::Identity();
+  }
+
+  Vec3 pos = camEntity->GetWorldPosition();
+  Quat rot = camEntity->GetWorldRotation();
+
+  Mat4 view = Mat4::Rotate(rot.Conjugate()) * Mat4::Translate(-pos);
+  return cam->Camera.GetProjection() * view;
+}
+

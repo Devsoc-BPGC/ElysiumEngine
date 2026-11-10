@@ -44,20 +44,42 @@ void SceneViewportPanel::OnImGuiRender(EditorContext &context, Scene &scene,
         (m_currentTextureSize.x != width || m_currentTextureSize.y != height)) {
       if (m_viewportTexture.resize(sf::Vector2u(width, height))) {
         m_currentTextureSize = sf::Vector2u(width, height);
+        scene.OnViewportResize(width, height);
+        if (context.runtimeScene) {
+          context.runtimeScene->OnViewportResize(width, height);
+        }
       } else {
         m_currentTextureSize = {0, 0};
         targetReady = false;
       }
     }
 
+    // Determine active scene and play state
+    bool isPlaying = (context.playState != ScenePlayState::Edit);
+    Scene &activeScene = (isPlaying && context.runtimeScene) ? *context.runtimeScene : scene;
+    GameObject *primaryCamEntity = isPlaying ? activeScene.GetPrimaryCameraEntity() : nullptr;
+    CameraComponent *primaryCamComp = primaryCamEntity ? primaryCamEntity->GetComponent<CameraComponent>() : nullptr;
+
     // Configure camera view
     float ptm = context.pixelsPerMeter;
     float zoom = context.camera.zoom;
     sf::View view;
-    view.setSize({static_cast<float>(width), static_cast<float>(height)});
-    view.setCenter(
-        {context.camera.center.x * ptm, context.camera.center.y * ptm});
-    view.zoom(1.0f / zoom);
+
+    if (isPlaying && primaryCamComp && primaryCamEntity) {
+      // Play mode: render through the primary camera entity
+      view = primaryCamComp->Camera.CalculateView(
+          primaryCamEntity->GetWorldPosition(), primaryCamEntity->GetWorldRotation(), ptm);
+      renderer.clearColor = primaryCamComp->ClearColor;
+      renderer.drawCameraFrustum = false;
+    } else {
+      // Edit mode (or play mode fallback): render through EditorCamera
+      view.setSize({static_cast<float>(width), static_cast<float>(height)});
+      view.setCenter(
+          {context.camera.center.x * ptm, context.camera.center.y * ptm});
+      view.zoom(1.0f / zoom);
+      renderer.clearColor = sf::Color(119, 221, 119);
+      renderer.drawCameraFrustum = true;
+    }
 
     // Render active scene to off-screen RenderTexture
     renderer.drawDebugGrid = context.drawDebugGrid;
@@ -66,7 +88,7 @@ void SceneViewportPanel::OnImGuiRender(EditorContext &context, Scene &scene,
     renderer.pixelsPerMeter = context.pixelsPerMeter;
     renderer.selectedEntity = context.selectedEntity;
     if (targetReady) {
-      renderer.Render(m_viewportTexture, scene, view);
+      renderer.Render(m_viewportTexture, activeScene, view);
       m_viewportTexture.display();
 
       // Display texture in ImGui
@@ -86,12 +108,17 @@ void SceneViewportPanel::OnImGuiRender(EditorContext &context, Scene &scene,
                           ImGuiWindowFlags_NoDecoration |
                               ImGuiWindowFlags_NoDocking |
                               ImGuiWindowFlags_NoSavedSettings)) {
-      ImGui::Text("Cam: (%.2f, %.2f) m", context.camera.center.x,
-                  context.camera.center.y);
-      ImGui::Text("Zoom: %.0f%%", context.camera.zoom * 100.0f);
-      ImGui::SameLine();
-      if (ImGui::SmallButton("Reset View")) {
-        context.camera.Reset();
+      if (isPlaying && primaryCamEntity) {
+        ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.4f, 1.0f), "[Play Mode - Camera]");
+        ImGui::Text("Cam: %s", primaryCamEntity->name.c_str());
+      } else {
+        ImGui::Text("Cam: (%.2f, %.2f) m", context.camera.center.x,
+                    context.camera.center.y);
+        ImGui::Text("Zoom: %.0f%%", context.camera.zoom * 100.0f);
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Reset View")) {
+          context.camera.Reset();
+        }
       }
     }
     ImGui::EndChild();
@@ -112,15 +139,34 @@ void SceneViewportPanel::OnImGuiRender(EditorContext &context, Scene &scene,
 
     if (isImageHovered && leftClicked && !isDragging && !overHud && !ImGui::IsAnyItemActive()) {
       sf::Vector2f mouseInViewport(mousePos.x - imageMin.x, mousePos.y - imageMin.y);
-      sf::Vector2f worldPos = context.camera.ViewportToWorld(
-          mouseInViewport, sf::Vector2f(imageSize.x, imageSize.y), ptm);
+      Vec2 worldPos(0.0f, 0.0f);
 
-      auto picked = renderer.PickEntity(scene, Vec2(worldPos.x, worldPos.y));
+      if (isPlaying && primaryCamComp && primaryCamEntity) {
+        // Unproject through active primary camera
+        float orthoH = primaryCamComp->Camera.GetOrthographicSize();
+        float orthoW = orthoH * primaryCamComp->Camera.GetAspectRatio();
+        float normX = (mouseInViewport.x / imageSize.x) - 0.5f;
+        float normY = (mouseInViewport.y / imageSize.y) - 0.5f;
+        float localX = normX * orthoW;
+        float localY = normY * orthoH;
+        Quat camRot = primaryCamEntity->GetWorldRotation();
+        float angleRad = 2.0f * std::atan2(camRot.z, camRot.w);
+        float rx = localX * std::cos(angleRad) - localY * std::sin(angleRad);
+        float ry = localX * std::sin(angleRad) + localY * std::cos(angleRad);
+        Vec3 camWorldPos = primaryCamEntity->GetWorldPosition();
+        worldPos = Vec2(camWorldPos.x + rx, camWorldPos.y + ry);
+      } else {
+        sf::Vector2f unprojected = context.camera.ViewportToWorld(
+            mouseInViewport, sf::Vector2f(imageSize.x, imageSize.y), ptm);
+        worldPos = Vec2(unprojected.x, unprojected.y);
+      }
+
+      auto picked = renderer.PickEntity(activeScene, worldPos);
       context.selectedEntity = picked;
     }
 
-    // Independent Viewport Camera Controls
-    if (context.isViewportHovered && !overHud) {
+    // Independent Viewport Camera Controls (Edit Mode only)
+    if (!isPlaying && context.isViewportHovered && !overHud) {
       // Zooming via mouse wheel
       float wheel = ImGui::GetIO().MouseWheel;
       if (wheel != 0.0f) {
