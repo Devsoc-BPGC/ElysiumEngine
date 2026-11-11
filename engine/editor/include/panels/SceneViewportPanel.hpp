@@ -2,6 +2,7 @@
 #define SCENEVIEWPORTPANEL_HPP
 
 #include "EditorPanel.hpp"
+#include "TransformGizmo.hpp"
 #include <SFML/Graphics/RenderTexture.hpp>
 
 namespace Elysium {
@@ -17,10 +18,13 @@ public:
   // Brings the panel to the front, selecting its tab if docked
   void RequestFocus() { m_focusRequested = true; }
 
+  TransformGizmo &GetGizmo() { return m_gizmo; }
+
 private:
   sf::RenderTexture m_viewportTexture;
   sf::Vector2u m_currentTextureSize = {0, 0};
   bool m_focusRequested = false;
+  TransformGizmo m_gizmo;
 };
 
 } // namespace Elysium

@@ -13,6 +13,18 @@ namespace Elysium {
 
 enum class ScenePlayState { Edit, Play, Pause, Step };
 
+enum class GizmoOperation {
+  None,
+  Translate,
+  Rotate,
+  Scale
+};
+
+enum class GizmoMode {
+  Local,
+  World
+};
+
 struct EditorCamera {
   sf::Vector2f center = {8.0f, 6.0f}; // Default center in meters
   float zoom = 1.0f;                  // 1.0f = 100% zoom
@@ -98,6 +110,16 @@ struct EditorContext {
   bool drawAABBs = false;
   bool gamePreviewDebugVisuals = false; // Editor-only visuals in Game Preview
   float pixelsPerMeter = 50.0f;
+
+  // Gizmo & Transformation settings
+  GizmoOperation gizmoOperation = GizmoOperation::Translate;
+  GizmoMode gizmoMode = GizmoMode::World;
+
+  // Snapping settings
+  bool snapEnabled = false;
+  float snapTranslation = 0.5f; // Grid snap step in meters
+  float snapRotation = 15.0f;   // Angle snap step in degrees
+  float snapScale = 0.1f;       // Scale snap step
 
   // Viewport geometry (in pixels)
   sf::Vector2f viewportPos = {0.0f, 0.0f};

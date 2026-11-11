@@ -29,10 +29,78 @@ void ToolbarPanel::OnImGuiRender(EditorContext &context, Scene &scene,
     }
 
     ImGui::SameLine();
+    ImGui::TextDisabled("|");
+    ImGui::SameLine();
+
+    // Gizmo Tool Buttons: Move (G), Rotate (R), Scale (S)
+    auto DrawToolButton = [&](const char *label, GizmoOperation op) {
+      bool isActive = (context.gizmoOperation == op);
+      if (isActive) {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.45f, 0.8f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.55f, 0.9f, 1.0f));
+      }
+      if (ImGui::Button(label)) {
+        context.gizmoOperation = isActive ? GizmoOperation::None : op;
+      }
+      if (isActive) {
+        ImGui::PopStyleColor(2);
+      }
+    };
+
+    DrawToolButton("Move (G)", GizmoOperation::Translate);
+    ImGui::SameLine();
+    DrawToolButton("Rotate (R)", GizmoOperation::Rotate);
+    ImGui::SameLine();
+    DrawToolButton("Scale (S)", GizmoOperation::Scale);
+    ImGui::SameLine();
+
+    // Coordinate Space: World / Local (W)
+    const char *spaceLabel = (context.gizmoMode == GizmoMode::World) ? "[World] (W)" : "[Local] (W)";
+    if (ImGui::Button(spaceLabel)) {
+      context.gizmoMode = (context.gizmoMode == GizmoMode::World) ? GizmoMode::Local : GizmoMode::World;
+    }
+    if (ImGui::IsItemHovered()) {
+      ImGui::SetTooltip("Toggle Gizmo Reference Space (World vs. Local) [Hotkey: W]");
+    }
+    ImGui::SameLine();
+
+    // Dedicated Snap Toggle Button (E) + Settings Popup
+    bool snapOn = context.snapEnabled;
+    if (snapOn) {
+      ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.55f, 0.3f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.22f, 0.65f, 0.38f, 1.0f));
+    }
+    if (ImGui::Button(snapOn ? "Snap: ON (E)" : "Snap: OFF (E)")) {
+      context.snapEnabled = !context.snapEnabled;
+    }
+    if (snapOn) {
+      ImGui::PopStyleColor(2);
+    }
+    if (ImGui::IsItemHovered()) {
+      ImGui::SetTooltip("Toggle Grid/Angle/Scale Snapping [Hotkey: E]\n(Hold Ctrl while dragging to temporarily snap)");
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("...##SnapSettings")) {
+      ImGui::OpenPopup("SnapSettingsPopup");
+    }
+    if (ImGui::IsItemHovered()) {
+      ImGui::SetTooltip("Configure Snap Steps");
+    }
+
+    if (ImGui::BeginPopup("SnapSettingsPopup")) {
+      ImGui::TextDisabled("Snap Step Configuration");
+      ImGui::Separator();
+      ImGui::DragFloat("Move Step (m)", &context.snapTranslation, 0.05f, 0.05f, 10.0f, "%.2f m");
+      ImGui::DragFloat("Rotate Step", &context.snapRotation, 1.0f, 1.0f, 90.0f, "%.1f deg");
+      ImGui::DragFloat("Scale Step", &context.snapScale, 0.01f, 0.01f, 2.0f, "%.2f");
+      ImGui::EndPopup();
+    }
+
+    ImGui::SameLine();
     ImGui::Spacing();
     ImGui::SameLine();
 
-    // Center-aligned toolbar buttons
+    // Center-aligned simulation playback buttons
     float buttonWidth = 80.0f;
     float totalControlsWidth = buttonWidth * 3.0f + 30.0f;
     float availWidth = ImGui::GetContentRegionAvail().x;
