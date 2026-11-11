@@ -99,6 +99,13 @@ void SceneViewportPanel::OnImGuiRender(EditorContext &context, Scene &scene,
     ImVec2 imageSize = ImGui::GetItemRectSize();
     bool isImageHovered = ImGui::IsItemHovered();
 
+    // Render interactive transform gizmo (Edit Mode only)
+    if (!isPlaying && context.selectedEntity && context.gizmoOperation != GizmoOperation::None) {
+      m_gizmo.Render(context, activeScene, imageMin, imageSize, ImGui::GetWindowDrawList());
+    } else {
+      m_gizmo.Reset();
+    }
+
     // Viewport HUD Overlay (Camera info & quick controls)
     ImVec2 overlayPos =
         ImVec2(context.viewportPos.x + 10.0f, context.viewportPos.y + 10.0f);
@@ -125,7 +132,8 @@ void SceneViewportPanel::OnImGuiRender(EditorContext &context, Scene &scene,
 
     // Viewport Mouse Picking / Entity Selection
     // Guard rails: Only trigger on Left-Click when hovered over the viewport image,
-    // not dragging, not over the HUD overlay, and not interacting with other ImGui items.
+    // not dragging, not over the HUD overlay, not interacting with other ImGui items,
+    // and not hovering or using any transform gizmo handle.
     ImVec2 mousePos = ImGui::GetMousePos();
     ImVec2 hudMin = overlayPos;
     ImVec2 hudMax = ImVec2(overlayPos.x + 240.0f, overlayPos.y + 65.0f);
@@ -137,7 +145,8 @@ void SceneViewportPanel::OnImGuiRender(EditorContext &context, Scene &scene,
                       ImGui::IsMouseDragging(ImGuiMouseButton_Right) ||
                       ImGui::IsMouseDragging(ImGuiMouseButton_Middle);
 
-    if (isImageHovered && leftClicked && !isDragging && !overHud && !ImGui::IsAnyItemActive()) {
+    if (isImageHovered && leftClicked && !isDragging && !overHud && !ImGui::IsAnyItemActive() &&
+        !m_gizmo.IsOver() && !m_gizmo.IsUsing()) {
       sf::Vector2f mouseInViewport(mousePos.x - imageMin.x, mousePos.y - imageMin.y);
       Vec2 worldPos(0.0f, 0.0f);
 
@@ -165,8 +174,8 @@ void SceneViewportPanel::OnImGuiRender(EditorContext &context, Scene &scene,
       context.selectedEntity = picked;
     }
 
-    // Independent Viewport Camera Controls (Edit Mode only)
-    if (!isPlaying && context.isViewportHovered && !overHud) {
+    // Independent Viewport Camera Controls (Edit Mode only, when not using gizmo)
+    if (!isPlaying && context.isViewportHovered && !overHud && !m_gizmo.IsUsing()) {
       // Zooming via mouse wheel
       float wheel = ImGui::GetIO().MouseWheel;
       if (wheel != 0.0f) {

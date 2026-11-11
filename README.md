@@ -333,10 +333,15 @@ Events are dispatched down the `LayerStack` in **reverse order**: Overlays (such
   - `Entities`: Quick-create Empty Entity, Ball, Box, or Platform.
   - `View`: Toggle visibility for any active panel.
   - `Options`: Switch themes (Dark, Classic, Light), toggle Debug Grid, Colliders, or AABBs.
-- **Shortcuts**:
+- **Shortcuts & Hotkeys ([`EditorHotkeys.hpp`](file:///home/mrgreenapple24/projects/ElysiumEngine/engine/editor/include/EditorHotkeys.hpp))**:
   - `Space`: Toggle Play / Pause simulation.
   - `F`: Focus viewport camera on selected entity.
   - `Delete`: Delete currently selected entity.
+  - `G`: Move / Translate Gizmo tool.
+  - `R`: Rotate Gizmo tool.
+  - `S`: Scale Gizmo tool (when not holding `Ctrl`).
+  - `W`: Toggle Gizmo reference coordinate space (`World` vs. `Local`).
+  - `E`: Toggle snapping on / off (hold `Ctrl` during drag for temporary snap).
 
 ---
 
@@ -368,6 +373,25 @@ The editor supports direct left-click selection of entities within the 2D viewpo
   - Clicking empty viewport space clears the current selection (`context.ClearSelection()`).
 - **Selection Highlighting**: Selected entities display an eye-catching golden-yellow (`#FFD700`) outline rendered directly into the off-screen scene texture matching the entity's exact bounding box or circle geometry.
 - **Two-Way Synchronization**: Picking in the viewport immediately updates `EditorContext::selectedEntity`, synchronizing the **Scene Hierarchy** tree and populating the **Entity Inspector** panel in real time.
+
+#### Interactive 2D Viewport Transform Gizmos (`TransformGizmo`)
+Elysium includes interactive 2D viewport transform manipulation rendered through Dear ImGui's `ImDrawList` overlay:
+- **Manipulation Operations**:
+  - **Move / Translate (`G`)**: Red X-axis arrow, green Y-axis arrow, and center planar translation quad.
+  - **Rotate (`R`)**: Cyan 2D circular ring ($R = 70$px) around the entity's pivot with live visual sector arc fill and degree delta overlay readout.
+  - **Scale (`S`)**: Red/green axis lines with solid cubic end-caps and uniform central scaling box.
+- **Reference Coordinate Spaces (`W`)**:
+  - **World Mode**: Directional arrows align with global axes (X right, Y down).
+  - **Local Mode**: Directional arrows rotate with the entity, allowing sliding along the entity's own angled orientation.
+- **Snapping System (`E`)**:
+  - Dedicated `[Snap: ON/OFF]` toolbar button and `E` hotkey.
+  - Dynamic modifier: Hold `Ctrl` while dragging to temporarily enforce snap increments.
+  - Configurable snap increments: translation grid step ($0.5$m), rotation angle ($15^\circ$), and scale increment ($0.1\times$).
+- **Parent-Child Hierarchy & Physics Synchronization**:
+  - Handles nested parent-child hierarchies via inverse parent matrix transformations:
+    $$\mathbf{M}_{\text{local, new}} = \mathbf{M}_{\text{parent, world}}^{-1} \times \mathbf{M}_{\text{world, new}}$$
+  - Updates local transforms, recursively updates child world transforms, and calls `SyncTransform()` to keep attached `RigidBody` and `Collider` positions synchronized with zero drift.
+- **Interaction Precedence**: Hovering or dragging gizmo handles takes strict precedence over viewport entity picking and camera panning.
 
 ---
 

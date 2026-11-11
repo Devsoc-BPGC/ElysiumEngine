@@ -22,6 +22,7 @@
 #include <imgui_internal.h>
 #include "AudioSourceComponent.hpp"
 #include "CameraComponent.hpp"
+#include "EditorHotkeys.hpp"
 
 namespace Elysium {
 
@@ -236,8 +237,11 @@ bool EditorLayer::OnKeyPressed(KeyPressedEvent &e) {
   if (io.WantTextInput)
     return false;
 
+  bool isCtrl = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LControl) ||
+                sf::Keyboard::isKeyPressed(sf::Keyboard::Key::RControl);
+
   // Space: Toggle Play / Pause
-  if (e.GetKeyCode() == sf::Keyboard::Key::Space) {
+  if (e.GetKeyCode() == Hotkeys::TogglePlayPause) {
     if (m_context.playState == ScenePlayState::Play) {
       m_context.playState = ScenePlayState::Pause;
       ELYSIUM_INFO("Editor: Paused");
@@ -249,7 +253,7 @@ bool EditorLayer::OnKeyPressed(KeyPressedEvent &e) {
   }
 
   // 'F': Focus camera on selected entity
-  if (e.GetKeyCode() == sf::Keyboard::Key::F && m_context.selectedEntity) {
+  if (e.GetKeyCode() == Hotkeys::FocusCamera && m_context.selectedEntity) {
     m_context.camera.center.x = m_context.selectedEntity->position.x;
     m_context.camera.center.y = m_context.selectedEntity->position.y;
     ELYSIUM_INFO("Editor Camera focused on: {}",
@@ -258,9 +262,46 @@ bool EditorLayer::OnKeyPressed(KeyPressedEvent &e) {
   }
 
   // Delete: Delete selected entity
-  if (e.GetKeyCode() == sf::Keyboard::Key::Delete && m_context.selectedEntity) {
+  if (e.GetKeyCode() == Hotkeys::DeleteEntity && m_context.selectedEntity) {
     m_scene.DestroyEntityByUUID(m_context.selectedEntity->GetUUID());
     m_context.selectedEntity = nullptr;
+    return true;
+  }
+
+  // 'G': Move / Grab Gizmo
+  if (!isCtrl && e.GetKeyCode() == Hotkeys::GizmoTranslate) {
+    m_context.gizmoOperation = GizmoOperation::Translate;
+    ELYSIUM_INFO("Gizmo Tool: Move (Translate)");
+    return true;
+  }
+
+  // 'R': Rotate Gizmo
+  if (!isCtrl && e.GetKeyCode() == Hotkeys::GizmoRotate) {
+    m_context.gizmoOperation = GizmoOperation::Rotate;
+    ELYSIUM_INFO("Gizmo Tool: Rotate");
+    return true;
+  }
+
+  // 'S': Scale Gizmo (only when Ctrl is not held, so Ctrl+S remains Save Scene)
+  if (!isCtrl && e.GetKeyCode() == Hotkeys::GizmoScale) {
+    m_context.gizmoOperation = GizmoOperation::Scale;
+    ELYSIUM_INFO("Gizmo Tool: Scale");
+    return true;
+  }
+
+  // 'W': Toggle World / Local coordinate space
+  if (!isCtrl && e.GetKeyCode() == Hotkeys::GizmoToggleMode) {
+    m_context.gizmoMode = (m_context.gizmoMode == GizmoMode::World)
+                              ? GizmoMode::Local
+                              : GizmoMode::World;
+    ELYSIUM_INFO("Gizmo Mode: {}", (m_context.gizmoMode == GizmoMode::World ? "World" : "Local"));
+    return true;
+  }
+
+  // 'E': Toggle Snapping
+  if (!isCtrl && e.GetKeyCode() == Hotkeys::GizmoToggleSnap) {
+    m_context.snapEnabled = !m_context.snapEnabled;
+    ELYSIUM_INFO("Gizmo Snapping: {}", (m_context.snapEnabled ? "Enabled" : "Disabled"));
     return true;
   }
 
