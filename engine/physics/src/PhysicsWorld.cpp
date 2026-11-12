@@ -3,6 +3,7 @@
  * @brief Implementation of the physics simulation loop and force management.
  */
 
+#include "elypch.hpp"
 #include "PhysicsWorld.hpp"
 #include "BroadPhase.hpp"
 #include "NarrowPhase.hpp"

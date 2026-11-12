@@ -1,9 +1,7 @@
+#include "elypch.hpp"
 #include "panels/GamePreviewPanel.hpp"
 #include "CameraComponent.hpp"
-#include <algorithm>
-#include <cmath>
 #include <imgui-SFML.h>
-#include <imgui.h>
 
 namespace Elysium {
 

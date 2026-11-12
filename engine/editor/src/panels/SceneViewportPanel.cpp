@@ -1,7 +1,6 @@
+#include "elypch.hpp"
 #include "panels/SceneViewportPanel.hpp"
-#include <algorithm>
 #include <imgui-SFML.h>
-#include <imgui.h>
 
 namespace Elysium {
 

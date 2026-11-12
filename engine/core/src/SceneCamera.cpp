@@ -1,5 +1,5 @@
+#include "elypch.hpp"
 #include "SceneCamera.hpp"
-#include <cmath>
 
 namespace Elysium {
 

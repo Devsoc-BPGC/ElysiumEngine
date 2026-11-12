@@ -1,7 +1,6 @@
+#include "elypch.hpp"
 #include "TransformGizmo.hpp"
 #include "Scene.hpp"
-#include <algorithm>
-#include <cmath>
 #include <cstdio>
 
 namespace Elysium {

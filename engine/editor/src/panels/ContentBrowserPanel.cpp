@@ -1,10 +1,8 @@
+#include "elypch.hpp"
 #include "panels/ContentBrowserPanel.hpp"
-#include "Log.h"
 #include "Project.hpp"
-#include <algorithm>
 #include <cstring>
 #include <imgui-SFML.h>
-#include <imgui.h>
 #include <SFML/Graphics/Image.hpp>
 
 namespace Elysium {
@@ -450,9 +448,9 @@ void ContentBrowserPanel::RenderDirectoryGrid() {
         continue;
       }
 
-      std::string name = entry.path().filename().string();
+      std::string entryName = entry.path().filename().string();
       if (!filterStr.empty()) {
-        std::string lowerName = name;
+        std::string lowerName = entryName;
         std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(), [](unsigned char c) {
           return static_cast<char>(std::tolower(c));
         });

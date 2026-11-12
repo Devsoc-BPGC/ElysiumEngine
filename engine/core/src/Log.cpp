@@ -1,3 +1,4 @@
+#include "elypch.hpp"
 #include "Log.h"
 
 #include <spdlog/sinks/rotating_file_sink.h>

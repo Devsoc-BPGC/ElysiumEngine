@@ -1,6 +1,6 @@
+#include "elypch.hpp"
 #include "ScriptEngine.hpp"
 #include "ScriptingWorld.hpp"
-#include "Log.h"
 
 namespace Elysium {
 

@@ -1,6 +1,6 @@
+#include "elypch.hpp"
 #include "Application.hpp"
 #include "AudioEngine.hpp"
-#include "Log.h"
 
 namespace Elysium {
 

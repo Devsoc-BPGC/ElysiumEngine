@@ -3,9 +3,9 @@
  * @brief Implementation of Separating Axis Theorem and Minimum Translation Vector (MTV).
  */
 
+#include "elypch.hpp"
 #include "SAT.hpp"
 #include <cfloat>
-#include <cmath>
 
 namespace Elysium {
 

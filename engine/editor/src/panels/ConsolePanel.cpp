@@ -1,3 +1,4 @@
+#include "elypch.hpp"
 #include "panels/ConsolePanel.hpp"
 #include "EditorLogSink.hpp"
 

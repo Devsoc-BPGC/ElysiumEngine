@@ -46,3 +46,9 @@ target_link_libraries(ElysiumEngine PUBLIC
     spdlog::spdlog_header_only
     ImGui-SFML::ImGui-SFML
 )
+
+configure_elysium_target(ElysiumEngine)
+
+target_precompile_headers(ElysiumEngine PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/core/include/elypch.hpp"
+)

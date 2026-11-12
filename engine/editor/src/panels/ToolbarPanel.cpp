@@ -1,6 +1,5 @@
+#include "elypch.hpp"
 #include "panels/ToolbarPanel.hpp"
-#include "Log.h"
-#include <imgui.h>
 
 namespace Elysium {
 

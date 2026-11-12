@@ -1,10 +1,10 @@
+#include "elypch.hpp"
 #include "EditorLayer.hpp"
 #include "Application.hpp"
 #include "AssetManager.hpp"
 #include "Collider.hpp"
 #include "EditorLogSink.hpp"
 #include "FileDialog.hpp"
-#include "Log.h"
 #include "Project.hpp"
 #include "ScriptingWorld.hpp"
 #include "panels/ConsolePanel.hpp"
@@ -15,10 +15,7 @@
 #include "panels/SceneViewportPanel.hpp"
 #include "panels/StatsPanel.hpp"
 #include "panels/ToolbarPanel.hpp"
-#include <algorithm>
-#include <filesystem>
 #include <imgui-SFML.h>
-#include <imgui.h>
 #include <imgui_internal.h>
 #include "AudioSourceComponent.hpp"
 #include "CameraComponent.hpp"
@@ -582,7 +579,7 @@ void EditorLayer::RenderMenuBar(Scene &scene) {
         auto entity = std::make_shared<GameObject>("Rigid Body");
         entity->position =
             Vec3(m_context.camera.center.x, m_context.camera.center.y, 0.0f);
-        auto &rb = entity->CreateRigidBody();
+        entity->CreateRigidBody();
         scene.AddGameObject(entity);
         m_context.selectedEntity = entity;
       }
@@ -590,7 +587,7 @@ void EditorLayer::RenderMenuBar(Scene &scene) {
         auto entity = std::make_shared<GameObject>("Audio Source");
         entity->position =
             Vec3(m_context.camera.center.x, m_context.camera.center.y, 0.0f);
-        auto &as = entity->AddComponent<AudioSourceComponent>();
+        entity->AddComponent<AudioSourceComponent>();
         scene.AddGameObject(entity);
         m_context.selectedEntity = entity;
         ELYSIUM_INFO("Added AudioSourceComponent to entity: {}", entity->GetComponent<AudioSourceComponent>() != nullptr);

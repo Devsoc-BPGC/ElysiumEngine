@@ -1,16 +1,14 @@
+#include "elypch.hpp"
 #include "panels/EntityInspectorPanel.hpp"
 #include "AssetManager.hpp"
 #include "AudioSourceComponent.hpp"
 #include "CameraComponent.hpp"
 #include "Collider.hpp"
 #include "FileDialog.hpp"
-#include "Log.h"
 #include "Project.hpp"
 #include "SpriteRenderer.hpp"
-#include <cmath>
 #include <cstring>
 #include <imgui-SFML.h>
-#include <imgui.h>
 
 namespace Elysium {
 
@@ -447,9 +445,9 @@ void EntityInspectorPanel::DrawSpriteRendererComponent(EditorContext &context,
           const auto &meta = AssetManager::Get().GetMetadata(droppedHandle);
           assignTexture(droppedHandle, meta.filePath);
         }
-      } else if (const ImGuiPayload *payload =
+      } else if (const ImGuiPayload *texPayload =
                      ImGui::AcceptDragDropPayload(AssetPayloads::TEXTURE)) {
-        uint64_t droppedHandle = *reinterpret_cast<const uint64_t *>(payload->Data);
+        uint64_t droppedHandle = *reinterpret_cast<const uint64_t *>(texPayload->Data);
         const auto &meta = AssetManager::Get().GetMetadata(droppedHandle);
         assignTexture(droppedHandle, meta.filePath);
       }
@@ -559,8 +557,10 @@ void EntityInspectorPanel::DrawAudioSourceComponent(EditorContext &context,
     if (audio->isSpatial) {
       ImGui::DragFloat("Min Distance", &audio->minDistance, 0.1f, 0.1f, 100.0f);
       ImGui::DragFloat("Attenuation", &audio->attenuation, 0.05f, 0.0f, 10.0f);
-      ImGui::TextDisabled("Source Pos: (%.2f, %.2f, %.2f)", entity.position.x,
-                          entity.position.y, entity.position.z);
+      ImGui::TextDisabled("Source Pos: (%.2f, %.2f, %.2f)",
+                          static_cast<double>(entity.position.x),
+                          static_cast<double>(entity.position.y),
+                          static_cast<double>(entity.position.z));
     }
   }
 }

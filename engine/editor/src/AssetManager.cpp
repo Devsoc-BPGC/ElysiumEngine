@@ -1,9 +1,6 @@
+#include "elypch.hpp"
 #include "AssetManager.hpp"
-#include "Log.h"
 #include "Scene.hpp"
-#include <algorithm>
-#include <fstream>
-#include <sstream>
 
 namespace Elysium {
 

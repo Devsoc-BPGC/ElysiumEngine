@@ -22,6 +22,11 @@ using AssetHandle = UUID;
 /**
  * @brief Asset types recognized and managed by the AssetRegistry.
  */
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wshadow"
+#endif
+
 enum class AssetType : uint16_t {
   None = 0,
   Texture,
@@ -29,6 +34,10 @@ enum class AssetType : uint16_t {
   Audio,
   Scene
 };
+
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 
 /**
  * @brief Converts an AssetType enum to a string.

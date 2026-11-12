@@ -1,8 +1,8 @@
+#include "elypch.hpp"
 #include "Window.hpp"
 #include "ApplicationEvent.hpp"
 #include "Input.hpp"
 #include "KeyEvent.hpp"
-#include "Log.h"
 #include "MouseEvent.hpp"
 #include <SFML/Window/Event.hpp>
 #include <imgui-SFML.h>

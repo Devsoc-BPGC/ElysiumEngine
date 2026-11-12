@@ -1,11 +1,10 @@
+#include "elypch.hpp"
 #include "Component.hpp"
 #include "GameObject.hpp"
 #include "Input.hpp"
 #include "SpriteRenderer.hpp"
 #include <Elysium.hpp>
 #include <EntryPoint.hpp>
-#include <cstdlib>
-#include <memory>
 #include <ScriptingAPI.hpp>
 
 class LifeSpan : public Component {

@@ -1,9 +1,8 @@
+#include "elypch.hpp"
 #include "Entity.hpp"
 #include "GameObject.hpp"
 #include "RigidBody.hpp"
 #include "SpriteRenderer.hpp"
-#include "Log.h"
-#include <cmath>
 
 namespace Elysium {
 
