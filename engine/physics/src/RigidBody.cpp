@@ -4,6 +4,7 @@
  * transformations, and integration.
  */
 
+#include "elypch.hpp"
 #include "RigidBody.hpp"
 #include "CoreMath.hpp"
 

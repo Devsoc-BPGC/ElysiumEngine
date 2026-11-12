@@ -3,8 +3,8 @@
  * @brief Implementation of 2D mouse picking and raycasting for Elysium Engine.
  */
 
+#include "elypch.hpp"
 #include "SimpleRenderer.hpp"
-#include <cmath>
 #include <limits>
 
 namespace {

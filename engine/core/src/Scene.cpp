@@ -1,7 +1,6 @@
+#include "elypch.hpp"
 #include "Scene.hpp"
 #include "CameraComponent.hpp"
-#include "Log.h"
-#include <algorithm>
 
 Scene::Scene() : physicsWorld(Vec3(0, -9.81f, 0)) {}
 

@@ -1,7 +1,6 @@
+#include "elypch.hpp"
 #include "GameObject.hpp"
-#include "Log.h"
 #include "Scene.hpp"
-#include <algorithm>
 
 GameObject::GameObject(const std::string &initialName)
     : m_UUID(), name(initialName), m_Scene(nullptr),

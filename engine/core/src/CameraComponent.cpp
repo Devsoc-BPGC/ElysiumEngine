@@ -1,3 +1,4 @@
+#include "elypch.hpp"
 #include "CameraComponent.hpp"
 
 namespace Elysium {

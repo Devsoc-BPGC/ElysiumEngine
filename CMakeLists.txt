@@ -140,6 +140,7 @@ target_link_libraries(ElysiumApp PUBLIC
     ImGui-SFML::ImGui-SFML
 )
 configure_elysium_target(ElysiumApp)
+target_precompile_headers(ElysiumApp REUSE_FROM ElysiumEngine)
 
 # Copy the bundled editor font next to the executable for build-directory launches.
 add_custom_command(TARGET ElysiumApp POST_BUILD

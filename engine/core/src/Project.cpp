@@ -1,7 +1,6 @@
+#include "elypch.hpp"
 #include "Project.hpp"
 #include "ProjectSerializer.hpp"
-#include "Log.h"
-#include <fstream>
 
 namespace Elysium {
 

@@ -1,8 +1,7 @@
+#include "elypch.hpp"
 #include "ScriptingInput.hpp"
 #include "Input.hpp"
-#include <algorithm>
 #include <cctype>
-#include <unordered_map>
 
 namespace Elysium {
 

@@ -1,9 +1,8 @@
+#include "elypch.hpp"
 #include "panels/SceneHierarchyPanel.hpp"
 #include "AudioSourceComponent.hpp"
 #include "CameraComponent.hpp"
 #include "Collider.hpp"
-#include "Log.h"
-#include <algorithm>
 
 namespace Elysium {
 
@@ -146,7 +145,7 @@ void SceneHierarchyPanel::OnImGuiRender(EditorContext &context, Scene &scene,
         auto entity = std::make_shared<GameObject>("Rigid Body");
         entity->position =
             Vec3(context.camera.center.x, context.camera.center.y, 0.0f);
-        auto &rb = entity->CreateRigidBody();
+        entity->CreateRigidBody();
         scene.AddGameObject(entity);
         context.selectedEntity = entity;
       }
@@ -154,7 +153,7 @@ void SceneHierarchyPanel::OnImGuiRender(EditorContext &context, Scene &scene,
         auto entity = std::make_shared<GameObject>("Audio Source");
         entity->position =
             Vec3(context.camera.center.x, context.camera.center.y, 0.0f);
-        auto &as = entity->AddComponent<AudioSourceComponent>();
+        entity->AddComponent<AudioSourceComponent>();
         scene.AddGameObject(entity);
         context.selectedEntity = entity;
         ELYSIUM_INFO("Added AudioSourceComponent to entity: {}", entity->GetComponent<AudioSourceComponent>() != nullptr);

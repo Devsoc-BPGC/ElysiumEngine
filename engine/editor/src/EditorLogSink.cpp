@@ -1,8 +1,7 @@
+#include "elypch.hpp"
 #include "EditorLogSink.hpp"
-#include <chrono>
 #include <ctime>
 #include <iomanip>
-#include <sstream>
 
 namespace Elysium {
 

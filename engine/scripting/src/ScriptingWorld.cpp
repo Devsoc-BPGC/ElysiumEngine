@@ -1,10 +1,10 @@
+#include "elypch.hpp"
 #include "ScriptingWorld.hpp"
 #include "Scene.hpp"
 #include "GameObject.hpp"
 #include "RigidBody.hpp"
 #include "Collider.hpp"
 #include "SpriteRenderer.hpp"
-#include "Log.h"
 
 namespace Elysium {
 

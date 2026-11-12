@@ -1,7 +1,5 @@
+#include "elypch.hpp"
 #include "AudioEngine.hpp"
-#include "Log.h"
-#include <algorithm>
-#include <filesystem>
 
 namespace Elysium {
 

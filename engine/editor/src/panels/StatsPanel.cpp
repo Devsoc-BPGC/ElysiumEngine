@@ -1,5 +1,5 @@
+#include "elypch.hpp"
 #include "panels/StatsPanel.hpp"
-#include <imgui.h>
 
 namespace Elysium {
 
@@ -17,11 +17,11 @@ void StatsPanel::OnImGuiRender(EditorContext &context, Scene &scene,
     // 1. Performance Overview
     if (ImGui::CollapsingHeader("Frame Performance",
                                 ImGuiTreeNodeFlags_DefaultOpen)) {
-      ImGui::Text("FPS: %.1f", context.stats.fps);
-      ImGui::Text("Frame Time: %.2f ms", context.stats.frameTimeMs);
+      ImGui::Text("FPS: %.1f", static_cast<double>(context.stats.fps));
+      ImGui::Text("Frame Time: %.2f ms", static_cast<double>(context.stats.frameTimeMs));
 
       char overlay[32];
-      snprintf(overlay, sizeof(overlay), "FPS: %.1f", context.stats.fps);
+      snprintf(overlay, sizeof(overlay), "FPS: %.1f", static_cast<double>(context.stats.fps));
       ImGui::PlotLines("##FPSHistory", m_fpsHistory.data(),
                        static_cast<int>(m_fpsHistory.size()),
                        static_cast<int>(m_historyIndex), overlay, 0.0f, 120.0f,
@@ -31,9 +31,9 @@ void StatsPanel::OnImGuiRender(EditorContext &context, Scene &scene,
     // 2. Timing Breakdown (Update, Physics, Render)
     if (ImGui::CollapsingHeader("Frame Timing Breakdown",
                                 ImGuiTreeNodeFlags_DefaultOpen)) {
-      ImGui::Text("Update Subsystem:  %.3f ms", context.stats.updateTimeMs);
-      ImGui::Text("Physics World:     %.3f ms", context.stats.physicsTimeMs);
-      ImGui::Text("Renderer Pipeline: %.3f ms", context.stats.renderTimeMs);
+      ImGui::Text("Update Subsystem:  %.3f ms", static_cast<double>(context.stats.updateTimeMs));
+      ImGui::Text("Physics World:     %.3f ms", static_cast<double>(context.stats.physicsTimeMs));
+      ImGui::Text("Renderer Pipeline: %.3f ms", static_cast<double>(context.stats.renderTimeMs));
 
       float total = context.stats.updateTimeMs + context.stats.physicsTimeMs +
                     context.stats.renderTimeMs;
@@ -49,8 +49,9 @@ void StatsPanel::OnImGuiRender(EditorContext &context, Scene &scene,
       ImGui::Text("Active Entities: %u", context.stats.entityCount);
       ImGui::Text("Draw Calls:      %u", renderer.drawCalls);
       ImGui::Text("Primitives:      %u", renderer.primitivesCount);
-      ImGui::Text("Viewport Size:   %.0f x %.0f", context.viewportSize.x,
-                  context.viewportSize.y);
+      ImGui::Text("Viewport Size:   %.0f x %.0f",
+                  static_cast<double>(context.viewportSize.x),
+                  static_cast<double>(context.viewportSize.y));
     }
 
     // 4. Viewport & Physics Debug Options
@@ -64,8 +65,8 @@ void StatsPanel::OnImGuiRender(EditorContext &context, Scene &scene,
       const Scene &simulated =
           context.runtimeScene ? *context.runtimeScene : scene;
       ImGui::Text("Boundary Rotation: %.2f deg",
-                  simulated.physicsWorld.boundaryRotation * 180.0f /
-                      3.14159265f);
+                  static_cast<double>(simulated.physicsWorld.boundaryRotation * 180.0f /
+                                      3.14159265f));
     }
   }
   ImGui::End();

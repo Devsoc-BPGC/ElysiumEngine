@@ -1,5 +1,5 @@
+#include "elypch.hpp"
 #include "LayerStack.hpp"
-#include <algorithm>
 
 namespace Elysium {
 

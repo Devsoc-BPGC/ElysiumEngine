@@ -22,6 +22,7 @@ Elysium has evolved from a standalone 2D physics engine into a full-featured 2D 
   - [8. Asset Management & Registry](#8-asset-management--registry)
   - [9. Project Architecture & Native File Dialogs](#9-project-architecture--native-file-dialogs)
   - [10. Scene Camera & Runtime Resolution](#10-scene-camera--runtime-resolution)
+  - [11. Precompiled Headers & Build System Acceleration](#11-precompiled-headers--build-system-acceleration)
 - [Prerequisites & Dependencies](#prerequisites--dependencies)
 - [Building & Running](#building--running)
 - [Developer & Contributor Guide](#developer--contributor-guide)
@@ -571,6 +572,24 @@ Elysium features a dedicated 2D orthographic camera system for gameplay and simu
     - **Play Mode**: Switches to the Primary Camera Entity, clearing the framebuffer with `cam.ClearColor`, disabling editor gizmos, and unprojecting mouse clicks through the active camera.
     - **Edit Mode**: Continues rendering through `EditorCamera` (pan/zoom), displaying a cyan (`#32C8FF`) wireframe frustum gizmo with top-edge direction notch matching the camera's visible world bounds.
   - Full reflection in `EntityInspectorPanel` with numeric drags, toggles, and color pickers.
+
+---
+
+### 11. Precompiled Headers & Build System Acceleration
+
+Elysium Engine uses modern CMake 3.16+ precompiled header (PCH) support via [`elypch.hpp`](file:///home/mrgreenapple24/projects/ElysiumEngine/engine/core/include/elypch.hpp) to significantly accelerate clean and incremental compile times across GCC, Clang, and MSVC:
+
+- **Target Precompilation**:
+  - `ElysiumEngine` compiles `elypch.hpp` via `target_precompile_headers(ElysiumEngine PRIVATE ...)`.
+  - The sandbox app `ElysiumApp` reuses the engine's precompiled header via `target_precompile_headers(ElysiumApp REUSE_FROM ElysiumEngine)`, avoiding redundant header parsing.
+- **Included in PCH**:
+  - Heavily used standard C++20 headers (`<vector>`, `<string>`, `<unordered_map>`, `<memory>`, `<functional>`, `<filesystem>`, `<algorithm>`, `<cmath>`, etc.).
+  - Core stable third-party libraries: `<spdlog/spdlog.h>`, `<SFML/Graphics.hpp>`, `<SFML/Window.hpp>`, `<SFML/System.hpp>`, `<imgui.h>`, and engine logging `"Log.h"`.
+  - Platform macro cleanliness guards (`NOMINMAX`, `WIN32_LEAN_AND_MEAN`).
+- **Excluded from PCH**:
+  - Frequently modified engine headers (`Scene.hpp`, `GameObject.hpp`, `EditorLayer.hpp`, `PhysicsWorld.hpp`) are kept outside `elypch.hpp` to prevent unnecessary cache invalidation.
+- **Self-Contained Headers**:
+  - All public `.hpp` files remain strictly self-contained and independently includable without requiring PCH.
 
 ---
 

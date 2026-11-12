@@ -1,3 +1,4 @@
+#include "elypch.hpp"
 #include "Script.hpp"
 #include "Entity.hpp"
 
