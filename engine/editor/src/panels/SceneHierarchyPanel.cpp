@@ -3,6 +3,7 @@
 #include "AudioSourceComponent.hpp"
 #include "CameraComponent.hpp"
 #include "Collider.hpp"
+#include "Command.hpp"
 
 namespace Elysium {
 
@@ -51,7 +52,11 @@ void SceneHierarchyPanel::DrawEntityNode(EditorContext &context, Scene &scene,
         GameObject *draggedEntity = scene.GetEntityByUUID(droppedUUID);
         if (draggedEntity && draggedEntity->GetUUID() != obj->GetUUID() &&
             !draggedEntity->IsParentOf(obj->GetUUID())) {
-          draggedEntity->SetParent(obj->GetUUID());
+          UUID oldParent = draggedEntity->GetTransform().ParentHandle;
+          UUID newParent = obj->GetUUID();
+          context.history.ExecuteCommand(std::make_unique<ReparentEntityCommand>(
+              scene, draggedEntity->GetUUID(), oldParent, newParent,
+              "Reparent '" + draggedEntity->name + "' under '" + obj->name + "'"));
           ELYSIUM_INFO("Reparented entity '{}' under '{}'", draggedEntity->name, obj->name);
         }
       }
@@ -79,14 +84,17 @@ void SceneHierarchyPanel::DrawEntityNode(EditorContext &context, Scene &scene,
           rb.AddColliders(col);
         }
       }
-      scene.AddGameObject(clone);
+      context.history.ExecuteCommand(std::make_unique<CreateEntityCommand>(
+          scene, clone, "Duplicate Entity '" + obj->name + "'"));
       context.selectedEntity = clone;
       ELYSIUM_INFO("Duplicated Entity: {}", clone->name);
     }
 
     if (obj->GetTransform().ParentHandle != 0) {
       if (ImGui::MenuItem("Unparent Entity")) {
-        obj->SetParent(0);
+        UUID oldParent = obj->GetTransform().ParentHandle;
+        context.history.ExecuteCommand(std::make_unique<ReparentEntityCommand>(
+            scene, obj->GetUUID(), oldParent, 0, "Unparent '" + obj->name + "'"));
         ELYSIUM_INFO("Unparented Entity: {}", obj->name);
       }
     }
@@ -137,7 +145,7 @@ void SceneHierarchyPanel::OnImGuiRender(EditorContext &context, Scene &scene,
         auto entity = std::make_shared<GameObject>("Empty Entity");
         entity->position =
             Vec3(context.camera.center.x, context.camera.center.y, 0.0f);
-        scene.AddGameObject(entity);
+        context.history.ExecuteCommand(std::make_unique<CreateEntityCommand>(scene, entity));
         context.selectedEntity = entity;
         ELYSIUM_INFO("Created new Empty Entity");
       }
@@ -146,7 +154,7 @@ void SceneHierarchyPanel::OnImGuiRender(EditorContext &context, Scene &scene,
         entity->position =
             Vec3(context.camera.center.x, context.camera.center.y, 0.0f);
         entity->CreateRigidBody();
-        scene.AddGameObject(entity);
+        context.history.ExecuteCommand(std::make_unique<CreateEntityCommand>(scene, entity, "Create Rigid Body"));
         context.selectedEntity = entity;
       }
       if (ImGui::MenuItem("Create Audio Source")) {
@@ -154,7 +162,7 @@ void SceneHierarchyPanel::OnImGuiRender(EditorContext &context, Scene &scene,
         entity->position =
             Vec3(context.camera.center.x, context.camera.center.y, 0.0f);
         entity->AddComponent<AudioSourceComponent>();
-        scene.AddGameObject(entity);
+        context.history.ExecuteCommand(std::make_unique<CreateEntityCommand>(scene, entity, "Create Audio Source"));
         context.selectedEntity = entity;
         ELYSIUM_INFO("Added AudioSourceComponent to entity: {}", entity->GetComponent<AudioSourceComponent>() != nullptr);
       }
@@ -202,7 +210,7 @@ void SceneHierarchyPanel::OnImGuiRender(EditorContext &context, Scene &scene,
         context.selectedEntity = nullptr;
       }
       ELYSIUM_INFO("Deleted Entity: {}", entityToDelete->name);
-      scene.DestroyEntityByUUID(entityToDelete->GetUUID());
+      context.history.ExecuteCommand(std::make_unique<DeleteEntityCommand>(scene, entityToDelete));
     }
 
     // Drag-and-drop into empty hierarchy window space: Unparent back to root
@@ -216,7 +224,9 @@ void SceneHierarchyPanel::OnImGuiRender(EditorContext &context, Scene &scene,
             Elysium::UUID droppedUUID(droppedRaw);
             GameObject *draggedEntity = scene.GetEntityByUUID(droppedUUID);
             if (draggedEntity && draggedEntity->GetTransform().ParentHandle != 0) {
-              draggedEntity->SetParent(0);
+              UUID oldParent = draggedEntity->GetTransform().ParentHandle;
+              context.history.ExecuteCommand(std::make_unique<ReparentEntityCommand>(
+                  scene, draggedEntity->GetUUID(), oldParent, 0, "Unparent '" + draggedEntity->name + "' to Root"));
               ELYSIUM_INFO("Detached entity '{}' to root level", draggedEntity->name);
             }
           }
@@ -233,7 +243,7 @@ void SceneHierarchyPanel::OnImGuiRender(EditorContext &context, Scene &scene,
         auto entity = std::make_shared<GameObject>("Empty Entity");
         entity->position =
             Vec3(context.camera.center.x, context.camera.center.y, 0.0f);
-        scene.AddGameObject(entity);
+        context.history.ExecuteCommand(std::make_unique<CreateEntityCommand>(scene, entity));
         context.selectedEntity = entity;
       }
       if (ImGui::MenuItem("Create Ball")) {
@@ -242,7 +252,7 @@ void SceneHierarchyPanel::OnImGuiRender(EditorContext &context, Scene &scene,
             Vec3(context.camera.center.x, context.camera.center.y, 0.0f);
         auto &rb = entity->CreateRigidBody();
         rb.AddColliders(Collider::CreateSphere(0.5f, 1.0f));
-        scene.AddGameObject(entity);
+        context.history.ExecuteCommand(std::make_unique<CreateEntityCommand>(scene, entity, "Create Ball"));
         context.selectedEntity = entity;
       }
       if (ImGui::MenuItem("Create Camera")) {
@@ -250,7 +260,7 @@ void SceneHierarchyPanel::OnImGuiRender(EditorContext &context, Scene &scene,
         entity->position =
             Vec3(context.camera.center.x, context.camera.center.y, 0.0f);
         entity->AddComponent<CameraComponent>();
-        scene.AddGameObject(entity);
+        context.history.ExecuteCommand(std::make_unique<CreateEntityCommand>(scene, entity, "Create Camera"));
         context.selectedEntity = entity;
         ELYSIUM_INFO("Created Camera entity: {}", entity->name);
       }

@@ -9,6 +9,10 @@ namespace Hotkeys {
 // Playback / Simulation
 constexpr auto TogglePlayPause       = sf::Keyboard::Key::Space;
 
+// History / Undo & Redo
+constexpr auto Undo                  = sf::Keyboard::Key::Z;
+constexpr auto Redo                  = sf::Keyboard::Key::Y;
+
 // Entity Navigation & Modification
 constexpr auto FocusCamera           = sf::Keyboard::Key::F;
 constexpr auto DeleteEntity          = sf::Keyboard::Key::Delete;

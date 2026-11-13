@@ -4,6 +4,7 @@
 #include "AudioSourceComponent.hpp"
 #include "CameraComponent.hpp"
 #include "Collider.hpp"
+#include "Command.hpp"
 #include "FileDialog.hpp"
 #include "Project.hpp"
 #include "SpriteRenderer.hpp"
@@ -40,9 +41,27 @@ void EntityInspectorPanel::OnImGuiRender(EditorContext &context, Scene &scene,
     if (ImGui::InputText("Entity Name", nameBuffer, sizeof(nameBuffer))) {
       entity.name = nameBuffer;
     }
+    if (ImGui::IsItemActivated()) {
+      m_dragStartString = entity.name;
+    }
+    if (ImGui::IsItemDeactivatedAfterEdit() && m_dragStartString != entity.name) {
+      std::string oldName = m_dragStartString;
+      std::string newName = entity.name;
+      context.history.PushExecutedCommand(std::make_unique<PropertyChangeCommand<std::string>>(
+          scene, entity.GetUUID(), oldName, newName,
+          [](GameObject &g, const std::string &val) { g.name = val; },
+          "Rename Entity"));
+    }
 
     ImGui::SameLine();
-    ImGui::Checkbox("Active", &entity.active);
+    bool active = entity.active;
+    if (ImGui::Checkbox("Active", &active)) {
+      entity.active = active;
+      context.history.PushExecutedCommand(std::make_unique<PropertyChangeCommand<bool>>(
+          scene, entity.GetUUID(), !active, active,
+          [](GameObject &g, const bool &val) { g.active = val; },
+          active ? "Activate Entity" : "Deactivate Entity"));
+    }
 
     ImGui::TextDisabled("Entity ID: %llu",
                         static_cast<unsigned long long>(static_cast<uint64_t>(entity.GetUUID())));
@@ -123,7 +142,6 @@ void EntityInspectorPanel::OnImGuiRender(EditorContext &context, Scene &scene,
 
 void EntityInspectorPanel::DrawTransformComponent(EditorContext &context,
                                                   GameObject &entity) {
-  (void)context;
   if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
     bool changed = false;
 
@@ -132,6 +150,18 @@ void EntityInspectorPanel::DrawTransformComponent(EditorContext &context,
     if (ImGui::DragFloat3("Position (m)", pos, 0.05f)) {
       entity.position = Vec3(pos[0], pos[1], pos[2]);
       changed = true;
+    }
+    if (ImGui::IsItemActivated()) {
+      m_dragStartPos = entity.position;
+    }
+    if (ImGui::IsItemDeactivatedAfterEdit() && m_dragStartPos != entity.position) {
+      if (entity.GetScene()) {
+        context.history.PushExecutedCommand(std::make_unique<TransformCommand>(
+            *entity.GetScene(), entity.GetUUID(),
+            m_dragStartPos, entity.rotation, entity.scale,
+            entity.position, entity.rotation, entity.scale,
+            "Change Position " + entity.name));
+      }
     }
 
     // Rotation (degrees around Z axis in 2D)
@@ -142,12 +172,36 @@ void EntityInspectorPanel::DrawTransformComponent(EditorContext &context,
       entity.rotation = Quat(Vec3(0, 0, 1), rad);
       changed = true;
     }
+    if (ImGui::IsItemActivated()) {
+      m_dragStartRot = entity.rotation;
+    }
+    if (ImGui::IsItemDeactivatedAfterEdit() && m_dragStartRot != entity.rotation) {
+      if (entity.GetScene()) {
+        context.history.PushExecutedCommand(std::make_unique<TransformCommand>(
+            *entity.GetScene(), entity.GetUUID(),
+            entity.position, m_dragStartRot, entity.scale,
+            entity.position, entity.rotation, entity.scale,
+            "Change Rotation " + entity.name));
+      }
+    }
 
     // Scale
     float scale[3] = {entity.scale.x, entity.scale.y, entity.scale.z};
     if (ImGui::DragFloat3("Scale", scale, 0.05f, 0.01f, 100.0f)) {
       entity.scale = Vec3(scale[0], scale[1], scale[2]);
       changed = true;
+    }
+    if (ImGui::IsItemActivated()) {
+      m_dragStartScale = entity.scale;
+    }
+    if (ImGui::IsItemDeactivatedAfterEdit() && m_dragStartScale != entity.scale) {
+      if (entity.GetScene()) {
+        context.history.PushExecutedCommand(std::make_unique<TransformCommand>(
+            *entity.GetScene(), entity.GetUUID(),
+            entity.position, entity.rotation, m_dragStartScale,
+            entity.position, entity.rotation, entity.scale,
+            "Change Scale " + entity.name));
+      }
     }
 
     // Immediately synchronize physics state with the transform changes
@@ -160,7 +214,6 @@ void EntityInspectorPanel::DrawTransformComponent(EditorContext &context,
 void EntityInspectorPanel::DrawRigidBodyComponent(EditorContext &context,
                                                   Scene &scene,
                                                   GameObject &entity) {
-  (void)context;
   if (!entity.rigidBody)
     return;
 
@@ -170,6 +223,7 @@ void EntityInspectorPanel::DrawRigidBodyComponent(EditorContext &context,
     // Body Type
     bool isStatic = body->isStatic;
     if (ImGui::Checkbox("Is Static", &isStatic)) {
+      bool oldStatic = body->isStatic;
       body->isStatic = isStatic;
       if (isStatic) {
         body->mass = 0.0f;
@@ -183,6 +237,25 @@ void EntityInspectorPanel::DrawRigidBodyComponent(EditorContext &context,
           body->inverseMass = 1.0f;
         }
       }
+      context.history.PushExecutedCommand(std::make_unique<PropertyChangeCommand<bool>>(
+          scene, entity.GetUUID(), oldStatic, isStatic,
+          [](GameObject &g, const bool &val) {
+            if (!g.rigidBody) return;
+            g.rigidBody->isStatic = val;
+            if (val) {
+              g.rigidBody->mass = 0.0f;
+              g.rigidBody->inverseMass = 0.0f;
+              g.rigidBody->linearVelocity = Vec3(0, 0, 0);
+              g.rigidBody->angularVelocity = Vec3(0, 0, 0);
+            } else {
+              g.rigidBody->RecalculateMassProperties();
+              if (g.rigidBody->mass <= 0.0f) {
+                g.rigidBody->mass = 1.0f;
+                g.rigidBody->inverseMass = 1.0f;
+              }
+            }
+          },
+          "Toggle RigidBody Static"));
     }
 
     if (!body->isStatic) {
@@ -192,12 +265,41 @@ void EntityInspectorPanel::DrawRigidBodyComponent(EditorContext &context,
           body->inverseMass = 1.0f / body->mass;
         }
       }
+      if (ImGui::IsItemActivated()) {
+        m_dragStartFloat = body->mass;
+      }
+      if (ImGui::IsItemDeactivatedAfterEdit() && m_dragStartFloat != body->mass) {
+        float oldMass = m_dragStartFloat;
+        float newMass = body->mass;
+        context.history.PushExecutedCommand(std::make_unique<PropertyChangeCommand<float>>(
+            scene, entity.GetUUID(), oldMass, newMass,
+            [](GameObject &g, const float &val) {
+              if (!g.rigidBody) return;
+              g.rigidBody->mass = val;
+              g.rigidBody->inverseMass = (val > 0.0f) ? (1.0f / val) : 0.0f;
+            },
+            "Change Mass"));
+      }
 
       // Linear Velocity
       float vel[2] = {body->linearVelocity.x, body->linearVelocity.y};
       if (ImGui::DragFloat2("Linear Velocity (m/s)", vel, 0.1f)) {
         body->linearVelocity.x = vel[0];
         body->linearVelocity.y = vel[1];
+      }
+      if (ImGui::IsItemActivated()) {
+        m_dragStartVec3 = body->linearVelocity;
+      }
+      if (ImGui::IsItemDeactivatedAfterEdit() &&
+          (m_dragStartVec3.x != body->linearVelocity.x || m_dragStartVec3.y != body->linearVelocity.y)) {
+        Vec3 oldVel = m_dragStartVec3;
+        Vec3 newVel = body->linearVelocity;
+        context.history.PushExecutedCommand(std::make_unique<PropertyChangeCommand<Vec3>>(
+            scene, entity.GetUUID(), oldVel, newVel,
+            [](GameObject &g, const Vec3 &val) {
+              if (g.rigidBody) g.rigidBody->linearVelocity = val;
+            },
+            "Change Linear Velocity"));
       }
 
       // Angular Velocity
@@ -209,7 +311,34 @@ void EntityInspectorPanel::DrawRigidBodyComponent(EditorContext &context,
 
     // Physics Material Properties
     ImGui::SliderFloat("Restitution", &body->restitution, 0.0f, 1.0f, "%.2f");
+    if (ImGui::IsItemActivated()) {
+      m_dragStartFloat = body->restitution;
+    }
+    if (ImGui::IsItemDeactivatedAfterEdit() && m_dragStartFloat != body->restitution) {
+      float oldRest = m_dragStartFloat;
+      float newRest = body->restitution;
+      context.history.PushExecutedCommand(std::make_unique<PropertyChangeCommand<float>>(
+          scene, entity.GetUUID(), oldRest, newRest,
+          [](GameObject &g, const float &val) {
+            if (g.rigidBody) g.rigidBody->restitution = val;
+          },
+          "Change Restitution"));
+    }
+
     ImGui::SliderFloat("Friction", &body->friction, 0.0f, 1.0f, "%.2f");
+    if (ImGui::IsItemActivated()) {
+      m_dragStartFloat = body->friction;
+    }
+    if (ImGui::IsItemDeactivatedAfterEdit() && m_dragStartFloat != body->friction) {
+      float oldFric = m_dragStartFloat;
+      float newFric = body->friction;
+      context.history.PushExecutedCommand(std::make_unique<PropertyChangeCommand<float>>(
+          scene, entity.GetUUID(), oldFric, newFric,
+          [](GameObject &g, const float &val) {
+            if (g.rigidBody) g.rigidBody->friction = val;
+          },
+          "Change Friction"));
+    }
 
     // Remove RigidBody Button
     if (ImGui::Button("Remove RigidBody", ImVec2(-1.0f, 0.0f))) {
@@ -545,11 +674,69 @@ void EntityInspectorPanel::DrawAudioSourceComponent(EditorContext &context,
 
     ImGui::Spacing();
     ImGui::SliderFloat("Volume", &audio->volume, 0.0f, 100.0f, "%.1f");
-    ImGui::SliderFloat("Pitch", &audio->pitch, 0.1f, 3.0f, "%.2f");
+    if (ImGui::IsItemActivated()) {
+      m_dragStartFloat = audio->volume;
+    }
+    if (ImGui::IsItemDeactivatedAfterEdit() && m_dragStartFloat != audio->volume) {
+      if (entity.GetScene()) {
+        float oldVol = m_dragStartFloat;
+        float newVol = audio->volume;
+        context.history.PushExecutedCommand(std::make_unique<PropertyChangeCommand<float>>(
+            *entity.GetScene(), entity.GetUUID(), oldVol, newVol,
+            [](GameObject &g, const float &val) {
+              auto *a = g.GetComponent<AudioSourceComponent>();
+              if (a) a->volume = val;
+            },
+            "Change Audio Volume"));
+      }
+    }
 
-    ImGui::Checkbox("Play On Awake", &audio->playOnAwake);
+    ImGui::SliderFloat("Pitch", &audio->pitch, 0.1f, 3.0f, "%.2f");
+    if (ImGui::IsItemActivated()) {
+      m_dragStartFloat = audio->pitch;
+    }
+    if (ImGui::IsItemDeactivatedAfterEdit() && m_dragStartFloat != audio->pitch) {
+      if (entity.GetScene()) {
+        float oldPitch = m_dragStartFloat;
+        float newPitch = audio->pitch;
+        context.history.PushExecutedCommand(std::make_unique<PropertyChangeCommand<float>>(
+            *entity.GetScene(), entity.GetUUID(), oldPitch, newPitch,
+            [](GameObject &g, const float &val) {
+              auto *a = g.GetComponent<AudioSourceComponent>();
+              if (a) a->pitch = val;
+            },
+            "Change Audio Pitch"));
+      }
+    }
+
+    bool playOnAwake = audio->playOnAwake;
+    if (ImGui::Checkbox("Play On Awake", &playOnAwake)) {
+      audio->playOnAwake = playOnAwake;
+      if (entity.GetScene()) {
+        context.history.PushExecutedCommand(std::make_unique<PropertyChangeCommand<bool>>(
+            *entity.GetScene(), entity.GetUUID(), !playOnAwake, playOnAwake,
+            [](GameObject &g, const bool &val) {
+              auto *a = g.GetComponent<AudioSourceComponent>();
+              if (a) a->playOnAwake = val;
+            },
+            "Toggle Play On Awake"));
+      }
+    }
+
     ImGui::SameLine();
-    ImGui::Checkbox("Loop", &audio->loop);
+    bool loop = audio->loop;
+    if (ImGui::Checkbox("Loop", &loop)) {
+      audio->loop = loop;
+      if (entity.GetScene()) {
+        context.history.PushExecutedCommand(std::make_unique<PropertyChangeCommand<bool>>(
+            *entity.GetScene(), entity.GetUUID(), !loop, loop,
+            [](GameObject &g, const bool &val) {
+              auto *a = g.GetComponent<AudioSourceComponent>();
+              if (a) a->loop = val;
+            },
+            "Toggle Audio Loop"));
+      }
+    }
 
     ImGui::Separator();
     ImGui::Checkbox("Spatial Audio (3D)", &audio->isSpatial);
@@ -597,6 +784,20 @@ void EntityInspectorPanel::DrawCameraComponent(EditorContext &context,
     if (ImGui::DragFloat("Size", &size, 0.1f, 0.1f, 1000.0f, "%.2f")) {
       cam->Camera.SetOrthographicSize(size);
     }
+    if (ImGui::IsItemActivated()) {
+      m_dragStartFloat = cam->Camera.GetOrthographicSize();
+    }
+    if (ImGui::IsItemDeactivatedAfterEdit() && m_dragStartFloat != cam->Camera.GetOrthographicSize()) {
+      float oldSize = m_dragStartFloat;
+      float newSize = cam->Camera.GetOrthographicSize();
+      context.history.PushExecutedCommand(std::make_unique<PropertyChangeCommand<float>>(
+          scene, entity.GetUUID(), oldSize, newSize,
+          [](GameObject &g, const float &val) {
+            auto *c = g.GetComponent<CameraComponent>();
+            if (c) c->Camera.SetOrthographicSize(val);
+          },
+          "Change Camera Size"));
+    }
 
     // Near and Far clipping planes
     float nearClip = cam->Camera.GetNearClip();
@@ -610,10 +811,30 @@ void EntityInspectorPanel::DrawCameraComponent(EditorContext &context,
     }
 
     // Primary Camera toggle
-    ImGui::Checkbox("Primary", &cam->Primary);
+    bool primary = cam->Primary;
+    if (ImGui::Checkbox("Primary", &primary)) {
+      cam->Primary = primary;
+      context.history.PushExecutedCommand(std::make_unique<PropertyChangeCommand<bool>>(
+          scene, entity.GetUUID(), !primary, primary,
+          [](GameObject &g, const bool &val) {
+            auto *c = g.GetComponent<CameraComponent>();
+            if (c) c->Primary = val;
+          },
+          primary ? "Set Primary Camera" : "Unset Primary Camera"));
+    }
 
     // Fixed Aspect Ratio toggle
-    ImGui::Checkbox("Fixed Aspect Ratio", &cam->FixedAspectRatio);
+    bool fixedAspect = cam->FixedAspectRatio;
+    if (ImGui::Checkbox("Fixed Aspect Ratio", &fixedAspect)) {
+      cam->FixedAspectRatio = fixedAspect;
+      context.history.PushExecutedCommand(std::make_unique<PropertyChangeCommand<bool>>(
+          scene, entity.GetUUID(), !fixedAspect, fixedAspect,
+          [](GameObject &g, const bool &val) {
+            auto *c = g.GetComponent<CameraComponent>();
+            if (c) c->FixedAspectRatio = val;
+          },
+          "Toggle Fixed Aspect Ratio"));
+    }
 
     if (cam->FixedAspectRatio) {
       float aspect = cam->Camera.GetAspectRatio();

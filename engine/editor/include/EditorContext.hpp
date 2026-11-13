@@ -1,6 +1,7 @@
 #ifndef EDITORCONTEXT_HPP
 #define EDITORCONTEXT_HPP
 
+#include "CommandHistory.hpp"
 #include "GameObject.hpp"
 #include <SFML/System/Vector2.hpp>
 #include <cstdint>
@@ -96,6 +97,7 @@ struct EditorContext {
   EditorCamera camera;
   GameCamera gameCamera;
   EditorStats stats;
+  CommandHistory history;
 
   void SelectEntity(const std::shared_ptr<GameObject> &entity) { selectedEntity = entity; }
   void ClearSelection() { selectedEntity = nullptr; }
