@@ -16,9 +16,18 @@
 #include "panels/StatsPanel.hpp"
 #include "panels/ToolbarPanel.hpp"
 #include <imgui-SFML.h>
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wconversion"
+#pragma GCC diagnostic ignored "-Wsign-conversion"
+#endif
 #include <imgui_internal.h>
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 #include "AudioSourceComponent.hpp"
 #include "CameraComponent.hpp"
+#include "Command.hpp"
 #include "EditorHotkeys.hpp"
 
 namespace Elysium {
@@ -155,6 +164,7 @@ void EditorLayer::OnUpdate(Timestep ts) {
   // discards the copy
   if (m_context.playState != ScenePlayState::Edit && !m_runtimeScene) {
     m_runtimeScene = m_scene.Clone();
+    m_context.history.SetLocked(true);
     // Scripts reach the scene through the scripting world's active scene, so
     // point them at the copy for the length of the play session
     m_activeSceneBeforePlay = GetActiveScene();
@@ -166,6 +176,7 @@ void EditorLayer::OnUpdate(Timestep ts) {
   } else if (m_context.playState == ScenePlayState::Edit && m_runtimeScene) {
     SetActiveScene(m_activeSceneBeforePlay);
     m_runtimeScene.reset();
+    m_context.history.SetLocked(false);
   }
   m_context.runtimeScene = m_runtimeScene.get();
 
@@ -236,6 +247,31 @@ bool EditorLayer::OnKeyPressed(KeyPressedEvent &e) {
 
   bool isCtrl = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LControl) ||
                 sf::Keyboard::isKeyPressed(sf::Keyboard::Key::RControl);
+  bool isShift = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LShift) ||
+                 sf::Keyboard::isKeyPressed(sf::Keyboard::Key::RShift);
+
+  // Undo: Ctrl+Z (without Shift)
+  if (m_context.playState == ScenePlayState::Edit && isCtrl && !isShift &&
+      e.GetKeyCode() == Hotkeys::Undo) {
+    if (m_context.history.CanUndo()) {
+      std::string name = m_context.history.GetUndoCommandName();
+      m_context.history.Undo();
+      ELYSIUM_INFO("Undo: {}", name);
+    }
+    return true;
+  }
+
+  // Redo: Ctrl+Y or Ctrl+Shift+Z
+  if (m_context.playState == ScenePlayState::Edit && isCtrl &&
+      ((!isShift && e.GetKeyCode() == Hotkeys::Redo) ||
+       (isShift && e.GetKeyCode() == Hotkeys::Undo))) {
+    if (m_context.history.CanRedo()) {
+      std::string name = m_context.history.GetRedoCommandName();
+      m_context.history.Redo();
+      ELYSIUM_INFO("Redo: {}", name);
+    }
+    return true;
+  }
 
   // Space: Toggle Play / Pause
   if (e.GetKeyCode() == Hotkeys::TogglePlayPause) {
@@ -259,8 +295,10 @@ bool EditorLayer::OnKeyPressed(KeyPressedEvent &e) {
   }
 
   // Delete: Delete selected entity
-  if (e.GetKeyCode() == Hotkeys::DeleteEntity && m_context.selectedEntity) {
-    m_scene.DestroyEntityByUUID(m_context.selectedEntity->GetUUID());
+  if (e.GetKeyCode() == Hotkeys::DeleteEntity && m_context.selectedEntity &&
+      m_context.playState == ScenePlayState::Edit) {
+    m_context.history.ExecuteCommand(
+        std::make_unique<DeleteEntityCommand>(m_scene, m_context.selectedEntity));
     m_context.selectedEntity = nullptr;
     return true;
   }
@@ -314,6 +352,7 @@ void EditorLayer::OnProjectLoaded() {
 
   // 1. Reload Asset Manager with project asset directory
   AssetManager::Get().ReloadProjectAssets(assetsDir);
+  m_context.history.Clear();
 
   // 2. Update window title
   if (m_window) {
@@ -503,6 +542,7 @@ void EditorLayer::RenderMenuBar(Scene &scene) {
       if (ImGui::MenuItem("New Scene", "Ctrl+N")) {
         scene.Clear();
         m_context.selectedEntity = nullptr;
+        m_context.history.Clear();
         ELYSIUM_INFO("New Scene created");
       }
       if (ImGui::MenuItem("Open Scene...", "Ctrl+O")) {
@@ -523,16 +563,29 @@ void EditorLayer::RenderMenuBar(Scene &scene) {
 
     // 2. Edit Menu
     if (ImGui::BeginMenu("Edit")) {
-      if (ImGui::MenuItem("Undo", "Ctrl+Z", false, false)) {
+      bool canUndo = (m_context.playState == ScenePlayState::Edit) && m_context.history.CanUndo();
+      bool canRedo = (m_context.playState == ScenePlayState::Edit) && m_context.history.CanRedo();
+
+      std::string undoLabel = canUndo ? ("Undo " + m_context.history.GetUndoCommandName()) : "Undo";
+      std::string redoLabel = canRedo ? ("Redo " + m_context.history.GetRedoCommandName()) : "Redo";
+
+      if (ImGui::MenuItem(undoLabel.c_str(), "Ctrl+Z", false, canUndo)) {
+        std::string name = m_context.history.GetUndoCommandName();
+        m_context.history.Undo();
+        ELYSIUM_INFO("Undo: {}", name);
       }
-      if (ImGui::MenuItem("Redo", "Ctrl+Y", false, false)) {
+      if (ImGui::MenuItem(redoLabel.c_str(), "Ctrl+Y", false, canRedo)) {
+        std::string name = m_context.history.GetRedoCommandName();
+        m_context.history.Redo();
+        ELYSIUM_INFO("Redo: {}", name);
       }
       ImGui::Separator();
       bool hasSelection = (m_context.selectedEntity != nullptr);
       if (ImGui::MenuItem("Delete Selected Entity", "Del", false,
-                          hasSelection)) {
+                          hasSelection && m_context.playState == ScenePlayState::Edit)) {
         if (m_context.selectedEntity) {
-          scene.DestroyEntityByUUID(m_context.selectedEntity->GetUUID());
+          m_context.history.ExecuteCommand(
+              std::make_unique<DeleteEntityCommand>(scene, m_context.selectedEntity));
           m_context.selectedEntity = nullptr;
         }
       }

@@ -23,6 +23,7 @@ Elysium has evolved from a standalone 2D physics engine into a full-featured 2D 
   - [9. Project Architecture & Native File Dialogs](#9-project-architecture--native-file-dialogs)
   - [10. Scene Camera & Runtime Resolution](#10-scene-camera--runtime-resolution)
   - [11. Precompiled Headers & Build System Acceleration](#11-precompiled-headers--build-system-acceleration)
+  - [12. Undo/Redo Command Stack System](#12-undoredo-command-stack-system)
 - [Prerequisites & Dependencies](#prerequisites--dependencies)
 - [Building & Running](#building--running)
 - [Developer & Contributor Guide](#developer--contributor-guide)
@@ -593,6 +594,29 @@ Elysium Engine uses modern CMake 3.16+ precompiled header (PCH) support via [`el
 
 ---
 
+### 12. Undo/Redo Command Stack System
+
+Elysium Engine features a memory-safe, UUID-backed command history architecture supporting unlimited or depth-bounded undo and redo operations (`Ctrl+Z` / `Ctrl+Y`), tightly integrated across the Editor suite:
+
+- **Core History Engine ([`CommandHistory.hpp`](file:///home/mrgreenapple24/projects/ElysiumEngine/engine/editor/include/CommandHistory.hpp))**:
+  - Maintained within [`EditorContext`](file:///home/mrgreenapple24/projects/ElysiumEngine/engine/editor/include/EditorContext.hpp) for universal access across panels.
+  - Configurable history depth (default `100`), trimming the oldest entries automatically.
+  - Strict redo-stack clearing whenever a new action is performed.
+  - Simulation isolation: automatically locked upon entering Play/Pause/Step modes and unlocked when returning to Edit mode.
+- **UUID-Backed Concrete Commands ([`Command.hpp`](file:///home/mrgreenapple24/projects/ElysiumEngine/engine/editor/include/Command.hpp))**:
+  - **`TransformCommand`**: Records initial and final local positions, orientations, and scale factors. Synchronizes recursive hierarchical world matrices and physics bodies via `SyncTransform()`.
+  - **`PropertyChangeCommand<T>`**: Generic templated command holding previous and next values along with an invokable setter (`std::function<void(GameObject&, const T&)>`).
+  - **`ReparentEntityCommand`**: Tracks child and parent UUIDs, maintaining correct parent-child scene graph links across undo/redo operations.
+  - **`CreateEntityCommand` & `DeleteEntityCommand`**: Preserves full entity state, attached components, physics bodies, and hierarchical subtrees, enabling non-destructive deletion and restoration.
+- **Continuous Drag Coalescing**:
+  - **Transform Gizmos**: Caches starting transforms on initial mouse-down. Live manipulation runs at full framerate (60+ FPS); releasing the mouse commits a single atomic `TransformCommand` via `PushExecutedCommand()`.
+  - **Inspector Properties**: Utilizes ImGui `IsItemActivated()` and `IsItemDeactivatedAfterEdit()` hooks to coalesce interactive drag-slider interactions into a single command upon release.
+- **Editor UI & Keybindings ([`EditorLayer.cpp`](file:///home/mrgreenapple24/projects/ElysiumEngine/engine/editor/src/EditorLayer.cpp))**:
+  - Global `Ctrl+Z` (Undo) and `Ctrl+Y` / `Ctrl+Shift+Z` (Redo) shortcuts guarded against active text inputs (`!io.WantTextInput`).
+  - Dynamic `Edit -> Undo <Action>` and `Edit -> Redo <Action>` menu items displaying current operation names and disabling when stacks are empty or during simulation.
+
+---
+
 ## Prerequisites & Dependencies
 
 ### System Requirements
@@ -747,6 +771,7 @@ Upcoming milestones as detailed in [`PLAN.md`](file:///home/mrgreenapple24/proje
 - [x] **Project Management & Native Dialogs**: Standalone `.elyproj` project files, directory auto-initialization, and OS file/folder pickers.
 - [x] **Viewport Mouse Picking**: 2D unprojection, geometric entity hit testing (OBB/colliders), and synchronized editor selection highlight.
 - [x] **Scene Camera Entity System**: 2D orthographic projection, `CameraComponent`, primary camera resolution, viewport resize sync, and Play mode viewport routing.
+- [x] **Undo/Redo Command Stack System**: `CommandHistory` with `Ctrl+Z` / `Ctrl+Y`, UUID-backed commands, continuous drag coalescing, and Play mode isolation.
 
 ---
 

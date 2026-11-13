@@ -1,5 +1,6 @@
 #include "elypch.hpp"
 #include "TransformGizmo.hpp"
+#include "Command.hpp"
 #include "Scene.hpp"
 #include <cstdio>
 
@@ -67,8 +68,38 @@ void TransformGizmo::Render(EditorContext &context, Scene &activeScene,
   bool isMouseDown = ImGui::IsMouseDown(ImGuiMouseButton_Left);
   bool isMouseClicked = ImGui::IsMouseClicked(ImGuiMouseButton_Left);
 
-  // If user released the mouse button, terminate any active drag
+  // If user released the mouse button, terminate any active drag and commit undo command
   if (!isMouseDown && m_activeHandle != GizmoHandle::None) {
+    Vec3 newLocalPos = entity.GetLocalPosition();
+    Quat newLocalRot = entity.GetLocalRotation();
+    Vec3 newLocalScale = entity.GetLocalScale();
+
+    bool changed = (m_initialLocalPos != newLocalPos) ||
+                   (m_initialLocalRot != newLocalRot) ||
+                   (m_initialLocalScale != newLocalScale);
+
+    if (changed) {
+      std::string actionName = "Transform " + entity.name;
+      if (m_activeHandle == GizmoHandle::TranslateX ||
+          m_activeHandle == GizmoHandle::TranslateY ||
+          m_activeHandle == GizmoHandle::TranslateXY) {
+        actionName = "Translate " + entity.name;
+      } else if (m_activeHandle == GizmoHandle::RotateRing) {
+        actionName = "Rotate " + entity.name;
+      } else if (m_activeHandle == GizmoHandle::ScaleX ||
+                 m_activeHandle == GizmoHandle::ScaleY ||
+                 m_activeHandle == GizmoHandle::ScaleXY) {
+        actionName = "Scale " + entity.name;
+      }
+
+      auto cmd = std::make_unique<TransformCommand>(
+          activeScene, entity.GetUUID(),
+          m_initialLocalPos, m_initialLocalRot, m_initialLocalScale,
+          newLocalPos, newLocalRot, newLocalScale,
+          actionName);
+      context.history.PushExecutedCommand(std::move(cmd));
+    }
+
     m_activeHandle = GizmoHandle::None;
   }
 
@@ -260,6 +291,9 @@ void TransformGizmo::RenderRotateGizmo(EditorContext &context, GameObject &entit
       m_initialWorldPos = entity.GetWorldPosition();
       m_initialWorldRot = entity.GetWorldRotation();
       m_initialWorldScale = entity.GetWorldScale();
+      m_initialLocalPos = entity.GetLocalPosition();
+      m_initialLocalRot = entity.GetLocalRotation();
+      m_initialLocalScale = entity.GetLocalScale();
       m_initialAngleRad = std::atan2(mousePos.y - originScreen.y, mousePos.x - originScreen.x);
       m_currentAngleDeltaRad = 0.0f;
     }

@@ -118,9 +118,10 @@ void SceneViewportPanel::OnImGuiRender(EditorContext &context, Scene &scene,
         ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.4f, 1.0f), "[Play Mode - Camera]");
         ImGui::Text("Cam: %s", primaryCamEntity->name.c_str());
       } else {
-        ImGui::Text("Cam: (%.2f, %.2f) m", context.camera.center.x,
-                    context.camera.center.y);
-        ImGui::Text("Zoom: %.0f%%", context.camera.zoom * 100.0f);
+        ImGui::Text("Cam: (%.2f, %.2f) m",
+                    static_cast<double>(context.camera.center.x),
+                    static_cast<double>(context.camera.center.y));
+        ImGui::Text("Zoom: %.0f%%", static_cast<double>(context.camera.zoom * 100.0f));
         ImGui::SameLine();
         if (ImGui::SmallButton("Reset View")) {
           context.camera.Reset();

@@ -159,6 +159,9 @@ struct Vec3 {
     z *= s;
   }
 
+  bool operator==(const Vec3 &v) const { return x == v.x && y == v.y && z == v.z; }
+  bool operator!=(const Vec3 &v) const { return !(*this == v); }
+
   /**
    * @brief Calculates the scalar dot product.
    * @return Positive if vectors face the same direction, 0 if perpendicular.
@@ -445,6 +448,10 @@ struct Quat {
   }
 
   Quat operator*(float s) const { return Quat(w * s, x * s, y * s, z * s); }
+
+  bool operator==(const Quat &q) const { return w == q.w && x == q.x && y == q.y && z == q.z; }
+  bool operator!=(const Quat &q) const { return !(*this == q); }
+
   void operator+=(const Quat &q) {
     w += q.w;
     x += q.x;

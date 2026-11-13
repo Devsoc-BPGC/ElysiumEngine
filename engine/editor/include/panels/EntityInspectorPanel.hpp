@@ -22,6 +22,15 @@ private:
   void DrawAudioSourceComponent(EditorContext &context, GameObject &entity);
   void DrawCameraComponent(EditorContext &context, Scene &scene, GameObject &entity);
   void DrawCustomComponents(EditorContext &context, GameObject &entity);
+
+  // Tracking for undo/redo coalescing during continuous inspector dragging
+  Vec3 m_dragStartPos{0.0f, 0.0f, 0.0f};
+  Quat m_dragStartRot;
+  Vec3 m_dragStartScale{1.0f, 1.0f, 1.0f};
+  float m_dragStartFloat = 0.0f;
+  Vec3 m_dragStartVec3{0.0f, 0.0f, 0.0f};
+  std::string m_dragStartString;
+  bool m_dragStartBool = false;
 };
 
 } // namespace Elysium
