@@ -107,7 +107,7 @@ struct EditorContext {
   Scene *runtimeScene = nullptr;
 
   // Visual settings
-  bool drawDebugGrid = true;
+  bool drawDebugGrid = false;
   bool drawPhysicsColliders = true;
   bool drawAABBs = false;
   bool gamePreviewDebugVisuals = false; // Editor-only visuals in Game Preview
