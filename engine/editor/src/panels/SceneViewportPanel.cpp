@@ -76,7 +76,7 @@ void SceneViewportPanel::OnImGuiRender(EditorContext &context, Scene &scene,
       view.setCenter(
           {context.camera.center.x * ptm, context.camera.center.y * ptm});
       view.zoom(1.0f / zoom);
-      renderer.clearColor = sf::Color(119, 221, 119);
+      renderer.clearColor = sf::Color(56, 56, 56, 255);
       renderer.drawCameraFrustum = true;
     }
 
@@ -84,6 +84,7 @@ void SceneViewportPanel::OnImGuiRender(EditorContext &context, Scene &scene,
     renderer.drawDebugGrid = context.drawDebugGrid;
     renderer.drawPhysicsColliders = context.drawPhysicsColliders;
     renderer.drawAABBs = context.drawAABBs;
+    renderer.drawBoundaryBox = context.drawBoundaryBox;
     renderer.pixelsPerMeter = context.pixelsPerMeter;
     renderer.selectedEntity = context.selectedEntity;
     if (targetReady) {

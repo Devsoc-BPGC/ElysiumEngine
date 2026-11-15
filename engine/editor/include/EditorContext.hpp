@@ -110,6 +110,7 @@ struct EditorContext {
   bool drawDebugGrid = false;
   bool drawPhysicsColliders = true;
   bool drawAABBs = false;
+  bool drawBoundaryBox = false;
   bool gamePreviewDebugVisuals = false; // Editor-only visuals in Game Preview
   float pixelsPerMeter = 50.0f;
 
