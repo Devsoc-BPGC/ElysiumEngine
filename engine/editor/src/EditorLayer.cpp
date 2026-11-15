@@ -348,8 +348,8 @@ bool EditorLayer::OnKeyPressed(KeyPressedEvent &e) {
 
   // 'E': Toggle Snapping
   if (!isCtrl && e.GetKeyCode() == Hotkeys::GizmoToggleSnap) {
-    m_context.snapEnabled = !m_context.snapEnabled;
-    ELYSIUM_INFO("Gizmo Snapping: {}", (m_context.snapEnabled ? "Enabled" : "Disabled"));
+    m_context.ToggleSnap();
+    ELYSIUM_INFO("Gizmo Snapping: {}", (m_context.SnapEnabled ? "Enabled" : "Disabled"));
     return true;
   }
 
@@ -704,6 +704,13 @@ void EditorLayer::RenderMenuBar(Scene &scene) {
         }
         ImGui::EndMenu();
       }
+      ImGui::Separator();
+      bool snapMenu = m_context.SnapEnabled;
+      if (ImGui::MenuItem("Snap to Grid", "E", &snapMenu)) {
+        m_context.SetSnapEnabled(snapMenu);
+      }
+      ImGui::MenuItem("Show Reference Grid", nullptr, &m_context.ShowGrid);
+      ImGui::MenuItem("Show Origin Axes", nullptr, &m_context.ShowAxes);
       ImGui::Separator();
       ImGui::MenuItem("Show Debug Grid", nullptr, &m_context.drawDebugGrid);
       ImGui::MenuItem("Show Colliders", nullptr,

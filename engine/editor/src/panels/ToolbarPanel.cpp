@@ -63,22 +63,71 @@ void ToolbarPanel::OnImGuiRender(EditorContext &context, Scene &scene,
     }
     ImGui::SameLine();
 
-    // Dedicated Snap Toggle Button (E) + Settings Popup
-    bool snapOn = context.snapEnabled;
+    // Reference Grid Toggle Button
+    bool gridOn = context.ShowGrid;
+    if (gridOn) {
+      ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.45f, 0.8f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.55f, 0.9f, 1.0f));
+    }
+    if (ImGui::Button(gridOn ? "Grid: ON" : "Grid: OFF")) {
+      context.ShowGrid = !context.ShowGrid;
+    }
+    if (gridOn) {
+      ImGui::PopStyleColor(2);
+    }
+    if (ImGui::IsItemHovered()) {
+      ImGui::SetTooltip("Toggle 2D Reference Grid");
+    }
+    ImGui::SameLine();
+
+    // Dedicated Snap Toggle Button (E)
+    bool snapOn = context.SnapEnabled;
     if (snapOn) {
       ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.55f, 0.3f, 1.0f));
       ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.22f, 0.65f, 0.38f, 1.0f));
     }
     if (ImGui::Button(snapOn ? "Snap: ON (E)" : "Snap: OFF (E)")) {
-      context.snapEnabled = !context.snapEnabled;
+      context.SetSnapEnabled(!context.SnapEnabled);
     }
     if (snapOn) {
       ImGui::PopStyleColor(2);
     }
     if (ImGui::IsItemHovered()) {
-      ImGui::SetTooltip("Toggle Grid/Angle/Scale Snapping [Hotkey: E]\n(Hold Ctrl while dragging to temporarily snap)");
+      ImGui::SetTooltip("Toggle Grid/Angle/Scale Snapping [Hotkey: E]\nEnabling snapping automatically enables the reference grid.\n(Hold Ctrl while dragging to temporarily snap)");
     }
     ImGui::SameLine();
+
+    // Compact Snap Step Dropdown (Presets: 0.25, 0.5, 1.0, 2.0 and Custom)
+    ImGui::SetNextItemWidth(75.0f);
+    int currentPreset = -1;
+    if (std::abs(context.GridSnapSize - 0.25f) < 0.001f) currentPreset = 0;
+    else if (std::abs(context.GridSnapSize - 0.50f) < 0.001f) currentPreset = 1;
+    else if (std::abs(context.GridSnapSize - 1.00f) < 0.001f) currentPreset = 2;
+    else if (std::abs(context.GridSnapSize - 2.00f) < 0.001f) currentPreset = 3;
+
+    char comboPreview[32];
+    if (currentPreset >= 0) {
+      snprintf(comboPreview, sizeof(comboPreview), "%.2f m", static_cast<double>(context.GridSnapSize));
+    } else {
+      snprintf(comboPreview, sizeof(comboPreview), "%.2f m*", static_cast<double>(context.GridSnapSize));
+    }
+
+    if (ImGui::BeginCombo("##SnapStepCombo", comboPreview)) {
+      if (ImGui::Selectable("0.25 m", currentPreset == 0)) context.GridSnapSize = 0.25f;
+      if (ImGui::Selectable("0.50 m", currentPreset == 1)) context.GridSnapSize = 0.50f;
+      if (ImGui::Selectable("1.00 m", currentPreset == 2)) context.GridSnapSize = 1.00f;
+      if (ImGui::Selectable("2.00 m", currentPreset == 3)) context.GridSnapSize = 2.00f;
+      ImGui::Separator();
+      ImGui::TextDisabled("Custom Step:");
+      ImGui::SetNextItemWidth(90.0f);
+      ImGui::DragFloat("##CustomSnapStep", &context.GridSnapSize, 0.05f, 0.05f, 10.0f, "%.2f m");
+      ImGui::EndCombo();
+    }
+    if (ImGui::IsItemHovered()) {
+      ImGui::SetTooltip("Grid Snap Size (determines reference grid spacing and translation snap step)");
+    }
+    ImGui::SameLine();
+
     if (ImGui::Button("...##SnapSettings")) {
       ImGui::OpenPopup("SnapSettingsPopup");
     }
@@ -89,7 +138,7 @@ void ToolbarPanel::OnImGuiRender(EditorContext &context, Scene &scene,
     if (ImGui::BeginPopup("SnapSettingsPopup")) {
       ImGui::TextDisabled("Snap Step Configuration");
       ImGui::Separator();
-      ImGui::DragFloat("Move Step (m)", &context.snapTranslation, 0.05f, 0.05f, 10.0f, "%.2f m");
+      ImGui::DragFloat("Grid / Move Step (m)", &context.GridSnapSize, 0.05f, 0.05f, 10.0f, "%.2f m");
       ImGui::DragFloat("Rotate Step", &context.snapRotation, 1.0f, 1.0f, 90.0f, "%.1f deg");
       ImGui::DragFloat("Scale Step", &context.snapScale, 0.01f, 0.01f, 2.0f, "%.2f");
       ImGui::EndPopup();

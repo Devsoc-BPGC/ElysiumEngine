@@ -205,8 +205,8 @@ void TransformGizmo::RenderTranslateGizmo(EditorContext &context, GameObject &en
       effectivePtm = 1.0f;
 
     ImVec2 mouseDelta(mousePos.x - m_dragStartMouse.x, mousePos.y - m_dragStartMouse.y);
-    bool snapActive = context.snapEnabled || ImGui::GetIO().KeyCtrl;
-    float snapStep = context.snapTranslation;
+    bool snapActive = context.SnapEnabled || ImGui::GetIO().KeyCtrl;
+    float snapStep = context.GridSnapSize;
     Vec3 newPos = m_initialWorldPos;
 
     if (m_activeHandle == GizmoHandle::TranslateXY) {
@@ -220,16 +220,32 @@ void TransformGizmo::RenderTranslateGizmo(EditorContext &context, GameObject &en
       float proj = mouseDelta.x * axisX.x + mouseDelta.y * axisX.y;
       float worldDist = proj / effectivePtm;
       if (snapActive && snapStep > 0.001f) {
-        worldDist = std::round(worldDist / snapStep) * snapStep;
+        if (context.gizmoMode == GizmoMode::World) {
+          float targetX = m_initialWorldPos.x + worldDist;
+          targetX = std::round(targetX / snapStep) * snapStep;
+          newPos.x = targetX;
+        } else {
+          worldDist = std::round(worldDist / snapStep) * snapStep;
+          newPos = m_initialWorldPos + Vec3(axisX.x * worldDist, axisX.y * worldDist, 0.0f);
+        }
+      } else {
+        newPos = m_initialWorldPos + Vec3(axisX.x * worldDist, axisX.y * worldDist, 0.0f);
       }
-      newPos = m_initialWorldPos + Vec3(axisX.x * worldDist, axisX.y * worldDist, 0.0f);
     } else if (m_activeHandle == GizmoHandle::TranslateY) {
       float proj = mouseDelta.x * axisY.x + mouseDelta.y * axisY.y;
       float worldDist = proj / effectivePtm;
       if (snapActive && snapStep > 0.001f) {
-        worldDist = std::round(worldDist / snapStep) * snapStep;
+        if (context.gizmoMode == GizmoMode::World) {
+          float targetY = m_initialWorldPos.y + worldDist;
+          targetY = std::round(targetY / snapStep) * snapStep;
+          newPos.y = targetY;
+        } else {
+          worldDist = std::round(worldDist / snapStep) * snapStep;
+          newPos = m_initialWorldPos + Vec3(axisY.x * worldDist, axisY.y * worldDist, 0.0f);
+        }
+      } else {
+        newPos = m_initialWorldPos + Vec3(axisY.x * worldDist, axisY.y * worldDist, 0.0f);
       }
-      newPos = m_initialWorldPos + Vec3(axisY.x * worldDist, axisY.y * worldDist, 0.0f);
     }
 
     Mat4 newWorldMat = Mat4::TRS(newPos, m_initialWorldRot, m_initialWorldScale);
@@ -304,7 +320,7 @@ void TransformGizmo::RenderRotateGizmo(EditorContext &context, GameObject &entit
     float curAngle = std::atan2(mousePos.y - originScreen.y, mousePos.x - originScreen.x);
     float deltaAngle = curAngle - m_initialAngleRad;
 
-    bool snapActive = context.snapEnabled || ImGui::GetIO().KeyCtrl;
+    bool snapActive = context.SnapEnabled || ImGui::GetIO().KeyCtrl;
     float snapDeg = context.snapRotation;
     if (snapActive && snapDeg > 0.001f) {
       float snapRad = snapDeg * (kPi / 180.0f);
@@ -404,7 +420,7 @@ void TransformGizmo::RenderScaleGizmo(EditorContext &context, GameObject &entity
   // Active scale dragging
   if (m_activeHandle != GizmoHandle::None && isMouseDown) {
     ImVec2 mouseDelta(mousePos.x - m_dragStartMouse.x, mousePos.y - m_dragStartMouse.y);
-    bool snapActive = context.snapEnabled || ImGui::GetIO().KeyCtrl;
+    bool snapActive = context.SnapEnabled || ImGui::GetIO().KeyCtrl;
     float snapStep = context.snapScale;
     Vec3 newScale = m_initialLocalScale;
 

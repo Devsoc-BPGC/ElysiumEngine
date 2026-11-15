@@ -21,6 +21,8 @@ public:
   TransformGizmo &GetGizmo() { return m_gizmo; }
 
 private:
+  void RenderGridAndAxes(EditorContext &context, const ImVec2 &imageMin, const ImVec2 &imageSize);
+
   sf::RenderTexture m_viewportTexture;
   sf::Vector2u m_currentTextureSize = {0, 0};
   bool m_focusRequested = false;

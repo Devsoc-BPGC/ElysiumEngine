@@ -115,10 +115,27 @@ void TestEditorContextDefaultsAndHotkeys() {
         "Default gizmo operation is Translate");
   Check(ctx.gizmoMode == Elysium::GizmoMode::World,
         "Default gizmo mode is World");
-  Check(ctx.snapEnabled == false,
+  Check(ctx.SnapEnabled == false,
         "Default snap is disabled");
-  Check(std::abs(ctx.snapTranslation - 0.5f) < 0.0001f,
-        "Default translation snap is 0.5m");
+  Check(std::abs(ctx.GridSnapSize - 1.0f) < 0.0001f,
+        "Default translation snap is 1.0m");
+  Check(ctx.ShowAxes == true,
+        "Default ShowAxes is true");
+  Check(ctx.ShowGrid == false,
+        "Default ShowGrid is false");
+
+  // Verify auto-enable grid on snap activation
+  ctx.SetSnapEnabled(true);
+  Check(ctx.SnapEnabled == true,
+        "SnapEnabled is true after SetSnapEnabled(true)");
+  Check(ctx.ShowGrid == true,
+        "ShowGrid auto-enabled when SnapEnabled becomes true");
+  ctx.SetSnapEnabled(false);
+  Check(ctx.SnapEnabled == false,
+        "SnapEnabled is false after SetSnapEnabled(false)");
+  Check(ctx.ShowGrid == true,
+        "ShowGrid remains true when SnapEnabled is disabled");
+
   Check(std::abs(ctx.snapRotation - 15.0f) < 0.0001f,
         "Default rotation snap is 15.0 deg");
   Check(std::abs(ctx.snapScale - 0.1f) < 0.0001f,
