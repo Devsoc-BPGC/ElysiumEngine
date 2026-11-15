@@ -131,6 +131,8 @@ struct EditorContext {
   void SetSnapEnabled(bool enabled) {
     if (!SnapEnabled && enabled) {
       ShowGrid = true;
+    } else if (SnapEnabled && !enabled) {
+      ShowGrid = false;
     }
     SnapEnabled = enabled;
   }

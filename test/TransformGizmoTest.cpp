@@ -133,8 +133,8 @@ void TestEditorContextDefaultsAndHotkeys() {
   ctx.SetSnapEnabled(false);
   Check(ctx.SnapEnabled == false,
         "SnapEnabled is false after SetSnapEnabled(false)");
-  Check(ctx.ShowGrid == true,
-        "ShowGrid remains true when SnapEnabled is disabled");
+  Check(ctx.ShowGrid == false,
+        "ShowGrid auto-disabled when SnapEnabled becomes false");
 
   Check(std::abs(ctx.snapRotation - 15.0f) < 0.0001f,
         "Default rotation snap is 15.0 deg");
