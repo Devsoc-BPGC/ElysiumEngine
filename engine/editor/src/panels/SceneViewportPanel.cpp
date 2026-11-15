@@ -99,6 +99,11 @@ void SceneViewportPanel::OnImGuiRender(EditorContext &context, Scene &scene,
     ImVec2 imageSize = ImGui::GetItemRectSize();
     bool isImageHovered = ImGui::IsItemHovered();
 
+    // Render 2D reference grid & origin axes (Edit Mode only)
+    if (!isPlaying) {
+      RenderGridAndAxes(context, imageMin, imageSize);
+    }
+
     // Render interactive transform gizmo (Edit Mode only)
     if (!isPlaying && context.selectedEntity && context.gizmoOperation != GizmoOperation::None) {
       m_gizmo.Render(context, activeScene, imageMin, imageSize, ImGui::GetWindowDrawList());
@@ -200,6 +205,100 @@ void SceneViewportPanel::OnImGuiRender(EditorContext &context, Scene &scene,
   }
   ImGui::End();
   ImGui::PopStyleVar();
+}
+
+void SceneViewportPanel::RenderGridAndAxes(EditorContext &context, const ImVec2 &imageMin,
+                                           const ImVec2 &imageSize) {
+  if (context.playState != ScenePlayState::Edit)
+    return;
+
+  if (imageSize.x <= 0.0f || imageSize.y <= 0.0f)
+    return;
+
+  ImDrawList *drawList = ImGui::GetWindowDrawList();
+  ImVec2 imageMax = ImVec2(imageMin.x + imageSize.x, imageMin.y + imageSize.y);
+  drawList->PushClipRect(imageMin, imageMax, true);
+
+  float effectivePtm = context.pixelsPerMeter * context.camera.zoom;
+  if (effectivePtm <= 0.0001f)
+    effectivePtm = 1.0f;
+
+  float halfWidth = imageSize.x * 0.5f;
+  float halfHeight = imageSize.y * 0.5f;
+
+  float worldMinX = context.camera.center.x - halfWidth / effectivePtm;
+  float worldMaxX = context.camera.center.x + halfWidth / effectivePtm;
+  float worldMinY = context.camera.center.y - halfHeight / effectivePtm;
+  float worldMaxY = context.camera.center.y + halfHeight / effectivePtm;
+
+  // 1. 2D Reference Snap Grid
+  if (context.ShowGrid) {
+    float baseSpacing = (context.GridSnapSize > 0.001f) ? context.GridSnapSize : 1.0f;
+    float cellSpacing = baseSpacing;
+
+    // Zoom-adaptive: if screen pixel spacing between lines drops below 8.0f pixels,
+    // step up the subdivision multiple (2x, 5x, 10x, etc.) so lines never moiré or turn solid.
+    while (cellSpacing * effectivePtm < 8.0f) {
+      float px = cellSpacing * effectivePtm;
+      if (px * 2.0f >= 8.0f) {
+        cellSpacing *= 2.0f;
+      } else if (px * 5.0f >= 8.0f) {
+        cellSpacing *= 5.0f;
+      } else {
+        cellSpacing *= 10.0f;
+      }
+    }
+
+    // Smoothly fade minor line alpha when pixel spacing approaches 8.0f
+    float pixelSpacing = cellSpacing * effectivePtm;
+    float alphaFade = std::clamp((pixelSpacing - 8.0f) / 16.0f, 0.0f, 1.0f);
+    int minorAlpha = static_cast<int>(18.0f * alphaFade);
+    int majorAlpha = 38;
+
+    ImU32 colMajor = IM_COL32(255, 255, 255, majorAlpha);
+    ImU32 colMinor = IM_COL32(255, 255, 255, minorAlpha);
+
+    // Vertical grid lines (constant world X)
+    int64_t startIdxX = static_cast<int64_t>(std::floor(worldMinX / cellSpacing));
+    int64_t endIdxX = static_cast<int64_t>(std::ceil(worldMaxX / cellSpacing));
+    for (int64_t idx = startIdxX; idx <= endIdxX; ++idx) {
+      bool isMajor = (idx % 5 == 0);
+      if (!isMajor && minorAlpha <= 0)
+        continue;
+      ImU32 col = isMajor ? colMajor : colMinor;
+      float worldX = static_cast<float>(idx) * cellSpacing;
+      float screenX = imageMin.x + halfWidth + (worldX - context.camera.center.x) * effectivePtm;
+      drawList->AddLine(ImVec2(screenX, imageMin.y), ImVec2(screenX, imageMax.y), col, 1.0f);
+    }
+
+    // Horizontal grid lines (constant world Y)
+    int64_t startIdxY = static_cast<int64_t>(std::floor(worldMinY / cellSpacing));
+    int64_t endIdxY = static_cast<int64_t>(std::ceil(worldMaxY / cellSpacing));
+    for (int64_t idx = startIdxY; idx <= endIdxY; ++idx) {
+      bool isMajor = (idx % 5 == 0);
+      if (!isMajor && minorAlpha <= 0)
+        continue;
+      ImU32 col = isMajor ? colMajor : colMinor;
+      float worldY = static_cast<float>(idx) * cellSpacing;
+      float screenY = imageMin.y + halfHeight + (worldY - context.camera.center.y) * effectivePtm;
+      drawList->AddLine(ImVec2(imageMin.x, screenY), ImVec2(imageMax.x, screenY), col, 1.0f);
+    }
+  }
+
+  // 2. Infinite X & Y World Origin Axes
+  if (context.ShowAxes) {
+    // World X-Axis: horizontal line at world y = 0
+    float screenOriginY = imageMin.y + halfHeight + (0.0f - context.camera.center.y) * effectivePtm;
+    drawList->AddLine(ImVec2(imageMin.x, screenOriginY), ImVec2(imageMax.x, screenOriginY),
+                      IM_COL32(205, 70, 70, 185), 1.5f);
+
+    // World Y-Axis: vertical line at world x = 0
+    float screenOriginX = imageMin.x + halfWidth + (0.0f - context.camera.center.x) * effectivePtm;
+    drawList->AddLine(ImVec2(screenOriginX, imageMin.y), ImVec2(screenOriginX, imageMax.y),
+                      IM_COL32(75, 200, 90, 185), 1.5f);
+  }
+
+  drawList->PopClipRect();
 }
 
 } // namespace Elysium

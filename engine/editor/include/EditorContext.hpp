@@ -114,15 +114,33 @@ struct EditorContext {
   bool gamePreviewDebugVisuals = false; // Editor-only visuals in Game Preview
   float pixelsPerMeter = 50.0f;
 
+  // Grid & Origin Axes settings
+  bool ShowGrid = false;
+  bool ShowAxes = true;
+
   // Gizmo & Transformation settings
   GizmoOperation gizmoOperation = GizmoOperation::Translate;
   GizmoMode gizmoMode = GizmoMode::World;
 
   // Snapping settings
-  bool snapEnabled = false;
-  float snapTranslation = 0.5f; // Grid snap step in meters
+  bool SnapEnabled = false;
+  float GridSnapSize = 1.0f;    // Grid snap step in meters
   float snapRotation = 15.0f;   // Angle snap step in degrees
   float snapScale = 0.1f;       // Scale snap step
+
+  void SetSnapEnabled(bool enabled) {
+    if (!SnapEnabled && enabled) {
+      ShowGrid = true;
+    }
+    SnapEnabled = enabled;
+  }
+
+  void ToggleSnap() {
+    SetSnapEnabled(!SnapEnabled);
+  }
+
+  bool &snapEnabled = SnapEnabled;
+  float &snapTranslation = GridSnapSize;
 
   // Viewport geometry (in pixels)
   sf::Vector2f viewportPos = {0.0f, 0.0f};
