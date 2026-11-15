@@ -16,7 +16,8 @@ public:
   bool drawPhysicsColliders = true;
   bool drawAABBs = false;
   bool drawCameraFrustum = true;
-  sf::Color clearColor = sf::Color(119, 221, 119);
+  bool drawBoundaryBox = false;
+  sf::Color clearColor = sf::Color(56, 56, 56, 255);
   uint32_t drawCalls = 0;
   uint32_t primitivesCount = 0;
   std::shared_ptr<GameObject> selectedEntity = nullptr;
@@ -84,22 +85,24 @@ public:
     }
 
     // Draw the Boundary Box
-    sf::RectangleShape boundaryVisual;
-    boundaryVisual.setSize(
-        {scene.physicsWorld.boundaryHalfExtents.x * 2.0f * ptm,
-         scene.physicsWorld.boundaryHalfExtents.y * 2.0f * ptm});
-    boundaryVisual.setOrigin({scene.physicsWorld.boundaryHalfExtents.x * ptm,
-                              scene.physicsWorld.boundaryHalfExtents.y * ptm});
-    boundaryVisual.setPosition({scene.physicsWorld.boundaryCenter.x * ptm,
-                                scene.physicsWorld.boundaryCenter.y * ptm});
-    boundaryVisual.setFillColor(sf::Color::Transparent);
-    boundaryVisual.setOutlineThickness(5.0f);
-    boundaryVisual.setOutlineColor(sf::Color::White);
-    boundaryVisual.setRotation(
-        sf::radians(scene.physicsWorld.boundaryRotation));
-    target.draw(boundaryVisual);
-    drawCalls++;
-    primitivesCount++;
+    if (drawBoundaryBox) {
+      sf::RectangleShape boundaryVisual;
+      boundaryVisual.setSize(
+          {scene.physicsWorld.boundaryHalfExtents.x * 2.0f * ptm,
+           scene.physicsWorld.boundaryHalfExtents.y * 2.0f * ptm});
+      boundaryVisual.setOrigin({scene.physicsWorld.boundaryHalfExtents.x * ptm,
+                                scene.physicsWorld.boundaryHalfExtents.y * ptm});
+      boundaryVisual.setPosition({scene.physicsWorld.boundaryCenter.x * ptm,
+                                  scene.physicsWorld.boundaryCenter.y * ptm});
+      boundaryVisual.setFillColor(sf::Color::Transparent);
+      boundaryVisual.setOutlineThickness(5.0f);
+      boundaryVisual.setOutlineColor(sf::Color::White);
+      boundaryVisual.setRotation(
+          sf::radians(scene.physicsWorld.boundaryRotation));
+      target.draw(boundaryVisual);
+      drawCalls++;
+      primitivesCount++;
+    }
 
     for (auto &obj : scene.objects) {
       if (!obj || !obj->active)

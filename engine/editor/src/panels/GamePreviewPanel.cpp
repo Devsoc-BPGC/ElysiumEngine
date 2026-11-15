@@ -107,7 +107,7 @@ void GamePreviewPanel::OnImGuiRender(EditorContext &context, Scene &scene,
         float outputAspect = static_cast<float>(width) / static_cast<float>(height);
         view.setCenter({cam.center.x * ptm, cam.center.y * ptm});
         view.setSize({cam.viewHeight * outputAspect * ptm, cam.viewHeight * ptm});
-        renderer.clearColor = sf::Color(119, 221, 119);
+        renderer.clearColor = sf::Color(56, 56, 56, 255);
         renderer.drawCameraFrustum = context.gamePreviewDebugVisuals;
       }
 
@@ -116,6 +116,7 @@ void GamePreviewPanel::OnImGuiRender(EditorContext &context, Scene &scene,
       renderer.drawDebugGrid = context.gamePreviewDebugVisuals;
       renderer.drawPhysicsColliders = context.gamePreviewDebugVisuals;
       renderer.drawAABBs = context.gamePreviewDebugVisuals;
+      renderer.drawBoundaryBox = context.gamePreviewDebugVisuals;
       renderer.pixelsPerMeter = ptm;
 
       renderer.Render(m_previewTexture, shown, view);

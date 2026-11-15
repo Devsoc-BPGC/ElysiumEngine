@@ -59,6 +59,10 @@ EditorLayer::~EditorLayer() {
 
 void EditorLayer::OnAttach() {
   if (!m_isInitialized) {
+    m_scene.Clear();
+    m_scene.physicsWorld.boundaryRotation = 0.0f;
+    m_context.selectedEntity = nullptr;
+    m_context.drawBoundaryBox = false;
     m_window = &Application::Get().GetWindow().GetNativeWindow();
     Init(*m_window);
   }
@@ -182,7 +186,6 @@ void EditorLayer::OnUpdate(Timestep ts) {
 
   sf::Clock updateTimer;
   if (m_context.playState == ScenePlayState::Play) {
-    m_runtimeScene->physicsWorld.boundaryRotation += 0.0005f;
     m_runtimeScene->Update(ts.GetSeconds());
   } else if (m_context.playState == ScenePlayState::Step) {
     m_runtimeScene->Update(1.0f / 60.0f);
@@ -249,6 +252,16 @@ bool EditorLayer::OnKeyPressed(KeyPressedEvent &e) {
                 sf::Keyboard::isKeyPressed(sf::Keyboard::Key::RControl);
   bool isShift = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LShift) ||
                  sf::Keyboard::isKeyPressed(sf::Keyboard::Key::RShift);
+
+  // New Scene: Ctrl+N
+  if (m_context.playState == ScenePlayState::Edit && isCtrl && !isShift &&
+      e.GetKeyCode() == sf::Keyboard::Key::N) {
+    m_scene.Clear();
+    m_context.selectedEntity = nullptr;
+    m_context.history.Clear();
+    ELYSIUM_INFO("New Scene created");
+    return true;
+  }
 
   // Undo: Ctrl+Z (without Shift)
   if (m_context.playState == ScenePlayState::Edit && isCtrl && !isShift &&
@@ -541,6 +554,7 @@ void EditorLayer::RenderMenuBar(Scene &scene) {
 
       if (ImGui::MenuItem("New Scene", "Ctrl+N")) {
         scene.Clear();
+        scene.physicsWorld.boundaryRotation = 0.0f;
         m_context.selectedEntity = nullptr;
         m_context.history.Clear();
         ELYSIUM_INFO("New Scene created");
@@ -614,7 +628,10 @@ void EditorLayer::RenderMenuBar(Scene &scene) {
       }
       if (ImGui::MenuItem("Clear All Objects")) {
         scene.Clear();
+        scene.physicsWorld.boundaryRotation = 0.0f;
         m_context.selectedEntity = nullptr;
+        m_context.history.Clear();
+        ELYSIUM_INFO("Scene cleared");
       }
       ImGui::EndMenu();
     }
@@ -692,6 +709,7 @@ void EditorLayer::RenderMenuBar(Scene &scene) {
       ImGui::MenuItem("Show Colliders", nullptr,
                       &m_context.drawPhysicsColliders);
       ImGui::MenuItem("Show AABBs", nullptr, &m_context.drawAABBs);
+      ImGui::MenuItem("Show World Boundary", nullptr, &m_context.drawBoundaryBox);
       ImGui::EndMenu();
     }
 

@@ -15,11 +15,11 @@ public:
   SceneCamera Camera;
   bool Primary = true;
   bool FixedAspectRatio = false;
-  sf::Color ClearColor = sf::Color(119, 221, 119);
+  sf::Color ClearColor = sf::Color(56, 56, 56, 255);
 
   CameraComponent() = default;
   explicit CameraComponent(bool primary, bool fixedAspect = false,
-                           sf::Color clearCol = sf::Color(119, 221, 119))
+                           sf::Color clearCol = sf::Color(56, 56, 56, 255))
       : Primary(primary), FixedAspectRatio(fixedAspect), ClearColor(clearCol) {}
 
   std::unique_ptr<Component> Clone() const override;

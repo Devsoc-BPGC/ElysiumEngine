@@ -198,6 +198,39 @@ void TestEmptySpaceDeselection() {
   std::cout << "[PASS] TestEmptySpaceDeselection" << std::endl;
 }
 
+void TestDefaultSceneAndClearColor() {
+  SimpleRenderer renderer(50.0f);
+  assert(renderer.clearColor == sf::Color(56, 56, 56, 255));
+  assert(renderer.drawBoundaryBox == false);
+
+  Scene scene;
+  assert(scene.objects.empty());
+
+  EditorContext context;
+  assert(context.selectedEntity == nullptr);
+  assert(context.drawBoundaryBox == false);
+
+  // Test rendering empty scene produces 0 primitives (no boundary box)
+  sf::RenderTexture target;
+  if (target.resize({100, 100})) {
+    renderer.Render(target, scene);
+    assert(renderer.primitivesCount == 0);
+  }
+
+  auto entity = std::make_shared<GameObject>("TestEntity");
+  scene.AddGameObject(entity);
+  assert(scene.objects.size() == 1);
+  context.selectedEntity = entity;
+  assert(context.selectedEntity != nullptr);
+
+  scene.Clear();
+  context.selectedEntity = nullptr;
+  assert(scene.objects.empty());
+  assert(context.selectedEntity == nullptr);
+
+  std::cout << "[PASS] TestDefaultSceneAndClearColor" << std::endl;
+}
+
 int main() {
   Elysium::Log::Init();
   std::cout << "Starting ViewportPickingTest..." << std::endl;
@@ -206,6 +239,7 @@ int main() {
   TestColliderPicking();
   TestTopMostLayerSelection();
   TestEmptySpaceDeselection();
+  TestDefaultSceneAndClearColor();
   std::cout << "All ViewportPickingTest cases PASSED!" << std::endl;
   return 0;
 }
