@@ -1,8 +1,11 @@
 #include "elypch.hpp"
 #include "FileDialog.hpp"
 
+#include <algorithm>
+#include <cctype>
 #include <cstdio>
 #include <cstdlib>
+#include <sstream>
 
 #if defined(ELYSIUM_PLATFORM_WINDOWS) || defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
@@ -12,6 +15,125 @@
 #endif
 
 namespace Elysium {
+
+// ============================================================================
+// Cross-Platform Filter Translation Helpers
+// ============================================================================
+
+std::vector<std::string> FileDialog::ParseFilterSpec(const std::string &spec) {
+  std::vector<std::string> exts;
+  std::string token;
+
+  for (size_t i = 0; i <= spec.size(); ++i) {
+    char c = (i < spec.size()) ? spec[i] : ';';
+    if (c == ';' || c == ',' || c == ' ' || c == '\t' || c == '|' || i == spec.size()) {
+      if (!token.empty()) {
+        if (token == "*" || token == "*.*" || token == ".*") {
+          exts.push_back("*");
+        } else {
+          size_t start = 0;
+          while (start < token.size() && (token[start] == '*' || token[start] == '.' || token[start] == ' ')) {
+            start++;
+          }
+          std::string ext = token.substr(start);
+          while (!ext.empty() && (ext.back() == ' ' || ext.back() == '\t')) {
+            ext.pop_back();
+          }
+          if (!ext.empty()) {
+            exts.push_back(ext);
+          }
+        }
+        token.clear();
+      }
+    } else {
+      token.push_back(c);
+    }
+  }
+
+  return exts;
+}
+
+std::string FileDialog::FormatLinuxFilterPattern(const std::string &spec, bool includeUppercase) {
+  auto exts = ParseFilterSpec(spec);
+  if (exts.empty()) {
+    return "*";
+  }
+
+  std::ostringstream oss;
+  bool first = true;
+  for (const auto &ext : exts) {
+    if (ext == "*") {
+      return "*";
+    }
+
+    std::string lowerExt = ext;
+    std::transform(lowerExt.begin(), lowerExt.end(), lowerExt.begin(),
+                   [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+    std::string upperExt = ext;
+    std::transform(upperExt.begin(), upperExt.end(), upperExt.begin(),
+                   [](unsigned char ch) { return static_cast<char>(std::toupper(ch)); });
+
+    if (!first) oss << " ";
+    oss << "*." << lowerExt;
+    first = false;
+
+    if (includeUppercase && upperExt != lowerExt) {
+      oss << " *." << upperExt;
+    }
+  }
+
+  return oss.str();
+}
+
+std::string FileDialog::FormatWindowsFilterPattern(const std::string &spec) {
+  auto exts = ParseFilterSpec(spec);
+  if (exts.empty()) {
+    return "*.*";
+  }
+
+  std::ostringstream oss;
+  bool first = true;
+  for (const auto &ext : exts) {
+    if (ext == "*") {
+      return "*.*";
+    }
+
+    std::string lowerExt = ext;
+    std::transform(lowerExt.begin(), lowerExt.end(), lowerExt.begin(),
+                   [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+
+    if (!first) oss << ";";
+    oss << "*." << lowerExt;
+    first = false;
+  }
+
+  return oss.str();
+}
+
+std::vector<std::string> FileDialog::FormatMacOSFilterExtensions(const std::string &spec) {
+  auto exts = ParseFilterSpec(spec);
+  std::vector<std::string> result;
+
+  for (const auto &ext : exts) {
+    if (ext == "*") {
+      return {}; // Empty indicates all files / no restriction
+    }
+
+    std::string lowerExt = ext;
+    std::transform(lowerExt.begin(), lowerExt.end(), lowerExt.begin(),
+                   [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+    std::string upperExt = ext;
+    std::transform(upperExt.begin(), upperExt.end(), upperExt.begin(),
+                   [](unsigned char ch) { return static_cast<char>(std::toupper(ch)); });
+
+    result.push_back(lowerExt);
+    if (upperExt != lowerExt) {
+      result.push_back(upperExt);
+    }
+  }
+
+  return result;
+}
 
 #if defined(ELYSIUM_PLATFORM_WINDOWS) || defined(_WIN32)
 
@@ -29,13 +151,21 @@ std::optional<std::filesystem::path> FileDialog::OpenFile(
   ofn.nMaxFile = sizeof(szFile);
 
   std::string filterStr;
+  bool hasAllFiles = false;
   for (const auto &f : filters) {
+    std::string winSpec = FormatWindowsFilterPattern(f.spec);
+    if (winSpec == "*.*" || winSpec == "*") {
+      hasAllFiles = true;
+    }
     filterStr += f.name;
     filterStr.push_back('\0');
-    filterStr += f.spec;
+    filterStr += winSpec;
     filterStr.push_back('\0');
   }
-  filterStr += "All Files (*.*)\0*.*\0";
+  if (!hasAllFiles) {
+    filterStr += "All Files (*.*)\0*.*\0";
+  }
+  filterStr.push_back('\0'); // terminate with double-null
   ofn.lpstrFilter = filterStr.c_str();
   ofn.nFilterIndex = 1;
 
@@ -66,13 +196,21 @@ std::optional<std::filesystem::path> FileDialog::SaveFile(
   ofn.nMaxFile = sizeof(szFile);
 
   std::string filterStr;
+  bool hasAllFiles = false;
   for (const auto &f : filters) {
+    std::string winSpec = FormatWindowsFilterPattern(f.spec);
+    if (winSpec == "*.*" || winSpec == "*") {
+      hasAllFiles = true;
+    }
     filterStr += f.name;
     filterStr.push_back('\0');
-    filterStr += f.spec;
+    filterStr += winSpec;
     filterStr.push_back('\0');
   }
-  filterStr += "All Files (*.*)\0*.*\0";
+  if (!hasAllFiles) {
+    filterStr += "All Files (*.*)\0*.*\0";
+  }
+  filterStr.push_back('\0'); // terminate with double-null
   ofn.lpstrFilter = filterStr.c_str();
   ofn.nFilterIndex = 1;
 
@@ -158,11 +296,27 @@ std::optional<std::filesystem::path> FileDialog::OpenFile(
     std::ostringstream cmd;
     cmd << "zenity --file-selection --title=\"" << title << "\"";
     if (!defaultPath.empty()) {
-      cmd << " --filename=\"" << defaultPath.string() << "\"";
+      std::string pathStr = defaultPath.string();
+      if (std::filesystem::is_directory(defaultPath) && !pathStr.empty() && pathStr.back() != '/') {
+        pathStr += '/';
+      }
+      cmd << " --filename=\"" << pathStr << "\"";
     }
+
+    bool hasAllFilesFilter = false;
     for (const auto &f : filters) {
-      cmd << " --file-filter=\"" << f.name << " | " << f.spec << "\"";
+      std::string pattern = FormatLinuxFilterPattern(f.spec, true);
+      if (pattern == "*") {
+        hasAllFilesFilter = true;
+      }
+      cmd << " --file-filter=\"" << f.name << " | " << pattern << "\"";
     }
+
+    // Always ensure a fallback "All Files (*)" option is present
+    if (!hasAllFilesFilter) {
+      cmd << " --file-filter=\"All Files | *\"";
+    }
+
     cmd << " 2>/dev/null";
 
     std::string out = RunCommandAndReadOutput(cmd.str());
@@ -180,13 +334,27 @@ std::optional<std::filesystem::path> FileDialog::OpenFile(
     } else {
       cmd << " \":\"";
     }
-    if (!filters.empty()) {
-      cmd << " \"";
-      for (size_t i = 0; i < filters.size(); ++i) {
-        if (i > 0) cmd << "; ";
-        cmd << filters[i].spec;
+
+    std::ostringstream filterStream;
+    bool hasAllFilesFilter = false;
+    bool first = true;
+    for (const auto &f : filters) {
+      std::string pattern = FormatLinuxFilterPattern(f.spec, true);
+      if (pattern == "*") {
+        hasAllFilesFilter = true;
       }
-      cmd << "\"";
+      if (!first) filterStream << "\n";
+      filterStream << pattern << "|" << f.name;
+      first = false;
+    }
+    if (!hasAllFilesFilter) {
+      if (!first) filterStream << "\n";
+      filterStream << "*|All Files";
+    }
+
+    std::string kFilter = filterStream.str();
+    if (!kFilter.empty()) {
+      cmd << " \"" << kFilter << "\"";
     }
     cmd << " 2>/dev/null";
 
@@ -210,11 +378,26 @@ std::optional<std::filesystem::path> FileDialog::SaveFile(
     std::ostringstream cmd;
     cmd << "zenity --file-selection --save --confirm-overwrite --title=\"" << title << "\"";
     if (!defaultPath.empty()) {
-      cmd << " --filename=\"" << defaultPath.string() << "\"";
+      std::string pathStr = defaultPath.string();
+      if (std::filesystem::is_directory(defaultPath) && !pathStr.empty() && pathStr.back() != '/') {
+        pathStr += '/';
+      }
+      cmd << " --filename=\"" << pathStr << "\"";
     }
+
+    bool hasAllFilesFilter = false;
     for (const auto &f : filters) {
-      cmd << " --file-filter=\"" << f.name << " | " << f.spec << "\"";
+      std::string pattern = FormatLinuxFilterPattern(f.spec, true);
+      if (pattern == "*") {
+        hasAllFilesFilter = true;
+      }
+      cmd << " --file-filter=\"" << f.name << " | " << pattern << "\"";
     }
+
+    if (!hasAllFilesFilter) {
+      cmd << " --file-filter=\"All Files | *\"";
+    }
+
     cmd << " 2>/dev/null";
 
     std::string out = RunCommandAndReadOutput(cmd.str());
@@ -232,13 +415,27 @@ std::optional<std::filesystem::path> FileDialog::SaveFile(
     } else {
       cmd << " \":\"";
     }
-    if (!filters.empty()) {
-      cmd << " \"";
-      for (size_t i = 0; i < filters.size(); ++i) {
-        if (i > 0) cmd << "; ";
-        cmd << filters[i].spec;
+
+    std::ostringstream filterStream;
+    bool hasAllFilesFilter = false;
+    bool first = true;
+    for (const auto &f : filters) {
+      std::string pattern = FormatLinuxFilterPattern(f.spec, true);
+      if (pattern == "*") {
+        hasAllFilesFilter = true;
       }
-      cmd << "\"";
+      if (!first) filterStream << "\n";
+      filterStream << pattern << "|" << f.name;
+      first = false;
+    }
+    if (!hasAllFilesFilter) {
+      if (!first) filterStream << "\n";
+      filterStream << "*|All Files";
+    }
+
+    std::string kFilter = filterStream.str();
+    if (!kFilter.empty()) {
+      cmd << " \"" << kFilter << "\"";
     }
     cmd << " 2>/dev/null";
 
@@ -261,7 +458,11 @@ std::optional<std::filesystem::path> FileDialog::SelectFolder(
     std::ostringstream cmd;
     cmd << "zenity --file-selection --directory --title=\"" << title << "\"";
     if (!defaultPath.empty()) {
-      cmd << " --filename=\"" << defaultPath.string() << "\"";
+      std::string pathStr = defaultPath.string();
+      if (std::filesystem::is_directory(defaultPath) && !pathStr.empty() && pathStr.back() != '/') {
+        pathStr += '/';
+      }
+      cmd << " --filename=\"" << pathStr << "\"";
     }
     cmd << " 2>/dev/null";
 
@@ -316,8 +517,32 @@ std::optional<std::filesystem::path> FileDialog::OpenFile(
     const std::string &title,
     const std::filesystem::path &defaultPath,
     const std::vector<FileDialogFilter> &filters) {
-  (void)filters;
-  std::string script = "POSIX path of (choose file with prompt \\\"" + title + "\\\")";
+
+  std::string script = "POSIX path of (choose file with prompt \\\"" + title + "\\\"";
+  if (!defaultPath.empty()) {
+    script += " default location POSIX file \\\"" + defaultPath.string() + "\\\"";
+  }
+
+  std::vector<std::string> allExts;
+  bool hasAllFiles = false;
+  for (const auto &f : filters) {
+    auto exts = FormatMacOSFilterExtensions(f.spec);
+    if (exts.empty()) {
+      hasAllFiles = true;
+    }
+    allExts.insert(allExts.end(), exts.begin(), exts.end());
+  }
+
+  if (!allExts.empty() && !hasAllFiles) {
+    script += " of type {";
+    for (size_t i = 0; i < allExts.size(); ++i) {
+      if (i > 0) script += ", ";
+      script += "\\\"" + allExts[i] + "\\\"";
+    }
+    script += "}";
+  }
+  script += ")";
+
   std::string out = RunAppleScript(script);
   if (!out.empty()) {
     return std::filesystem::path(out);
@@ -329,8 +554,32 @@ std::optional<std::filesystem::path> FileDialog::SaveFile(
     const std::string &title,
     const std::filesystem::path &defaultPath,
     const std::vector<FileDialogFilter> &filters) {
-  (void)filters;
-  std::string script = "POSIX path of (choose file name with prompt \\\"" + title + "\\\")";
+
+  std::string script = "POSIX path of (choose file name with prompt \\\"" + title + "\\\"";
+  if (!defaultPath.empty()) {
+    script += " default location POSIX file \\\"" + defaultPath.string() + "\\\"";
+  }
+
+  std::vector<std::string> allExts;
+  bool hasAllFiles = false;
+  for (const auto &f : filters) {
+    auto exts = FormatMacOSFilterExtensions(f.spec);
+    if (exts.empty()) {
+      hasAllFiles = true;
+    }
+    allExts.insert(allExts.end(), exts.begin(), exts.end());
+  }
+
+  if (!allExts.empty() && !hasAllFiles) {
+    script += " of type {";
+    for (size_t i = 0; i < allExts.size(); ++i) {
+      if (i > 0) script += ", ";
+      script += "\\\"" + allExts[i] + "\\\"";
+    }
+    script += "}";
+  }
+  script += ")";
+
   std::string out = RunAppleScript(script);
   if (!out.empty()) {
     return std::filesystem::path(out);
@@ -341,7 +590,11 @@ std::optional<std::filesystem::path> FileDialog::SaveFile(
 std::optional<std::filesystem::path> FileDialog::SelectFolder(
     const std::string &title,
     const std::filesystem::path &defaultPath) {
-  std::string script = "POSIX path of (choose folder with prompt \\\"" + title + "\\\")";
+  std::string script = "POSIX path of (choose folder with prompt \\\"" + title + "\\\"";
+  if (!defaultPath.empty()) {
+    script += " default location POSIX file \\\"" + defaultPath.string() + "\\\"";
+  }
+  script += ")";
   std::string out = RunAppleScript(script);
   if (!out.empty()) {
     return std::filesystem::path(out);
