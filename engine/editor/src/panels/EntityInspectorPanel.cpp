@@ -587,8 +587,8 @@ void EntityInspectorPanel::DrawSpriteRendererComponent(EditorContext &context,
     if (openFilePicker) {
       std::filesystem::path assetDir = Project::GetActiveAssetDirectory();
       std::vector<FileDialogFilter> filters = {
-          {"Image Files (*.png *.jpg *.tga)", "*.png;*.jpg;*.jpeg;*.tga;*.bmp"},
-          {"All Files (*.*)", "*.*"}};
+          {"Image Files (*.png, *.jpg, *.tga, *.bmp)", "*.png *.jpg *.jpeg *.tga *.bmp"},
+          {"All Files", "*"}};
       auto selectedFile = FileDialog::OpenFile("Select Texture", assetDir, filters);
       if (selectedFile.has_value() && !selectedFile->empty()) {
         std::filesystem::path absPath = *selectedFile;

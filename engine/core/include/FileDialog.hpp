@@ -10,7 +10,11 @@ namespace Elysium {
 
 struct FileDialogFilter {
   std::string name;
-  std::string spec; // e.g. "*.elyproj" or "elyproj"
+  std::string spec; // e.g. "png,jpg,jpeg,tga,bmp", "*.png *.jpg", or "*.elyproj"
+
+  FileDialogFilter() = default;
+  FileDialogFilter(std::string filterName, std::string filterSpec)
+      : name(std::move(filterName)), spec(std::move(filterSpec)) {}
 };
 
 /**
@@ -54,6 +58,12 @@ public:
   static std::optional<std::filesystem::path> SelectFolder(
       const std::string &title = "Select Folder",
       const std::filesystem::path &defaultPath = "");
+
+  // Cross-platform filter translation helpers
+  static std::vector<std::string> ParseFilterSpec(const std::string &spec);
+  static std::string FormatLinuxFilterPattern(const std::string &spec, bool includeUppercase = true);
+  static std::string FormatWindowsFilterPattern(const std::string &spec);
+  static std::vector<std::string> FormatMacOSFilterExtensions(const std::string &spec);
 };
 
 } // namespace Elysium

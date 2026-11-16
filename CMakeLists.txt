@@ -199,6 +199,7 @@ if(BUILD_TESTING OR BUILD_BENCHMARKS)
         elysium_add_test(SceneCameraTest           test/SceneCameraTest.cpp)
         elysium_add_test(TransformGizmoTest        test/TransformGizmoTest.cpp)
         elysium_add_test(CommandHistoryTest        test/CommandHistoryTest.cpp)
+        elysium_add_test(FileDialogTest            test/FileDialogTest.cpp)
     endif()
 
     add_executable(PhysicsBenchmark test/PhysicsBenchmark.cpp)
