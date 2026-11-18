@@ -1,4 +1,5 @@
 #include "AssetManager.hpp"
+#include "AssetPickerModal.hpp"
 #include "Log.h"
 #include <cassert>
 #include <filesystem>
@@ -86,6 +87,63 @@ void TestManifestSerializationAcrossRestarts() {
   std::cout << "[PASS] TestManifestSerializationAcrossRestarts" << std::endl;
 }
 
+void TestGetAssetsByType() {
+  auto &am = Elysium::AssetManager::Get();
+  std::filesystem::path testDir = "test_sandbox_assets_query";
+  std::filesystem::create_directories(testDir);
+  am.Init(testDir);
+
+  am.RegisterAsset("textures/wood.png", Elysium::AssetType::Texture);
+  am.RegisterAsset("textures/stone.jpg", Elysium::AssetType::Texture);
+  am.RegisterAsset("audio/music.ogg", Elysium::AssetType::Audio);
+  am.RegisterAsset("audio/jump.wav", Elysium::AssetType::Audio);
+  am.RegisterAsset("fonts/arial.ttf", Elysium::AssetType::Font);
+
+  auto textures = am.GetAssetsByType(Elysium::AssetType::Texture);
+  assert(textures.size() == 2);
+
+  auto audio = am.GetAssetsByType(Elysium::AssetType::Audio);
+  assert(audio.size() == 2);
+
+  auto fonts = am.GetAssetsByType(Elysium::AssetType::Font);
+  assert(fonts.size() == 1);
+  assert(fonts[0].filename == "arial.ttf");
+
+  auto scenes = am.GetAssetsByType(Elysium::AssetType::Scene);
+  assert(scenes.empty());
+
+  auto all = am.GetAssetsByType(Elysium::AssetType::None);
+  assert(all.size() == 5);
+
+  am.Shutdown();
+  std::error_code ec;
+  std::filesystem::remove_all(testDir, ec);
+
+  std::cout << "[PASS] TestGetAssetsByType" << std::endl;
+}
+
+void TestAssetPickerModalLifecycle() {
+  assert(!Elysium::AssetPickerModal::IsOpen());
+
+  bool callbackInvoked = false;
+  Elysium::AssetHandle selectedHandle = 0;
+  std::filesystem::path selectedPath;
+
+  Elysium::AssetPickerModal::Open("Select Texture Test", Elysium::AssetType::Texture, 12345,
+                                 [&](Elysium::AssetHandle h, const std::filesystem::path &p) {
+                                   callbackInvoked = true;
+                                   selectedHandle = h;
+                                   selectedPath = p;
+                                 });
+
+  assert(Elysium::AssetPickerModal::IsOpen());
+
+  Elysium::AssetPickerModal::Close();
+  assert(!Elysium::AssetPickerModal::IsOpen());
+
+  std::cout << "[PASS] TestAssetPickerModalLifecycle" << std::endl;
+}
+
 int main(int argc, char **argv) {
   (void)argc;
   (void)argv;
@@ -93,6 +151,8 @@ int main(int argc, char **argv) {
   std::cout << "Running Elysium AssetManager & Manifest Tests...\n";
   TestAssetRegistrationAndLookup();
   TestManifestSerializationAcrossRestarts();
+  TestGetAssetsByType();
+  TestAssetPickerModalLifecycle();
   std::cout << "\nAll AssetManager tests PASSED successfully!\n";
   return 0;
 }

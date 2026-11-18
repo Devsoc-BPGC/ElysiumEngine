@@ -241,11 +241,18 @@ AssetHandle AssetManager::RegisterAsset(const std::filesystem::path &path,
   std::lock_guard<std::mutex> lock(m_RegistryMutex);
 
   std::filesystem::path relPath = path;
+  std::error_code ec;
   if (path.is_absolute()) {
-    std::error_code ec;
     relPath = std::filesystem::relative(path, m_AssetDirectory, ec);
     if (ec) {
       relPath = path;
+    }
+  } else {
+    std::filesystem::path absPath = std::filesystem::absolute(path, ec);
+    std::filesystem::path absDir = std::filesystem::absolute(m_AssetDirectory, ec);
+    std::filesystem::path candidateRel = std::filesystem::relative(absPath, absDir, ec);
+    if (!ec && !candidateRel.empty() && candidateRel.string().rfind("..", 0) != 0) {
+      relPath = candidateRel;
     }
   }
   std::string normPath = relPath.generic_string();
@@ -359,6 +366,29 @@ void AssetManager::ScanAssetDirectory() {
   }
 }
 
+std::vector<AssetItem> AssetManager::GetAssetsByType(AssetType type) const {
+  std::lock_guard<std::mutex> lock(m_RegistryMutex);
+  std::vector<AssetItem> items;
+  items.reserve(m_Registry.size());
+
+  for (const auto &[handle, meta] : m_Registry) {
+    if (type == AssetType::None || meta.type == type) {
+      AssetItem item;
+      item.handle = handle;
+      item.type = meta.type;
+      item.relativePath = meta.filePath;
+      item.filename = meta.filePath.filename().string();
+      items.push_back(std::move(item));
+    }
+  }
+
+  std::sort(items.begin(), items.end(), [](const AssetItem &a, const AssetItem &b) {
+    return a.filename < b.filename;
+  });
+
+  return items;
+}
+
 void AssetManager::Unload(AssetHandle handle) {
   std::lock_guard<std::mutex> lock(m_CacheMutex);
   m_TextureCache.erase(handle);
@@ -413,6 +443,9 @@ std::shared_ptr<sf::Texture> AssetManager::Load<sf::Texture>(AssetHandle handle)
     fullPath = it->second.filePath.is_absolute()
                    ? it->second.filePath
                    : (m_AssetDirectory / it->second.filePath);
+    if (!std::filesystem::exists(fullPath) && std::filesystem::exists(it->second.filePath)) {
+      fullPath = it->second.filePath;
+    }
   }
 
   auto texture = std::make_shared<sf::Texture>();
@@ -456,6 +489,9 @@ std::shared_ptr<sf::Font> AssetManager::Load<sf::Font>(AssetHandle handle) {
     fullPath = it->second.filePath.is_absolute()
                    ? it->second.filePath
                    : (m_AssetDirectory / it->second.filePath);
+    if (!std::filesystem::exists(fullPath) && std::filesystem::exists(it->second.filePath)) {
+      fullPath = it->second.filePath;
+    }
   }
 
   auto font = std::make_shared<sf::Font>();
@@ -499,6 +535,9 @@ std::shared_ptr<sf::SoundBuffer> AssetManager::Load<sf::SoundBuffer>(AssetHandle
     fullPath = it->second.filePath.is_absolute()
                    ? it->second.filePath
                    : (m_AssetDirectory / it->second.filePath);
+    if (!std::filesystem::exists(fullPath) && std::filesystem::exists(it->second.filePath)) {
+      fullPath = it->second.filePath;
+    }
   }
 
   auto buffer = std::make_shared<sf::SoundBuffer>();
@@ -540,6 +579,9 @@ std::shared_ptr<Scene> AssetManager::Load<Scene>(AssetHandle handle) {
     fullPath = it->second.filePath.is_absolute()
                    ? it->second.filePath
                    : (m_AssetDirectory / it->second.filePath);
+    if (!std::filesystem::exists(fullPath) && std::filesystem::exists(it->second.filePath)) {
+      fullPath = it->second.filePath;
+    }
   }
 
   auto scene = std::make_shared<Scene>();

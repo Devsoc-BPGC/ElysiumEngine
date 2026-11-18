@@ -2,6 +2,7 @@
 #include "EditorLayer.hpp"
 #include "Application.hpp"
 #include "AssetManager.hpp"
+#include "AssetPickerModal.hpp"
 #include "Collider.hpp"
 #include "EditorLogSink.hpp"
 #include "FileDialog.hpp"
@@ -230,6 +231,7 @@ void EditorLayer::OnImGuiRender() {
   }
 
   RenderProjectModals();
+  AssetPickerModal::Draw();
 
   ImGui::SFML::Render(*m_window);
 

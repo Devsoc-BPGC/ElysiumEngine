@@ -103,6 +103,16 @@ struct AssetMetadata {
 };
 
 /**
+ * @brief Representation of an asset item for picker and browser queries.
+ */
+struct AssetItem {
+  AssetHandle handle = 0;
+  AssetType type = AssetType::None;
+  std::filesystem::path relativePath;
+  std::string filename;
+};
+
+/**
  * @brief Centralized Asset Manager and Registry singleton.
  *
  * Maps 64-bit UUID AssetHandles to disk paths and loaded asset memory (Textures,
@@ -141,6 +151,8 @@ public:
   const std::unordered_map<AssetHandle, AssetMetadata> &GetRegistry() const {
     return m_Registry;
   }
+
+  [[nodiscard]] std::vector<AssetItem> GetAssetsByType(AssetType type = AssetType::None) const;
 
   // Directory Scanning / Sync
   void ScanAssetDirectory();

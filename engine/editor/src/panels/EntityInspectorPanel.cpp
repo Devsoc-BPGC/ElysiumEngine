@@ -1,6 +1,7 @@
 #include "elypch.hpp"
 #include "panels/EntityInspectorPanel.hpp"
 #include "AssetManager.hpp"
+#include "AssetPickerModal.hpp"
 #include "AudioSourceComponent.hpp"
 #include "CameraComponent.hpp"
 #include "Collider.hpp"
@@ -481,20 +482,49 @@ void EntityInspectorPanel::DrawSpriteRendererComponent(EditorContext &context,
                                 static_cast<uint8_t>(color[3] * 255.0f));
     }
 
-    // Helper lambda to assign and synchronize texture on sprite renderer
-    auto assignTexture = [&](AssetHandle handle, const std::filesystem::path &debugPath = "") {
-      sprite->SetTextureHandle(handle);
-      if (static_cast<uint64_t>(handle) != 0) {
-        auto loadedTex = AssetManager::Get().Load<sf::Texture>(handle);
-        if (loadedTex) {
-          sprite->texture = std::make_shared<const Texture>(*loadedTex);
-          sprite->isTextured = true;
-        }
+    // Helper lambda to assign and synchronize texture on sprite renderer with undo/redo
+    auto applyTexture = [&](AssetHandle newHandle, const std::filesystem::path &debugPath = "") {
+      AssetHandle oldHandle = sprite->textureHandle;
+      if (oldHandle == newHandle)
+        return;
+
+      if (entity.GetScene()) {
+        context.history.PushExecutedCommand(
+            std::make_unique<PropertyChangeCommand<AssetHandle>>(
+                *entity.GetScene(), entity.GetUUID(), oldHandle, newHandle,
+                [](GameObject &g, const AssetHandle &handle) {
+                  auto *s = g.GetComponent<SpriteRenderer>();
+                  if (s) {
+                    s->SetTextureHandle(handle);
+                    if (static_cast<uint64_t>(handle) != 0) {
+                      auto loadedTex = AssetManager::Get().Load<sf::Texture>(handle);
+                      if (loadedTex) {
+                        s->texture = std::make_shared<const Texture>(*loadedTex);
+                        s->isTextured = true;
+                      }
+                    } else {
+                      s->texture = nullptr;
+                      s->isTextured = false;
+                    }
+                  }
+                },
+                (static_cast<uint64_t>(newHandle) != 0) ? "Assign Texture" : "Clear Texture"));
       } else {
-        sprite->SetTextureHandle(0);
+        sprite->SetTextureHandle(newHandle);
+        if (static_cast<uint64_t>(newHandle) != 0) {
+          auto loadedTex = AssetManager::Get().Load<sf::Texture>(newHandle);
+          if (loadedTex) {
+            sprite->texture = std::make_shared<const Texture>(*loadedTex);
+            sprite->isTextured = true;
+          }
+        } else {
+          sprite->texture = nullptr;
+          sprite->isTextured = false;
+        }
       }
+
       if (!debugPath.empty()) {
-        ELYSIUM_INFO("Assigned texture '{0}' to entity", debugPath.string());
+        ELYSIUM_INFO("Assigned texture '{0}' to entity '{1}'", debugPath.string(), entity.name);
       }
     };
 
@@ -507,7 +537,7 @@ void EntityInspectorPanel::DrawSpriteRendererComponent(EditorContext &context,
       }
     }
 
-    // Texture slot with Thumbnail Preview and Native File Browser Picking
+    // Texture slot with Thumbnail Preview and In-Editor Asset Picker
     ImGui::Spacing();
     ImGui::Text("Texture Slot:");
 
@@ -524,7 +554,7 @@ void EntityInspectorPanel::DrawSpriteRendererComponent(EditorContext &context,
       sfmlTexture = AssetManager::Get().Load<sf::Texture>(sprite->textureHandle);
     }
 
-    bool openFilePicker = false;
+    bool openAssetPicker = false;
     float previewWidth = ImGui::GetContentRegionAvail().x - 60.0f;
     if (previewWidth < 60.0f) previewWidth = 60.0f;
 
@@ -533,7 +563,7 @@ void EntityInspectorPanel::DrawSpriteRendererComponent(EditorContext &context,
       ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.24f, 0.32f, 0.45f, 1.0f));
       ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.30f, 0.40f, 0.58f, 1.0f));
       if (ImGui::ImageButton("##TextureThumb", *sfmlTexture, sf::Vector2f(32.0f, 32.0f))) {
-        openFilePicker = true;
+        openAssetPicker = true;
       }
       ImGui::PopStyleColor(3);
 
@@ -541,7 +571,7 @@ void EntityInspectorPanel::DrawSpriteRendererComponent(EditorContext &context,
       ImVec2 slotSize(previewWidth - 40.0f, 32.0f);
       ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.14f, 0.16f, 0.20f, 1.0f));
       if (ImGui::Button(textureLabel.c_str(), slotSize)) {
-        openFilePicker = true;
+        openAssetPicker = true;
       }
       ImGui::PopStyleColor();
     } else {
@@ -549,13 +579,13 @@ void EntityInspectorPanel::DrawSpriteRendererComponent(EditorContext &context,
       ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.14f, 0.16f, 0.20f, 1.0f));
       ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.24f, 0.32f, 0.45f, 1.0f));
       if (ImGui::Button(textureLabel.c_str(), slotSize)) {
-        openFilePicker = true;
+        openAssetPicker = true;
       }
       ImGui::PopStyleColor(2);
     }
 
     if (ImGui::IsItemHovered()) {
-      ImGui::SetTooltip("Click to browse texture from disk or drag-and-drop from Content Browser");
+      ImGui::SetTooltip("Click to open Asset Picker or drag-and-drop from Content Browser");
     }
 
     // Drag-and-Drop Target for Texture
@@ -567,49 +597,72 @@ void EntityInspectorPanel::DrawSpriteRendererComponent(EditorContext &context,
           std::filesystem::path texturePath(path);
           if (AssetManager::IsTextureFile(texturePath)) {
             AssetHandle handle = AssetManager::GetOrCreateAssetHandle(texturePath);
-            assignTexture(handle, texturePath);
+            applyTexture(handle, texturePath);
           }
         } else if (payload->DataSize == sizeof(uint64_t)) {
           uint64_t droppedHandle = *reinterpret_cast<const uint64_t *>(payload->Data);
           const auto &meta = AssetManager::Get().GetMetadata(droppedHandle);
-          assignTexture(droppedHandle, meta.filePath);
+          applyTexture(droppedHandle, meta.filePath);
         }
       } else if (const ImGuiPayload *texPayload =
                      ImGui::AcceptDragDropPayload(AssetPayloads::TEXTURE)) {
         uint64_t droppedHandle = *reinterpret_cast<const uint64_t *>(texPayload->Data);
         const auto &meta = AssetManager::Get().GetMetadata(droppedHandle);
-        assignTexture(droppedHandle, meta.filePath);
+        applyTexture(droppedHandle, meta.filePath);
       }
       ImGui::EndDragDropTarget();
     }
 
-    // Native File Browser Picking Trigger
-    if (openFilePicker) {
-      std::filesystem::path assetDir = Project::GetActiveAssetDirectory();
-      std::vector<FileDialogFilter> filters = {
-          {"Image Files (*.png, *.jpg, *.tga, *.bmp)", "*.png *.jpg *.jpeg *.tga *.bmp"},
-          {"All Files", "*"}};
-      auto selectedFile = FileDialog::OpenFile("Select Texture", assetDir, filters);
-      if (selectedFile.has_value() && !selectedFile->empty()) {
-        std::filesystem::path absPath = *selectedFile;
-        std::error_code ec;
-        std::filesystem::path relPath = std::filesystem::relative(absPath, assetDir, ec);
-        if (ec || relPath.empty()) {
-          relPath = absPath;
-        }
+    // Asset Picker Modal Trigger
+    if (openAssetPicker) {
+      UUID entityUUID = entity.GetUUID();
+      Scene *scene = entity.GetScene();
+      AssetPickerModal::Open(
+          "Select Texture", AssetType::Texture, sprite->textureHandle,
+          [entityUUID, scene, &context](AssetHandle handle, const std::filesystem::path &path) {
+            if (!scene)
+              return;
+            GameObject *target = scene->GetEntityByUUID(entityUUID);
+            if (!target)
+              return;
+            auto *sp = target->GetComponent<SpriteRenderer>();
+            if (!sp)
+              return;
 
-        if (AssetManager::IsTextureFile(absPath)) {
-          AssetHandle handle = AssetManager::GetOrCreateAssetHandle(relPath);
-          assignTexture(handle, relPath);
-        } else {
-          ELYSIUM_WARN("Selected file '{}' is not a recognized texture format", absPath.string());
-        }
-      }
+            AssetHandle oldHandle = sp->textureHandle;
+            if (oldHandle == handle)
+              return;
+
+            context.history.PushExecutedCommand(
+                std::make_unique<PropertyChangeCommand<AssetHandle>>(
+                    *scene, entityUUID, oldHandle, handle,
+                    [](GameObject &g, const AssetHandle &h) {
+                      auto *s = g.GetComponent<SpriteRenderer>();
+                      if (s) {
+                        s->SetTextureHandle(h);
+                        if (static_cast<uint64_t>(h) != 0) {
+                          auto loadedTex = AssetManager::Get().Load<sf::Texture>(h);
+                          if (loadedTex) {
+                            s->texture = std::make_shared<const Texture>(*loadedTex);
+                            s->isTextured = true;
+                          }
+                        } else {
+                          s->texture = nullptr;
+                          s->isTextured = false;
+                        }
+                      }
+                    },
+                    (static_cast<uint64_t>(handle) != 0) ? "Assign Texture" : "Clear Texture"));
+
+            if (!path.empty()) {
+              ELYSIUM_INFO("Assigned texture '{0}' to entity '{1}'", path.string(), target->name);
+            }
+          });
     }
 
     ImGui::SameLine();
     if (ImGui::Button("X##ClearTex", ImVec2(24.0f, 32.0f)) || ImGui::Button("Clear##Tex")) {
-      assignTexture(0);
+      applyTexture(0);
     }
 
     if (ImGui::IsItemHovered()) {
@@ -626,12 +679,56 @@ void EntityInspectorPanel::DrawAudioSourceComponent(EditorContext &context,
     return;
 
   if (ImGui::CollapsingHeader("Audio Source", ImGuiTreeNodeFlags_DefaultOpen)) {
-    // Filepath buffer input with drag-and-drop target
-    char pathBuffer[512];
-    std::strncpy(pathBuffer, audio->filepath.c_str(), sizeof(pathBuffer) - 1);
-    pathBuffer[sizeof(pathBuffer) - 1] = '\0';
-    if (ImGui::InputText("Sound File", pathBuffer, sizeof(pathBuffer))) {
-      audio->filepath = pathBuffer;
+    auto applyAudio = [&](const std::string &newPath) {
+      std::string oldPath = audio->filepath;
+      if (oldPath == newPath)
+        return;
+
+      if (entity.GetScene()) {
+        context.history.PushExecutedCommand(
+            std::make_unique<PropertyChangeCommand<std::string>>(
+                *entity.GetScene(), entity.GetUUID(), oldPath, newPath,
+                [](GameObject &g, const std::string &path) {
+                  auto *a = g.GetComponent<AudioSourceComponent>();
+                  if (a) {
+                    a->filepath = path;
+                  }
+                },
+                !newPath.empty() ? "Assign Audio Clip" : "Clear Audio Clip"));
+      } else {
+        audio->filepath = newPath;
+      }
+      ELYSIUM_INFO("EntityInspector: Assigned audio file '{}' to entity '{}'",
+                   newPath, entity.name);
+    };
+
+    // Audio slot with filename label, asset picker modal, and drag-and-drop
+    ImGui::Spacing();
+    ImGui::Text("Audio Clip Slot:");
+
+    std::string audioLabel = "[ None (Audio Clip) ]";
+    if (!audio->filepath.empty()) {
+      audioLabel = std::filesystem::path(audio->filepath).filename().string();
+    }
+
+    float availW = ImGui::GetContentRegionAvail().x - 32.0f;
+    if (availW < 60.0f) availW = 60.0f;
+
+    bool openAudioPicker = false;
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.14f, 0.16f, 0.20f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.24f, 0.32f, 0.45f, 1.0f));
+    if (ImGui::Button(audioLabel.c_str(), ImVec2(availW, 28.0f))) {
+      openAudioPicker = true;
+    }
+    ImGui::PopStyleColor(2);
+
+    if (ImGui::IsItemHovered()) {
+      if (!audio->filepath.empty()) {
+        ImGui::SetTooltip("File: %s\nClick to open Asset Picker or drag-and-drop from Content Browser",
+                          audio->filepath.c_str());
+      } else {
+        ImGui::SetTooltip("Click to open Asset Picker or drag-and-drop from Content Browser");
+      }
     }
 
     // Drag-and-drop target for audio files
@@ -641,12 +738,74 @@ void EntityInspectorPanel::DrawAudioSourceComponent(EditorContext &context,
         uint64_t droppedHandle = *reinterpret_cast<const uint64_t *>(payload->Data);
         const auto &meta = AssetManager::Get().GetMetadata(droppedHandle);
         if (static_cast<uint64_t>(meta.handle) != 0) {
-          audio->filepath = meta.filePath.generic_string();
-          ELYSIUM_INFO("EntityInspector: Dropped audio file '{}' onto entity '{}'",
-                       audio->filepath, entity.name);
+          applyAudio(meta.filePath.generic_string());
+        }
+      } else if (const ImGuiPayload *genericPayload =
+                     ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM")) {
+        if (genericPayload->DataSize > static_cast<int>(sizeof(uint64_t))) {
+          const wchar_t *path = reinterpret_cast<const wchar_t *>(genericPayload->Data);
+          std::filesystem::path audioPath(path);
+          applyAudio(audioPath.generic_string());
         }
       }
       ImGui::EndDragDropTarget();
+    }
+
+    ImGui::SameLine();
+    if (ImGui::Button("X##ClearAudio", ImVec2(24.0f, 28.0f))) {
+      applyAudio("");
+    }
+    if (ImGui::IsItemHovered()) {
+      ImGui::SetTooltip("Clear assigned audio clip");
+    }
+
+    if (openAudioPicker) {
+      UUID entityUUID = entity.GetUUID();
+      Scene *scene = entity.GetScene();
+      AssetHandle curHandle = 0;
+      if (!audio->filepath.empty()) {
+        curHandle = AssetManager::Get().GetHandleFromPath(audio->filepath);
+      }
+      AssetPickerModal::Open(
+          "Select Audio Clip", AssetType::Audio, curHandle,
+          [entityUUID, scene, &context](AssetHandle handle, const std::filesystem::path &path) {
+            (void)handle;
+            if (!scene)
+              return;
+            GameObject *target = scene->GetEntityByUUID(entityUUID);
+            if (!target)
+              return;
+            auto *a = target->GetComponent<AudioSourceComponent>();
+            if (!a)
+              return;
+
+            std::string oldPath = a->filepath;
+            std::string newPath = path.generic_string();
+            if (oldPath == newPath)
+              return;
+
+            context.history.PushExecutedCommand(
+                std::make_unique<PropertyChangeCommand<std::string>>(
+                    *scene, entityUUID, oldPath, newPath,
+                    [](GameObject &g, const std::string &p) {
+                      auto *ac = g.GetComponent<AudioSourceComponent>();
+                      if (ac) {
+                        ac->filepath = p;
+                      }
+                    },
+                    !newPath.empty() ? "Assign Audio Clip" : "Clear Audio Clip"));
+
+            ELYSIUM_INFO("EntityInspector: Assigned audio file '{}' to entity '{}'",
+                         newPath, target->name);
+          });
+    }
+
+    // Manual Filepath buffer input
+    char pathBuffer[512];
+    std::strncpy(pathBuffer, audio->filepath.c_str(), sizeof(pathBuffer) - 1);
+    pathBuffer[sizeof(pathBuffer) - 1] = '\0';
+    if (ImGui::InputText("Sound Path", pathBuffer, sizeof(pathBuffer))) {
+      applyAudio(pathBuffer);
     }
 
     // Playback preview controls
