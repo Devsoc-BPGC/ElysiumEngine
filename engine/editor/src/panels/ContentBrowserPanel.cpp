@@ -273,17 +273,37 @@ void ContentBrowserPanel::OnImGuiRender(EditorContext &context, Scene &scene,
   if (ImGui::Begin(name.c_str(), &isOpen)) {
     if (!Project::GetActive() || m_RootDirectory.empty() || !std::filesystem::exists(m_RootDirectory)) {
       // Placeholder state: No Project Loaded
-      ImVec2 windowSize = ImGui::GetWindowSize();
       const char *titleText = "No Project Loaded";
       const char *hintText = "Create or Open a project via File -> New Project... or File -> Open Project...";
-      ImVec2 titleSize = ImGui::CalcTextSize(titleText);
-      ImVec2 hintSize = ImGui::CalcTextSize(hintText);
 
-      ImGui::SetCursorPos(ImVec2((windowSize.x - titleSize.x) * 0.5f, (windowSize.y - titleSize.y) * 0.4f));
+      ImVec2 availRegion = ImGui::GetContentRegionAvail();
+      ImVec2 startCursorPos = ImGui::GetCursorPos();
+
+      const float padding = 16.0f;
+      const float wrapWidth = std::max(1.0f, availRegion.x - padding * 2.0f);
+
+      ImVec2 titleSize = ImGui::CalcTextSize(titleText, nullptr, false, wrapWidth);
+      ImVec2 hintSize = ImGui::CalcTextSize(hintText, nullptr, false, wrapWidth);
+
+      const float spacingY = 10.0f;
+      const float totalHeight = titleSize.y + spacingY + hintSize.y;
+
+      // Center vertically in available content region
+      const float startY = startCursorPos.y + std::max(0.0f, (availRegion.y - totalHeight) * 0.5f);
+
+      // Render Title (wrapped if needed and centered)
+      const float titleX = startCursorPos.x + std::max(0.0f, (availRegion.x - titleSize.x) * 0.5f);
+      ImGui::SetCursorPos(ImVec2(titleX, startY));
+      ImGui::PushTextWrapPos(titleX + wrapWidth);
       ImGui::TextColored(ImVec4(0.85f, 0.85f, 0.85f, 1.0f), "%s", titleText);
+      ImGui::PopTextWrapPos();
 
-      ImGui::SetCursorPos(ImVec2((windowSize.x - hintSize.x) * 0.5f, (windowSize.y - titleSize.y) * 0.4f + 30.0f));
+      // Render Hint (wrapped and centered)
+      const float hintX = startCursorPos.x + std::max(0.0f, (availRegion.x - hintSize.x) * 0.5f);
+      ImGui::SetCursorPos(ImVec2(hintX, startY + titleSize.y + spacingY));
+      ImGui::PushTextWrapPos(hintX + wrapWidth);
       ImGui::TextDisabled("%s", hintText);
+      ImGui::PopTextWrapPos();
 
       ImGui::End();
       ImGui::PopStyleVar();
