@@ -40,51 +40,29 @@ void TestAssetRegistrationAndLookup() {
   assert(am.HasAsset("textures/player.png"));
   assert(am.GetHandleFromPath("textures/player.png") == h1);
 
+  am.Shutdown();
+  std::error_code ec;
+  std::filesystem::remove_all(testDir, ec);
+
   std::cout << "[PASS] TestAssetRegistrationAndLookup" << std::endl;
 }
 
-void TestManifestSerializationAcrossRestarts() {
-  std::filesystem::path testDir = "test_sandbox_assets";
-  std::filesystem::path manifestPath = testDir / "assets.meta";
+void TestNoManifestFileGenerated() {
+  auto &am = Elysium::AssetManager::Get();
+  std::filesystem::path testDir = "test_sandbox_assets_nomanifest";
+  std::filesystem::create_directories(testDir);
 
-  // First session: register and save manifest
-  {
-    auto &am = Elysium::AssetManager::Get();
-    am.Init(testDir);
+  am.Init(testDir);
+  am.RegisterAsset("sprites/hero.png", Elysium::AssetType::Texture);
+  am.ReloadProjectAssets(testDir);
+  am.Shutdown();
 
-    Elysium::AssetHandle h1 = am.RegisterAsset("sprites/hero.png", Elysium::AssetType::Texture);
-    Elysium::AssetHandle h2 = am.RegisterAsset("sfx/coin.wav", Elysium::AssetType::Audio);
-    assert(static_cast<uint64_t>(h1) != 0 && static_cast<uint64_t>(h2) != 0);
-
-    bool saved = am.SaveManifest(manifestPath);
-    assert(saved);
-    assert(std::filesystem::exists(manifestPath));
-
-    am.Shutdown();
-  }
-
-  // Second session (simulating engine restart): load manifest and verify UUID persistence
-  {
-    auto &am = Elysium::AssetManager::Get();
-    am.Init(testDir);
-
-    assert(am.HasAsset("sprites/hero.png"));
-    assert(am.HasAsset("sfx/coin.wav"));
-
-    Elysium::AssetHandle loadedHeroHandle = am.GetHandleFromPath("sprites/hero.png");
-    assert(static_cast<uint64_t>(loadedHeroHandle) != 0);
-
-    const auto &metaHero = am.GetMetadata(loadedHeroHandle);
-    assert(metaHero.type == Elysium::AssetType::Texture);
-    assert(metaHero.filePath == "sprites/hero.png");
-
-    am.Shutdown();
-  }
+  assert(!std::filesystem::exists(testDir / "assets.meta"));
 
   std::error_code ec;
   std::filesystem::remove_all(testDir, ec);
 
-  std::cout << "[PASS] TestManifestSerializationAcrossRestarts" << std::endl;
+  std::cout << "[PASS] TestNoManifestFileGenerated" << std::endl;
 }
 
 void TestGetAssetsByType() {
@@ -150,7 +128,6 @@ int main(int argc, char **argv) {
   Elysium::Log::Init();
   std::cout << "Running Elysium AssetManager & Manifest Tests...\n";
   TestAssetRegistrationAndLookup();
-  TestManifestSerializationAcrossRestarts();
   TestGetAssetsByType();
   TestAssetPickerModalLifecycle();
   std::cout << "\nAll AssetManager tests PASSED successfully!\n";
