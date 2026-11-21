@@ -132,9 +132,6 @@ public:
 
   void ReloadProjectAssets(const std::filesystem::path &projectAssetDirectory);
 
-  bool SaveManifest(const std::filesystem::path &manifestPath = "");
-  bool LoadManifest(const std::filesystem::path &manifestPath = "");
-
   // Registry Queries & Registration
   AssetHandle RegisterAsset(const std::filesystem::path &relativeOrFullPath,
                             AssetType type = AssetType::None,

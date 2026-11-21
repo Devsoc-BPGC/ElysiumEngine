@@ -51,18 +51,6 @@ std::shared_ptr<Project> Project::NewProject(const std::filesystem::path &projec
   std::filesystem::path scenesDir = assetsDir / "Scenes";
   std::filesystem::create_directories(scenesDir, ec);
 
-  // Initialize an empty assets.meta manifest inside Assets/
-  std::filesystem::path metaPath = assetsDir / "assets.meta";
-  if (!std::filesystem::exists(metaPath, ec)) {
-    std::ofstream metaOut(metaPath);
-    if (metaOut.is_open()) {
-      metaOut << "# Elysium Engine Asset Registry Manifest\n";
-      metaOut << "# Version: 1.0\n";
-      metaOut << "AssetRegistry:\n";
-      metaOut.close();
-    }
-  }
-
   // Save the .elyproj file
   std::filesystem::path projectFilePath = canonicalDir / (config.Name + ".elyproj");
   ProjectSerializer serializer(project);
