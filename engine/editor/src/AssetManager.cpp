@@ -45,14 +45,6 @@ void AssetManager::Init(const std::filesystem::path &projectAssetDirectory) {
     }
   }
 
-  // Attempt to load manifest if exists
-  std::filesystem::path manifestPath = m_AssetDirectory / "assets.meta";
-  if (std::filesystem::exists(manifestPath)) {
-    m_RegistryMutex.unlock();
-    LoadManifest(manifestPath);
-    m_RegistryMutex.lock();
-  }
-
   // Scan folder to pick up any untracked new files
   m_RegistryMutex.unlock();
   ScanAssetDirectory();
@@ -63,7 +55,6 @@ void AssetManager::Init(const std::filesystem::path &projectAssetDirectory) {
 }
 
 void AssetManager::Shutdown() {
-  SaveManifest();
   ClearCache();
 
   std::lock_guard<std::mutex> lock(m_RegistryMutex);
@@ -83,8 +74,7 @@ const std::filesystem::path &AssetManager::GetAssetDirectory() const {
 }
 
 void AssetManager::ReloadProjectAssets(const std::filesystem::path &projectAssetDirectory) {
-  // 1. Save current manifest and flush cache
-  SaveManifest();
+  // 1. Flush cache
   ClearCache();
 
   {
@@ -99,17 +89,8 @@ void AssetManager::ReloadProjectAssets(const std::filesystem::path &projectAsset
     }
   }
 
-  // 2. Load manifest from new project asset directory
-  std::filesystem::path manifestPath = projectAssetDirectory / "assets.meta";
-  if (std::filesystem::exists(manifestPath)) {
-    LoadManifest(manifestPath);
-  }
-
   // 3. Scan directory for untracked / new files
   ScanAssetDirectory();
-
-  // 4. Save up-to-date manifest
-  SaveManifest(manifestPath);
 
   ELYSIUM_CORE_INFO("AssetManager: Reloaded assets for '{}' (Total registered: {})",
                     projectAssetDirectory.string(), m_Registry.size());
@@ -119,120 +100,6 @@ std::filesystem::path AssetManager::NormalizePath(const std::filesystem::path &p
   std::filesystem::path p = path.lexically_normal();
   std::string s = p.generic_string();
   return std::filesystem::path(s);
-}
-
-bool AssetManager::SaveManifest(const std::filesystem::path &manifestPath) {
-  std::lock_guard<std::mutex> lock(m_RegistryMutex);
-
-  std::filesystem::path actualPath;
-  if (manifestPath.empty()) {
-    actualPath = m_AssetDirectory / "assets.meta";
-  } else if (manifestPath.is_relative()) {
-    actualPath = m_AssetDirectory / manifestPath.filename();
-  } else {
-    actualPath = manifestPath;
-  }
-
-  std::ofstream out(actualPath);
-  if (!out.is_open()) {
-    ELYSIUM_CORE_ERROR("AssetManager: Failed to open manifest for writing: {}",
-                       actualPath.string());
-    return false;
-  }
-
-  out << "# Elysium Engine Asset Registry Manifest\n";
-  out << "# Version: 1.0\n";
-  out << "AssetRegistry:\n";
-
-  for (const auto &[handle, meta] : m_Registry) {
-    out << "  - Handle: " << static_cast<uint64_t>(handle) << "\n";
-    out << "    Type: " << AssetTypeToString(meta.type) << "\n";
-    out << "    Path: " << meta.filePath.generic_string() << "\n";
-  }
-
-  ELYSIUM_CORE_INFO("AssetManager: Manifest saved with {} entries to '{}'",
-                    m_Registry.size(), actualPath.string());
-  return true;
-}
-
-bool AssetManager::LoadManifest(const std::filesystem::path &manifestPath) {
-  std::filesystem::path actualPath;
-  if (manifestPath.empty()) {
-    actualPath = m_AssetDirectory / "assets.meta";
-  } else if (manifestPath.is_relative()) {
-    actualPath = m_AssetDirectory / manifestPath.filename();
-  } else {
-    actualPath = manifestPath;
-  }
-
-  if (!std::filesystem::exists(actualPath)) {
-    return false;
-  }
-
-  std::ifstream in(actualPath);
-  if (!in.is_open()) {
-    ELYSIUM_CORE_ERROR("AssetManager: Failed to open manifest for reading: {}",
-                       actualPath.string());
-    return false;
-  }
-
-  std::lock_guard<std::mutex> lock(m_RegistryMutex);
-
-  std::string line;
-  AssetHandle currentHandle = 0;
-  AssetType currentType = AssetType::None;
-  std::string currentPathStr;
-
-  auto commitEntry = [&]() {
-    if (static_cast<uint64_t>(currentHandle) != 0 && !currentPathStr.empty()) {
-      AssetMetadata meta;
-      meta.handle = currentHandle;
-      meta.type = currentType;
-      meta.filePath = std::filesystem::path(currentPathStr).generic_string();
-      meta.isLoaded = false;
-
-      m_Registry[currentHandle] = meta;
-      m_PathToHandle[meta.filePath.generic_string()] = currentHandle;
-    }
-    currentHandle = 0;
-    currentType = AssetType::None;
-    currentPathStr.clear();
-  };
-
-  while (std::getline(in, line)) {
-    // Strip leading / trailing whitespace
-    size_t first = line.find_first_not_of(" \t\r\n");
-    if (first == std::string::npos || line[first] == '#') {
-      continue;
-    }
-    std::string trimmed = line.substr(first);
-
-    if (trimmed.rfind("- Handle:", 0) == 0) {
-      commitEntry();
-      std::string val = trimmed.substr(9);
-      size_t valFirst = val.find_first_not_of(" \t");
-      if (valFirst != std::string::npos) {
-        currentHandle = std::stoull(val.substr(valFirst));
-      }
-    } else if (trimmed.rfind("Type:", 0) == 0) {
-      std::string val = trimmed.substr(5);
-      size_t valFirst = val.find_first_not_of(" \t");
-      if (valFirst != std::string::npos) {
-        currentType = AssetTypeFromString(val.substr(valFirst));
-      }
-    } else if (trimmed.rfind("Path:", 0) == 0) {
-      std::string val = trimmed.substr(5);
-      size_t valFirst = val.find_first_not_of(" \t");
-      if (valFirst != std::string::npos) {
-        currentPathStr = val.substr(valFirst);
-      }
-    }
-  }
-  commitEntry();
-
-  ELYSIUM_CORE_INFO("AssetManager: Manifest loaded with {} entries from '{}'",
-                    m_Registry.size(), actualPath.string());
-  return true;
 }
 
 AssetHandle AssetManager::RegisterAsset(const std::filesystem::path &path,

@@ -189,7 +189,6 @@ const sf::Texture *ContentBrowserPanel::GetIconForPath(const std::filesystem::pa
 
 void ContentBrowserPanel::Refresh() {
   AssetManager::Get().ScanAssetDirectory();
-  AssetManager::Get().SaveManifest();
 
   std::error_code ec;
   if (!std::filesystem::exists(m_CurrentDirectory, ec)) {

@@ -550,7 +550,6 @@ void EditorLayer::RenderMenuBar(Scene &scene) {
       }
       if (ImGui::MenuItem("Save Project", nullptr, false, Project::GetActive() != nullptr)) {
         Project::SaveActiveProject();
-        AssetManager::Get().SaveManifest();
         ELYSIUM_INFO("Project and Manifest saved");
       }
       ImGui::Separator();
