@@ -39,11 +39,11 @@ endif()
 
 
 target_link_libraries(ElysiumEngine PUBLIC
-    SFML::Graphics 
+    SFML::Graphics
     SFML::Audio
-    SFML::Window 
-    SFML::System 
-    spdlog::spdlog_header_only
+    SFML::Window
+    SFML::System
+    spdlog::spdlog
     ImGui-SFML::ImGui-SFML
 )
 

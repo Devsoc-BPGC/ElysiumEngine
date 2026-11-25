@@ -78,43 +78,18 @@ if(NOT MSVC)
 endif()
 
 # ============================================================
-#  spdlog configuration
+#  Platform SDK resolution (LIBDIR -> find_package -> FetchContent)
 # ============================================================
-# Header-only mode is the ONLY reliable way to use spdlog here.
-# It avoids every ABI/symbol-mismatch issue with the compiled lib.
-set(SPDLOG_FMT_EXTERNAL     OFF CACHE BOOL "" FORCE)
-set(SPDLOG_BUILD_EXAMPLE    OFF CACHE BOOL "" FORCE)
-set(SPDLOG_BUILD_TESTS      OFF CACHE BOOL "" FORCE)
-set(SPDLOG_INSTALL          OFF CACHE BOOL "" FORCE)
-set(SPDLOG_BUILD_SHARED     OFF CACHE BOOL "" FORCE)
-
-add_subdirectory(external/spdlog)
+if(WIN32)
+    include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/platform/platform_win32.cmake")
+elseif(UNIX)
+    include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/platform/platform_unix.cmake")
+endif()
 
 # ============================================================
-#  SFML configuration
+#  Vendored source dependencies (Dear ImGui & ImGui-SFML)
 # ============================================================
-set(SFML_BUILD_EXAMPLES      OFF CACHE BOOL "" FORCE)
-set(SFML_BUILD_TEST_PROGRAMS OFF CACHE BOOL "" FORCE)
-set(SFML_BUILD_DOC           OFF CACHE BOOL "" FORCE)
-set(SFML_INSTALL             OFF CACHE BOOL "" FORCE)
-set(SFML_BUILD_NETWORK       OFF CACHE BOOL "" FORCE)
-set(SFML_BUILD_AUDIO         ON  CACHE BOOL "" FORCE)
-
-add_subdirectory(external/SFML)
-
-# ============================================================
-# Dear ImGui & ImGui-SFML (Docking Branch + SFML 3)
-# ============================================================
-
-# Dear ImGui is source-only; ImGui-SFML integrates its sources.
-set(IMGUI_DIR
-    "${CMAKE_CURRENT_SOURCE_DIR}/external/imgui"
-    CACHE PATH "Path to Dear ImGui" FORCE
-)
-
-set(IMGUI_SFML_FIND_SFML OFF CACHE BOOL "" FORCE)
-
-add_subdirectory(external/imgui-sfml)
+add_subdirectory(extern)
 
 # ============================================================
 #  Engine library
@@ -136,7 +111,7 @@ target_link_libraries(ElysiumApp PUBLIC
     SFML::Audio
     SFML::Window
     SFML::System
-    spdlog::spdlog_header_only
+    spdlog::spdlog
     ImGui-SFML::ImGui-SFML
 )
 configure_elysium_target(ElysiumApp)
@@ -152,17 +127,21 @@ add_custom_command(TARGET ElysiumApp POST_BUILD
     COMMENT "Copying bundled editor font next to ElysiumApp"
     VERBATIM
 )
-# Windows: copy runtime DLLs next to the app (spdlog removed — header-only)
+# Windows: copy runtime DLLs next to the app when SFML is built/linked as shared
 if(WIN32)
-    add_custom_command(TARGET ElysiumApp POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            $<TARGET_FILE:SFML::Graphics>
-            $<TARGET_FILE:SFML::Window>
-            $<TARGET_FILE:SFML::System>
-            $<TARGET_FILE_DIR:ElysiumApp>
-        COMMENT "Copying runtime DLLs next to ElysiumApp"
-        VERBATIM
-    )
+    get_target_property(_sfml_graphics_type SFML::Graphics TYPE)
+    if(_sfml_graphics_type STREQUAL "SHARED_LIBRARY")
+        add_custom_command(TARGET ElysiumApp POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                $<TARGET_FILE:SFML::Graphics>
+                $<TARGET_FILE:SFML::Window>
+                $<TARGET_FILE:SFML::System>
+                $<TARGET_FILE:SFML::Audio>
+                $<TARGET_FILE_DIR:ElysiumApp>
+            COMMENT "Copying runtime DLLs next to ElysiumApp"
+            VERBATIM
+        )
+    endif()
 endif()
 
 # ============================================================
@@ -177,7 +156,7 @@ if(BUILD_TESTING OR BUILD_BENCHMARKS)
             target_link_libraries(${test_name} PRIVATE
                 ElysiumEngine
                 SFML::System
-                spdlog::spdlog_header_only
+                spdlog::spdlog
             )
             configure_elysium_target(${test_name})
             add_test(NAME ${test_name} COMMAND ${test_name})
@@ -206,7 +185,7 @@ if(BUILD_TESTING OR BUILD_BENCHMARKS)
     target_link_libraries(PhysicsBenchmark PRIVATE
         ElysiumEngine
         SFML::System
-        spdlog::spdlog_header_only
+        spdlog::spdlog
     )
     configure_elysium_target(PhysicsBenchmark)
 
