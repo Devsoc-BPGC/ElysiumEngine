@@ -33,10 +33,8 @@ jobs:
             cxx: cl
 
     steps:
-      - name: Checkout (with submodules)
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       # ---------------- MSVC environment (Windows) ----------------
       - name: Setup MSVC
@@ -92,12 +90,6 @@ jobs:
           -DCMAKE_CXX_COMPILER=${{ matrix.cxx }}
           -DCMAKE_C_COMPILER_LAUNCHER=ccache
           -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
-          -DSFML_BUILD_EXAMPLES=OFF
-          -DSFML_BUILD_TEST_PROGRAMS=OFF
-          -DSFML_BUILD_DOC=OFF
-          -DSFML_INSTALL=OFF
-          -DSFML_BUILD_NETWORK=OFF
-          -DSFML_BUILD_AUDIO=OFF
 
       # ---------------- Build ----------------
       - name: Build

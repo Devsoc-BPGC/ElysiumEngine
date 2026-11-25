@@ -1,5 +1,6 @@
 #include "elypch.hpp"
 #include "EditorLayer.hpp"
+#include <cstring>
 #include "Application.hpp"
 #include "AssetManager.hpp"
 #include "AssetPickerModal.hpp"
