@@ -5,18 +5,29 @@
 #include "EditorPanel.hpp"
 #include "KeyEvent.hpp"
 #include "Layer.hpp"
+#include "ProjectHubPanel.hpp"
+#include "RecentProjects.hpp"
 #include "Scene.hpp"
 #include "SimpleRenderer.hpp"
 #include "Timestep.hpp"
 #include <SFML/Graphics/RenderWindow.hpp>
+#include <filesystem>
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace Elysium {
 
+class ContentBrowserPanel;
 class GamePreviewPanel;
 class SceneViewportPanel;
 class ToolbarPanel;
+class Window;
+
+enum class EditorMode {
+  ProjectHub,
+  Workspace
+};
 
 class EditorLayer : public Layer {
 public:
@@ -31,6 +42,17 @@ public:
 
   void Init(sf::RenderWindow &window);
   void Shutdown();
+
+  EditorMode GetMode() const { return m_mode; }
+  RecentProjectsManager &GetRecentProjects() { return m_recentProjects; }
+  const RecentProjectsManager &GetRecentProjects() const { return m_recentProjects; }
+  ProjectHubPanel *GetProjectHubPanel() { return m_projectHubPanel.get(); }
+
+  bool OpenProject(const std::filesystem::path &projectFilePath,
+                   std::string *outError = nullptr);
+  bool CreateNewProject(const NewProjectRequest &request,
+                        std::string *outError = nullptr);
+  void SwitchToProjectHub();
 
   EditorContext &GetContext() { return m_context; }
   const EditorContext &GetContext() const { return m_context; }
@@ -59,8 +81,20 @@ public:
 
   bool OnKeyPressed(KeyPressedEvent &e);
 
+  void ResetWorkspaceScene();
+  bool InitImGui(sf::RenderWindow &window);
+  void ApplyPendingWindowReconfigure();
+
+  enum class PendingWindowMode { None, ProjectHub, Workspace };
+
+  EditorMode m_mode = EditorMode::ProjectHub;
+  PendingWindowMode m_PendingWindowMode = PendingWindowMode::None;
+  bool m_logSinkAttached = false;
+  Window *m_appWindow = nullptr;
   sf::RenderWindow *m_window = nullptr;
   EditorContext m_context;
+  RecentProjectsManager m_recentProjects;
+  std::unique_ptr<ProjectHubPanel> m_projectHubPanel;
   std::vector<std::unique_ptr<EditorPanel>> m_panels;
   bool m_isInitialized = false;
 
@@ -76,6 +110,7 @@ public:
   ToolbarPanel *m_toolbar = nullptr;
   SceneViewportPanel *m_sceneViewport = nullptr;
   GamePreviewPanel *m_gamePreview = nullptr;
+  ContentBrowserPanel *m_contentBrowser = nullptr;
   bool m_gamePreviewWasOpen = false; // The Toolbar opens along with it
   Scene *m_activeSceneBeforePlay = nullptr; // Restored when Play stops
   SimpleRenderer m_renderer{50.0f};

@@ -6,7 +6,9 @@ namespace Elysium {
 
 Application *Application::s_Instance = nullptr;
 
-Application::Application(const std::string &name) {
+Application::Application(const WindowProps &windowProps,
+                         ApplicationCommandLineArgs args)
+    : m_CommandLineArgs(args) {
   if (s_Instance) {
     ELYSIUM_CORE_ERROR("Application already exists!");
   }
@@ -15,9 +17,13 @@ Application::Application(const std::string &name) {
   m_AudioEngine = std::make_unique<AudioEngine>();
   m_AudioEngine->Init();
 
-  m_Window = std::make_unique<Window>(WindowProps(name));
+  m_Window = std::make_unique<Window>(windowProps);
   m_Window->SetEventCallback([this](Event &e) { OnEvent(e); });
 }
+
+Application::Application(const std::string &name,
+                         ApplicationCommandLineArgs args)
+    : Application(WindowProps(name), args) {}
 
 Application::~Application() {
   if (m_AudioEngine) {

@@ -31,6 +31,8 @@
 #include "CameraComponent.hpp"
 #include "Command.hpp"
 #include "EditorHotkeys.hpp"
+#include "ProjectSerializer.hpp"
+#include "SpriteRenderer.hpp"
 
 namespace Elysium {
 
@@ -38,6 +40,10 @@ namespace {
 constexpr float EditorUiScale = 1.25f;
 constexpr float EditorFontSize = 20.0f;
 constexpr char EditorFontPath[] = "assets/fonts/Roboto-Medium.ttf";
+constexpr unsigned int ProjectHubWindowWidth = 820;
+constexpr unsigned int ProjectHubWindowHeight = 520;
+constexpr unsigned int WorkspaceWindowWidth = 1280;
+constexpr unsigned int WorkspaceWindowHeight = 720;
 
 ImFont *LoadEditorFont(ImFontAtlas *fonts) {
   std::error_code error;
@@ -65,23 +71,18 @@ void EditorLayer::OnAttach() {
     m_scene.physicsWorld.boundaryRotation = 0.0f;
     m_context.selectedEntity = nullptr;
     m_context.drawBoundaryBox = false;
-    m_window = &Application::Get().GetWindow().GetNativeWindow();
+    m_appWindow = &Application::Get().GetWindow();
+    m_window = &m_appWindow->GetNativeWindow();
     Init(*m_window);
   }
 }
 
 void EditorLayer::OnDetach() { Shutdown(); }
 
-void EditorLayer::Init(sf::RenderWindow &window) {
-  if (m_isInitialized)
-    return;
-
-  m_window = &window;
-
-  // Initialize ImGui-SFML binding
+bool EditorLayer::InitImGui(sf::RenderWindow &window) {
   if (!ImGui::SFML::Init(window)) {
     ELYSIUM_CORE_ERROR("Failed to initialize ImGui-SFML");
-    return;
+    return false;
   }
 
   ImGuiIO &io = ImGui::GetIO();
@@ -95,34 +96,74 @@ void EditorLayer::Init(sf::RenderWindow &window) {
     ELYSIUM_CORE_WARN("Bundled editor font is unavailable; using the default ImGui font");
   }
 
-  // Configure ImGui layout persistence: tie to active project or disable to avoid cwd pollution
-  if (auto project = Project::GetActive()) {
-    m_ImGuiIniPath = (project->GetProjectDirectory() / "imgui.ini").string();
-    io.IniFilename = m_ImGuiIniPath.c_str();
+  if (m_mode == EditorMode::Workspace) {
+    if (auto project = Project::GetActive()) {
+      m_ImGuiIniPath = (project->GetProjectDirectory() / "imgui.ini").string();
+      io.IniFilename = m_ImGuiIniPath.c_str();
+      if (std::filesystem::exists(m_ImGuiIniPath)) {
+        ImGui::LoadIniSettingsFromDisk(m_ImGuiIniPath.c_str());
+      } else {
+        m_ResetLayoutScheduled = true;
+      }
+    } else {
+      m_ImGuiIniPath.clear();
+      io.IniFilename = nullptr;
+    }
   } else {
     m_ImGuiIniPath.clear();
     io.IniFilename = nullptr;
   }
 
-  // Hook custom memory log sink into spdlog
-  auto sink = GetEditorLogSink();
-  if (Log::GetCoreLogger()) {
-    Log::GetCoreLogger()->sinks().push_back(sink);
-  }
-  if (Log::GetClientLogger()) {
-    Log::GetClientLogger()->sinks().push_back(sink);
-  }
-
-  // Apply professional editor styling
   ApplyModernDarkTheme();
+  return true;
+}
 
-  // Initialize Project / Asset Registry
+void EditorLayer::Init(sf::RenderWindow &window) {
+  if (m_isInitialized)
+    return;
+
+  m_window = &window;
+
+  // Initialize Project / Asset Registry only when a project is active
   if (auto project = Project::GetActive()) {
+    m_mode = EditorMode::Workspace;
     AssetManager::Get().Init(project->GetAssetDirectory());
   } else {
-    // Default fallback project initialization or assets directory
-    AssetManager::Get().Init("assets");
+    m_mode = EditorMode::ProjectHub;
+    if (m_window) {
+      m_window->setTitle("Elysium Game Engine — Project Hub");
+    }
   }
+
+  if (!InitImGui(window)) {
+    return;
+  }
+
+  // Hook custom memory log sink into spdlog once
+  if (!m_logSinkAttached) {
+    auto sink = GetEditorLogSink();
+    if (Log::GetCoreLogger()) {
+      Log::GetCoreLogger()->sinks().push_back(sink);
+    }
+    if (Log::GetClientLogger()) {
+      Log::GetClientLogger()->sinks().push_back(sink);
+    }
+    m_logSinkAttached = true;
+  }
+
+  // Load Recent Projects registry & initialize Project Hub panel
+  m_recentProjects.Load();
+  ProjectHubCallbacks hubCallbacks;
+  hubCallbacks.onOpenProject = [this](const std::filesystem::path &path,
+                                      std::string &outError) {
+    return OpenProject(path, &outError);
+  };
+  hubCallbacks.onCreateProject = [this](const NewProjectRequest &request,
+                                        std::string &outError) {
+    return CreateNewProject(request, &outError);
+  };
+  m_projectHubPanel =
+      std::make_unique<ProjectHubPanel>(m_recentProjects, std::move(hubCallbacks));
 
   // Instantiate standard editor panels
   m_toolbar = &AddPanel<ToolbarPanel>();
@@ -130,7 +171,7 @@ void EditorLayer::Init(sf::RenderWindow &window) {
   m_gamePreview = &AddPanel<GamePreviewPanel>();
   auto &sceneHierarchy = AddPanel<SceneHierarchyPanel>();
   auto &inspector = AddPanel<EntityInspectorPanel>();
-  auto &contentBrowser = AddPanel<ContentBrowserPanel>();
+  m_contentBrowser = &AddPanel<ContentBrowserPanel>();
   auto &console = AddPanel<ConsolePanel>();
   auto &stats = AddPanel<StatsPanel>();
 
@@ -141,7 +182,7 @@ void EditorLayer::Init(sf::RenderWindow &window) {
   m_sceneViewport->isOpen = true;
   m_gamePreview->isOpen = true;
   sceneHierarchy.isOpen = true;
-  contentBrowser.isOpen = true;
+  m_contentBrowser->isOpen = true;
   console.isOpen = true;
   inspector.isOpen = true;
 
@@ -159,11 +200,16 @@ void EditorLayer::Init(sf::RenderWindow &window) {
   }
 
   m_isInitialized = true;
-  ELYSIUM_CORE_INFO("Elysium EditorLayer attached with Dear ImGui Docking");
+  ELYSIUM_CORE_INFO("Elysium EditorLayer attached ({})",
+                    m_mode == EditorMode::ProjectHub ? "ProjectHub" : "Workspace");
 }
 
 void EditorLayer::OnUpdate(Timestep ts) {
   m_lastDt = ts.GetSeconds();
+
+  if (m_mode == EditorMode::ProjectHub) {
+    return;
+  }
 
   // Leaving Edit mode simulates a copy of the scene, so the edit scene (and
   // the scene viewport showing it) stays unchanged; returning to Edit mode
@@ -214,9 +260,25 @@ void EditorLayer::OnImGuiRender() {
 
   ImGui::SFML::Update(*m_window, sf::seconds(m_lastDt));
 
+  if (m_mode == EditorMode::ProjectHub) {
+    if (m_projectHubPanel) {
+      m_projectHubPanel->OnImGuiRender();
+    }
+    ImGui::SFML::Render(*m_window);
+    ApplyPendingWindowReconfigure();
+    return;
+  }
+
   SetupDockSpace();
   RenderMenuBar(m_scene);
   ImGui::End();
+
+  // Handle transition out of Workspace triggered during RenderMenuBar
+  if (m_mode != EditorMode::Workspace) {
+    ImGui::SFML::Render(*m_window);
+    ApplyPendingWindowReconfigure();
+    return;
+  }
 
   // The Toolbar opens along with the Game Preview, whether at startup, from
   // the View menu or when Play reopens it
@@ -235,12 +297,16 @@ void EditorLayer::OnImGuiRender() {
   AssetPickerModal::Draw();
 
   ImGui::SFML::Render(*m_window);
+  ApplyPendingWindowReconfigure();
 
   m_context.stats.renderTimeMs =
       renderTimer.getElapsedTime().asSeconds() * 1000.0f;
 }
 
 void EditorLayer::OnEvent(Event &event) {
+  if (m_mode == EditorMode::ProjectHub) {
+    return;
+  }
   EventDispatcher dispatcher(event);
   dispatcher.Dispatch<KeyPressedEvent>(
       [this](KeyPressedEvent &e) { return OnKeyPressed(e); });
@@ -357,6 +423,247 @@ bool EditorLayer::OnKeyPressed(KeyPressedEvent &e) {
   }
 
   return false;
+}
+
+void EditorLayer::ResetWorkspaceScene() {
+  if (m_runtimeScene) {
+    SetActiveScene(m_activeSceneBeforePlay ? m_activeSceneBeforePlay : &m_scene);
+    m_runtimeScene.reset();
+  }
+  m_activeSceneBeforePlay = nullptr;
+  m_context.runtimeScene = nullptr;
+  m_context.playState = ScenePlayState::Edit;
+  m_context.history.SetLocked(false);
+  m_context.history.Clear();
+  m_context.selectedEntity = nullptr;
+  m_context.camera.Reset();
+  m_context.gameCamera.Reset();
+
+  m_scene.Clear();
+  m_scene.physicsWorld.gravity = Vec3(0.0f, 9.81f, 0.0f);
+  m_scene.physicsWorld.boundaryRotation = 0.0f;
+  SetActiveScene(&m_scene);
+}
+
+void EditorLayer::ApplyPendingWindowReconfigure() {
+  if (m_PendingWindowMode == PendingWindowMode::None) {
+    return;
+  }
+
+  const PendingWindowMode targetMode = m_PendingWindowMode;
+  m_PendingWindowMode = PendingWindowMode::None;
+
+  Window &appWindow = Application::Get().GetWindow();
+  // Ensure the SFML window no longer references ImGui-SFML's cursors before Shutdown() frees them
+  appWindow.ResetMouseCursor();
+  ImGui::SFML::Shutdown();
+  if (targetMode == PendingWindowMode::Workspace) {
+    std::string title = "Elysium Game Engine — Editor";
+    if (auto project = Project::GetActive()) {
+      const auto &config = project->GetConfig();
+      title = "Elysium Game Engine — " + config.Name + " [" +
+              config.ProjectDirectory.string() + "]";
+    }
+    appWindow.Reconfigure(WorkspaceWindowWidth, WorkspaceWindowHeight, title,
+                          true);
+  } else if (targetMode == PendingWindowMode::ProjectHub) {
+    appWindow.Reconfigure(ProjectHubWindowWidth, ProjectHubWindowHeight,
+                          "Elysium Game Engine — Project Hub", false);
+  }
+
+  m_window = &appWindow.GetNativeWindow();
+  InitImGui(*m_window);
+}
+
+bool EditorLayer::OpenProject(const std::filesystem::path &projectFilePath,
+                              std::string *outError) {
+  std::error_code ec;
+  if (projectFilePath.empty() ||
+      !std::filesystem::exists(projectFilePath, ec) ||
+      !std::filesystem::is_regular_file(projectFilePath, ec)) {
+    const std::string msg =
+        "Project file does not exist: '" + projectFilePath.string() + "'";
+    if (outError) {
+      *outError = msg;
+    }
+    ELYSIUM_ERROR("Editor: {}", msg);
+    return false;
+  }
+
+  auto project = Project::LoadProject(projectFilePath);
+  if (!project) {
+    const std::string msg =
+        "Failed to load project from '" + projectFilePath.string() + "'";
+    if (outError) {
+      *outError = msg;
+    }
+    ELYSIUM_ERROR("Editor: {}", msg);
+    return false;
+  }
+
+  ResetWorkspaceScene();
+
+  const std::filesystem::path resolvedFilePath =
+      project->GetConfig().ProjectFilePath.empty()
+          ? projectFilePath
+          : project->GetConfig().ProjectFilePath;
+  m_recentProjects.AddOrUpdateProject(project->GetConfig().Name,
+                                      resolvedFilePath);
+
+  const bool needsWindowTileReconfigure =
+      !Application::Get().GetWindow().IsResizable();
+  m_mode = EditorMode::Workspace;
+  OnProjectLoaded();
+  if (needsWindowTileReconfigure) {
+    m_PendingWindowMode = PendingWindowMode::Workspace;
+  }
+  return true;
+}
+
+bool EditorLayer::CreateNewProject(const NewProjectRequest &request,
+                                   std::string *outError) {
+  if (!ProjectHubPanel::IsValidProjectName(request.projectName)) {
+    if (outError) {
+      *outError = "Invalid project name.";
+    }
+    return false;
+  }
+  if (request.baseDirectory.empty()) {
+    if (outError) {
+      *outError = "Base directory cannot be empty.";
+    }
+    return false;
+  }
+
+  std::error_code ec;
+  const std::filesystem::path projectDir =
+      std::filesystem::absolute(request.baseDirectory / request.projectName, ec)
+          .lexically_normal();
+  if (ec) {
+    if (outError) {
+      *outError = "Failed to resolve project directory: " + ec.message();
+    }
+    return false;
+  }
+
+  std::filesystem::create_directories(projectDir, ec);
+  if (ec) {
+    if (outError) {
+      *outError = "Failed to create project directory: " + ec.message();
+    }
+    return false;
+  }
+
+  std::filesystem::path canonicalDir = std::filesystem::canonical(projectDir, ec);
+  if (ec) {
+    canonicalDir = projectDir;
+  }
+
+  const std::filesystem::path assetsDir = canonicalDir / "Assets";
+  const std::filesystem::path scenesDir = assetsDir / "Scenes";
+  const std::filesystem::path texturesDir = assetsDir / "Textures";
+  const std::filesystem::path audioDir = assetsDir / "Audio";
+  const std::filesystem::path scriptsDir = assetsDir / "Scripts";
+
+  for (const auto &subDir :
+       {assetsDir, scenesDir, texturesDir, audioDir, scriptsDir}) {
+    std::filesystem::create_directories(subDir, ec);
+    if (ec) {
+      if (outError) {
+        *outError = "Failed to create folder '" + subDir.string() +
+                    "': " + ec.message();
+      }
+      return false;
+    }
+  }
+
+  ResetWorkspaceScene();
+
+  // Write default Main.elyscene
+  const std::filesystem::path mainScenePath = scenesDir / "Main.elyscene";
+  {
+    std::ofstream sceneOut(mainScenePath);
+    if (!sceneOut.is_open()) {
+      if (outError) {
+        *outError = "Failed to write default scene '" + mainScenePath.string() +
+                    "'";
+      }
+      return false;
+    }
+    sceneOut << "# Elysium Engine Scene File\n";
+    sceneOut << "# Version: 1.0\n";
+    sceneOut << "Scene: Main\n";
+    sceneOut << "Gravity: [0.0, 9.81, 0.0]\n";
+    sceneOut << "Entities: []\n";
+  }
+
+  // Build ProjectConfig & serialize .elyproj
+  ProjectConfig config;
+  config.Name = request.projectName;
+  config.ProjectDirectory = canonicalDir;
+  config.ProjectFilePath = canonicalDir / (config.Name + ".elyproj");
+  config.AssetDirectory = "Assets";
+  config.StartScenePath = "Scenes/Main.elyscene";
+
+  auto project = std::make_shared<Project>(config);
+  ProjectSerializer serializer(project);
+  if (!serializer.Serialize(config.ProjectFilePath)) {
+    if (outError) {
+      *outError = "Failed to write project file '" +
+                  config.ProjectFilePath.string() + "'";
+    }
+    return false;
+  }
+
+  Project::SetActive(project);
+  m_recentProjects.AddOrUpdateProject(config.Name, config.ProjectFilePath);
+
+  const bool needsWindowTileReconfigure =
+      !Application::Get().GetWindow().IsResizable();
+  m_mode = EditorMode::Workspace;
+  OnProjectLoaded();
+  if (needsWindowTileReconfigure) {
+    m_PendingWindowMode = PendingWindowMode::Workspace;
+  }
+  return true;
+}
+
+void EditorLayer::SwitchToProjectHub() {
+  if (m_mode == EditorMode::ProjectHub) {
+    return;
+  }
+
+  // Save current project's docking layout before unloading
+  if (Project::GetActive() && !m_ImGuiIniPath.empty()) {
+    ImGui::SaveIniSettingsToDisk(m_ImGuiIniPath.c_str());
+  }
+
+  AssetPickerModal::Close();
+  m_ShowNewProjectModal = false;
+  m_ShowOpenProjectModal = false;
+
+  ResetWorkspaceScene();
+  if (m_contentBrowser) {
+    m_contentBrowser->SetRootDirectory({});
+  }
+  AssetManager::Get().Shutdown();
+  Project::SetActive(nullptr);
+
+  m_ImGuiIniPath.clear();
+  ImGui::GetIO().IniFilename = nullptr;
+
+  m_recentProjects.Load();
+  if (m_projectHubPanel) {
+    m_projectHubPanel->ClearErrorMessage();
+  }
+
+  m_mode = EditorMode::ProjectHub;
+  if (Application::Get().GetWindow().IsResizable()) {
+    m_PendingWindowMode = PendingWindowMode::ProjectHub;
+  } else if (m_window) {
+    m_window->setTitle("Elysium Game Engine — Project Hub");
+  }
+  ELYSIUM_INFO("Editor: Returned to Project Hub");
 }
 
 void EditorLayer::OnProjectLoaded() {
@@ -510,6 +817,10 @@ void EditorLayer::NewProjectDialog() {
 
     auto project = Project::NewProject(folderPath, projName);
     if (project) {
+      ResetWorkspaceScene();
+      m_recentProjects.AddOrUpdateProject(project->GetConfig().Name,
+                                          project->GetConfig().ProjectFilePath);
+      m_mode = EditorMode::Workspace;
       OnProjectLoaded();
     } else {
       ELYSIUM_ERROR("Failed to create new project at '{}'", folderPath.string());
@@ -528,13 +839,7 @@ void EditorLayer::OpenProjectDialog() {
 
   auto selectedFile = FileDialog::OpenFile("Open Elysium Project", defaultDir, filters);
   if (selectedFile.has_value()) {
-    std::filesystem::path projFile = *selectedFile;
-    auto project = Project::LoadProject(projFile);
-    if (project) {
-      OnProjectLoaded();
-    } else {
-      ELYSIUM_ERROR("Failed to open project file at '{}'", projFile.string());
-    }
+    OpenProject(*selectedFile);
   }
 }
 
@@ -551,6 +856,9 @@ void EditorLayer::RenderMenuBar(Scene &scene) {
       if (ImGui::MenuItem("Save Project", nullptr, false, Project::GetActive() != nullptr)) {
         Project::SaveActiveProject();
         ELYSIUM_INFO("Project and Manifest saved");
+      }
+      if (ImGui::MenuItem("Switch Project / Project Hub")) {
+        SwitchToProjectHub();
       }
       ImGui::Separator();
 
@@ -770,6 +1078,10 @@ void EditorLayer::RenderProjectModals() {
 
       auto project = Project::NewProject(dirPath, name);
       if (project) {
+        ResetWorkspaceScene();
+        m_recentProjects.AddOrUpdateProject(project->GetConfig().Name,
+                                            project->GetConfig().ProjectFilePath);
+        m_mode = EditorMode::Workspace;
         OnProjectLoaded();
       }
       m_ShowNewProjectModal = false;
@@ -833,10 +1145,7 @@ void EditorLayer::RenderProjectModals() {
 
     if (ImGui::Button("Open", ImVec2(120.0f, 0.0f))) {
       std::filesystem::path projPath = m_OpenProjectPathBuffer;
-      auto project = Project::LoadProject(projPath);
-      if (project) {
-        OnProjectLoaded();
-      }
+      OpenProject(projPath);
       m_ShowOpenProjectModal = false;
       ImGui::CloseCurrentPopup();
     }
@@ -860,14 +1169,20 @@ void EditorLayer::Shutdown() {
   m_toolbar = nullptr;
   m_sceneViewport = nullptr;
   m_gamePreview = nullptr;
+  m_contentBrowser = nullptr;
+  m_projectHubPanel.reset();
   if (m_runtimeScene) {
     SetActiveScene(m_activeSceneBeforePlay);
     m_runtimeScene.reset();
   }
   m_context.runtimeScene = nullptr;
+  if (m_appWindow) {
+    m_appWindow->ResetMouseCursor();
+  }
   ImGui::SFML::Shutdown();
   m_isInitialized = false;
   m_window = nullptr;
+  m_appWindow = nullptr;
   ELYSIUM_CORE_INFO("Elysium EditorLayer detached");
 }
 

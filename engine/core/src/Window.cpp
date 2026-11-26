@@ -17,12 +17,63 @@ void Window::Init(const WindowProps &props) {
   m_Data.Title = props.Title;
   m_Data.Width = props.Width;
   m_Data.Height = props.Height;
+  m_Data.Resizable = props.Resizable;
 
-  ELYSIUM_CORE_INFO("Creating window {} ({}x{})", props.Title, props.Width,
-                    props.Height);
+  ELYSIUM_CORE_INFO("Creating window {} ({}x{}, {})", props.Title, props.Width,
+                    props.Height, props.Resizable ? "resizable" : "floating");
 
-  m_Window.create(sf::VideoMode({props.Width, props.Height}), props.Title);
+  m_DefaultCursor = sf::Cursor::createFromSystem(sf::Cursor::Type::Arrow);
+
+  const std::uint32_t style =
+      props.Resizable ? sf::Style::Default
+                      : (sf::Style::Titlebar | sf::Style::Close);
+  m_Window.create(sf::VideoMode({props.Width, props.Height}), props.Title,
+                  style);
+  ResetMouseCursor();
+  if (!props.Resizable) {
+    CenterOnDesktop();
+  }
   SetVSync(true);
+}
+
+void Window::ResetMouseCursor() {
+  if (m_Window.isOpen() && m_DefaultCursor.has_value()) {
+    m_Window.setMouseCursorVisible(true);
+    m_Window.setMouseCursor(*m_DefaultCursor);
+  }
+}
+
+void Window::Reconfigure(unsigned int width, unsigned int height,
+                         const std::string &title, bool resizable) {
+  m_Data.Title = title;
+  m_Data.Width = width;
+  m_Data.Height = height;
+  m_Data.Resizable = resizable;
+
+  ELYSIUM_CORE_INFO("Reconfiguring window {} ({}x{}, {})", title, width,
+                    height, resizable ? "resizable" : "floating");
+
+  // Detach any temporary external cursor (e.g. ImGui-SFML's freed cursors) before create()
+  ResetMouseCursor();
+
+  const std::uint32_t style =
+      resizable ? sf::Style::Default
+                : (sf::Style::Titlebar | sf::Style::Close);
+  m_Window.create(sf::VideoMode({width, height}), title, style);
+  ResetMouseCursor();
+  if (!resizable) {
+    CenterOnDesktop();
+  }
+  SetVSync(m_Data.VSync);
+}
+
+void Window::CenterOnDesktop() {
+  const sf::VideoMode desktop = sf::VideoMode::getDesktopMode();
+  if (desktop.size.x > m_Data.Width && desktop.size.y > m_Data.Height) {
+    const int posX = static_cast<int>((desktop.size.x - m_Data.Width) / 2);
+    const int posY = static_cast<int>((desktop.size.y - m_Data.Height) / 2);
+    m_Window.setPosition({posX, posY});
+  }
 }
 
 void Window::Shutdown() {
