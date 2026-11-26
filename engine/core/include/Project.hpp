@@ -13,6 +13,7 @@ namespace Elysium {
 struct ProjectConfig {
   std::string Name = "Untitled";
   std::filesystem::path ProjectDirectory;
+  std::filesystem::path ProjectFilePath;             // Resolved .elyproj file path
   std::filesystem::path AssetDirectory = "Assets"; // Relative to ProjectDirectory
   std::filesystem::path StartScenePath;            // Optional default scene path
 };

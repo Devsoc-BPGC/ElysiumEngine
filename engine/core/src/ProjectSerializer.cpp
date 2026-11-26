@@ -54,8 +54,14 @@ bool ProjectSerializer::Deserialize(const std::filesystem::path &filepath) {
     canonicalParent = std::filesystem::absolute(parentDir).lexically_normal();
   }
 
+  std::filesystem::path canonicalFile = std::filesystem::canonical(filepath, ec);
+  if (ec) {
+    canonicalFile = std::filesystem::absolute(filepath).lexically_normal();
+  }
+
   auto &config = m_Project->GetConfig();
   config.ProjectDirectory = canonicalParent;
+  config.ProjectFilePath = canonicalFile;
 
   std::string line;
   while (std::getline(in, line)) {

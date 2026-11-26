@@ -53,6 +53,7 @@ std::shared_ptr<Project> Project::NewProject(const std::filesystem::path &projec
 
   // Save the .elyproj file
   std::filesystem::path projectFilePath = canonicalDir / (config.Name + ".elyproj");
+  project->GetConfig().ProjectFilePath = projectFilePath;
   ProjectSerializer serializer(project);
   if (!serializer.Serialize(projectFilePath)) {
     ELYSIUM_CORE_ERROR("Project::NewProject: Failed to write project file '{}'",
